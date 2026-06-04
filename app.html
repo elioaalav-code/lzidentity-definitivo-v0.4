@@ -304,7 +304,7 @@
     <!-- ============================================================ -->
     <!-- ===== RECOVERY VIEW · guardians ============================ -->
     <!-- ============================================================ -->
-    <section class="view anima-view" data-view="recovery">
+    <section class="view anima-view rec" data-view="recovery">
       <div class="view-header">
         <div>
           <h1>Recovery <small>a way back, without the seed phrase</small></h1>
@@ -322,15 +322,75 @@
         <div class="lcard"><div class="lab">chains covered</div><div class="v" id="recoveryChains">5</div></div>
       </div>
 
-      <div class="section-label" style="margin-bottom:14px"><span class="num">[ your guardians ]</span> two of them together can restore your identity on every chain at once</div>
+      <!-- per-chain deployment status -->
+      <div class="section-label" style="margin-bottom:14px"><span class="num">[ where it lives ]</span> your recovery rule, deployed on every chain at once</div>
+      <div class="rec-chains" id="recoveryChainStatus" role="list" aria-label="Per-chain deployment status"></div>
 
-      <div class="recovery-budgets" id="recoveryGuardiansList">
-        <div class="recovery-budget"><div class="chain eth"><span class="d"></span>Maya · friend</div><div class="bar"><i style="width:100%"></i></div><div class="amt"><strong>ready</strong></div></div>
-        <div class="recovery-budget"><div class="chain arb"><span class="d"></span>Ledger Nano · drawer</div><div class="bar"><i style="width:100%"></i></div><div class="amt"><strong>ready</strong></div></div>
-        <div class="recovery-budget"><div class="chain op"><span class="d"></span>Backup phone</div><div class="bar"><i style="width:100%"></i></div><div class="amt"><strong>ready</strong></div></div>
+      <!-- guardians -->
+      <div class="section-label" style="margin:32px 0 14px"><span class="num">[ your guardians ]</span> two of them together can restore your identity on every chain at once</div>
+
+      <div class="rec-guardians" id="recoveryGuardiansList" role="list" aria-label="Guardians"></div>
+
+      <div class="rec-actions">
+        <button class="btn ghost sm" id="recoveryAddBtn" aria-haspopup="dialog" aria-expanded="false">+ Add guardian</button>
+
+        <!-- threshold M-of-N stepper -->
+        <div class="rec-threshold" role="group" aria-label="Recovery threshold">
+          <span class="rt-label">Signatures needed</span>
+          <div class="rt-stepper">
+            <button type="button" class="rt-step" id="recoveryThreshDown" aria-label="Lower threshold">−</button>
+            <span class="rt-val" id="recoveryThreshVal" aria-live="polite">2<span class="rt-of">of</span>3</span>
+            <button type="button" class="rt-step" id="recoveryThreshUp" aria-label="Raise threshold">+</button>
+          </div>
+        </div>
       </div>
-      <button class="btn ghost sm" style="margin-top:14px">+ Add guardian</button>
 
+      <!-- add-guardian inline panel (modal-ish) -->
+      <div class="rec-addpanel" id="recoveryAddPanel" role="dialog" aria-modal="false" aria-labelledby="recAddTitle" hidden>
+        <div class="rec-addpanel-in">
+          <div class="rap-head">
+            <h3 id="recAddTitle">Invite a guardian</h3>
+            <button type="button" class="rap-close" id="recoveryAddClose" aria-label="Close">✕</button>
+          </div>
+          <p class="rap-sub">Send this link to someone you trust, or have them scan the code. They accept on their own device — you never share a seed phrase.</p>
+          <div class="rap-grid">
+            <div class="rap-fields">
+              <label class="rap-field">
+                <span>Their name or label</span>
+                <input type="text" id="recoveryInviteName" placeholder="e.g. Sister · Sam" autocomplete="off" />
+              </label>
+              <label class="rap-field">
+                <span>Guardian type</span>
+                <select id="recoveryInviteType" aria-label="Guardian type">
+                  <option value="friend">Friend</option>
+                  <option value="device">Device</option>
+                  <option value="backup wallet">Backup wallet</option>
+                </select>
+              </label>
+              <label class="rap-field">
+                <span>Invite link</span>
+                <div class="rap-copy">
+                  <input type="text" id="recoveryInviteLink" readonly value="https://lz.id/g/inv-7f3a-91c2" aria-label="Invite link" />
+                  <button type="button" class="btn ghost xs" id="recoveryInviteCopy">Copy</button>
+                </div>
+              </label>
+            </div>
+            <div class="rap-qr" aria-hidden="true">
+              <div class="rap-qr-grid" id="recoveryQR"></div>
+              <span class="rap-qr-cap">scan to accept</span>
+            </div>
+          </div>
+          <div class="rap-foot">
+            <button type="button" class="btn ghost sm" id="recoveryAddCancel">Cancel</button>
+            <button type="button" class="btn accent sm" id="recoveryAddConfirm">Send invite</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- recovery drill sequence -->
+      <div class="rec-drill" id="recoveryDrill" hidden aria-live="polite"></div>
+
+      <!-- activity feed -->
       <div class="section-label" style="margin:32px 0 14px"><span class="num">[ recovery history ]</span> drills, additions, removals</div>
       <div class="recovery-feed" id="recoveryFeed">
         <div class="recovery-event"><span class="t">7 d</span><span class="what">Recovery drill · <em>2 of 3 signed in 14 s</em></span><span class="delta pos">ok</span></div>
