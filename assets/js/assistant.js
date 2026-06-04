@@ -15,11 +15,14 @@
  *  The key lives only in localStorage and is sent only to Anthropic.
  * ============================================================ */
 
+import { CustomSelect } from "./ui.js";
+
 const LS = { KEY: "lz:ai:key", MODEL: "lz:ai:model" };
 const API = "https://api.anthropic.com/v1/messages";
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 
 const $ = (id) => document.getElementById(id);
+const reduce = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ─── DOM ──────────────────────────────────────────────────── */
 const fab        = $("copilotFab");
@@ -32,6 +35,8 @@ const settingsBtn= $("copilotSettings");
 const settingsEl = $("copilotSettingsPanel");
 const keyInput   = $("copilotKey");
 const modelSel   = $("copilotModel");
+const slashBtn   = $("copilotSlash");
+const cmdEl      = $("copilotCmd");
 
 /* ─── config ───────────────────────────────────────────────── */
 const getKey   = () => localStorage.getItem(LS.KEY) || "";
@@ -102,25 +107,71 @@ function mdLite(s){
   h = h.replace(/^- (.+)$/gm, "• $1");
   return h.replace(/\n/g, "<br>");
 }
+function nearBottom(){ return body.scrollHeight - body.scrollTop - body.clientHeight < 80; }
+function autoscroll(force){ if (force || nearBottom()) body.scrollTop = body.scrollHeight; }
+function nowTime(){ return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+
 function addBubble(role, text=""){
   const el = document.createElement("div");
   el.className = "cm " + role;
-  el.innerHTML = `<div class="cm-b">${text ? mdLite(text) : ""}</div>`;
+  el.innerHTML = `<div class="cm-b">${text ? mdLite(text) : ""}</div><div class="cm-time">${nowTime()}</div>`;
   body.appendChild(el);
-  body.scrollTop = body.scrollHeight;
+  autoscroll(true);
   return el.querySelector(".cm-b");
 }
-function addTrace(label){
+
+const TRACE_LABELS = {
+  navigate: "Opening", get_app_state: "Reading app state",
+  set_trading_market: "Switching market", prefill_order: "Pre-filling order",
+};
+function addTrace(name, args){
+  const detail = args && Object.keys(args).length ? Object.values(args).join(" · ") : "";
+  const label = (TRACE_LABELS[name] || name) + (detail ? " · " + detail : "");
   const el = document.createElement("div");
   el.className = "cm-trace";
-  el.textContent = label;
+  el.innerHTML = `<span class="cm-trace-ic"><span class="cm-trace-spin"></span></span><span class="cm-trace-label">${escapeHtml(label)}</span>`;
   body.appendChild(el);
-  body.scrollTop = body.scrollHeight;
+  autoscroll();
+  return {
+    done(){
+      el.classList.add("done");
+      el.querySelector(".cm-trace-ic").innerHTML =
+        `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg>`;
+    },
+    fail(){
+      el.classList.add("err");
+      el.querySelector(".cm-trace-ic").innerHTML =
+        `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 4 12M4 4l8 8"/></svg>`;
+    },
+  };
 }
+
+function addError(msg, retryFn){
+  const el = document.createElement("div");
+  el.className = "cm-error";
+  el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+    <div><div>${escapeHtml(msg)}</div>${retryFn ? `<div class="cm-error-act"><button type="button">Try again</button></div>` : ""}</div>`;
+  if (retryFn) el.querySelector("button").addEventListener("click", () => { el.remove(); retryFn(); });
+  body.appendChild(el);
+  autoscroll(true);
+}
+
+/* refined streaming indicator (shimmer) with dot-typing fallback */
 function typing(on){
   let t = $("copilotTyping");
-  if (on && !t){ t = document.createElement("div"); t.id = "copilotTyping"; t.className = "cm bot"; t.innerHTML = `<div class="cm-b typing"><span></span><span></span><span></span></div>`; body.appendChild(t); body.scrollTop = body.scrollHeight; }
-  else if (!on && t){ t.remove(); }
+  if (on && !t){
+    t = document.createElement("div");
+    t.id = "copilotTyping";
+    if (reduce()){
+      t.className = "cm bot";
+      t.innerHTML = `<div class="cm-b typing"><span></span><span></span><span></span></div>`;
+    } else {
+      t.className = "cm-stream";
+      t.innerHTML = `<div class="cm-b"><span class="cm-shimmer"></span><span class="cm-stream-lbl">thinking</span></div>`;
+    }
+    body.appendChild(t);
+    autoscroll(true);
+  } else if (!on && t){ t.remove(); }
 }
 
 /* ─── Claude engine (streaming + tool loop) ────────────────── */
@@ -190,12 +241,13 @@ async function askClaude(userText){
     let bubble = null, acc = "";
     typing(true);
     const { blocks, stopReason } = await streamOnce(history, (delta) => {
-      if (!bubble){ typing(false); bubble = addBubble("bot"); }
+      if (!bubble){ typing(false); bubble = addBubble("bot"); bubble.classList.add("streaming"); }
       acc += delta;
       bubble.innerHTML = mdLite(acc);
-      body.scrollTop = body.scrollHeight;
+      autoscroll();
     });
     typing(false);
+    if (bubble) bubble.classList.remove("streaming");
     // assistant turn (sanitize tool blocks for the wire)
     history.push({ role: "assistant", content: blocks.map(b => b.type === "tool_use"
       ? { type: "tool_use", id: b.id, name: b.name, input: b.input || {} }
@@ -204,8 +256,9 @@ async function askClaude(userText){
     if (stopReason === "tool_use"){
       const results = [];
       for (const b of blocks.filter(x => x.type === "tool_use")){
-        addTrace(`⚙ ${b.name}${b.input && Object.keys(b.input).length ? " · " + JSON.stringify(b.input) : ""}`);
+        const trace = addTrace(b.name, b.input || {});
         const out = runTool(b.name, b.input || {});
+        if (out && out.error) trace.fail(); else trace.done();
         results.push({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(out) });
       }
       history.push({ role: "user", content: results });
@@ -253,36 +306,247 @@ async function send(text){
     else { typing(true); await new Promise(r => setTimeout(r, 300)); typing(false); addBubble("bot", scriptedReply(text)); }
   } catch (e){
     typing(false);
+    const streaming = body.querySelector(".cm-b.streaming");
+    if (streaming) streaming.classList.remove("streaming");
     const m = e.status === 401 ? "That API key was rejected. Check it in settings (gear icon)."
             : e.status === 429 ? "Rate limited by Anthropic — give it a moment and try again."
             : "Something went wrong: " + (e?.message || e);
-    addBubble("bot", m);
+    // a failed turn left a dangling user message in history — drop it so retry is clean
+    if (getKey() && history.length && history[history.length - 1].role === "user") history.pop();
+    addError(m, () => send(text));
   } finally { busy = false; input.focus(); }
 }
 
+/* ─── quick-action chips (greeting) ────────────────────────── */
+const ICONS = {
+  trade: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 7-8"/><path d="M21 7v5h-5"/></svg>`,
+  wallet: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12h3M3 9h12"/></svg>`,
+  recovery: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 7-7 8-4-1-7-4-7-8V6z"/><path d="M9.5 12l2 2 3.5-4"/></svg>`,
+  spark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/></svg>`,
+  nav: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`,
+  net: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>`,
+  clear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>`,
+  key: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="14" r="4"/><path d="M11 11l8-8M16 3h4v4"/></svg>`,
+  chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.4 7.2L4 20l.8-5.6A8 8 0 1 1 21 12z"/></svg>`,
+  markets: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16M8 16v-4M12 16V8M16 16v-7"/></svg>`,
+  identity: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg>`,
+};
+
+const GREET_CHIPS = [
+  { icon: "trade", label: "Open Trading", run: () => { window.LZ?.navigate?.("trade"); flagSuggestionSeen(); } },
+  { icon: "wallet", label: "Read balances", run: () => send("show my balances") },
+  { icon: "recovery", label: "Explain Recovery", run: () => send("explain recovery") },
+  { icon: "spark", label: "Prefill a BTC trade", run: () => {
+      window.LZ?.navigate?.("trade");
+      window.LZ?.hl?.prefillOrder?.({ side: "buy", type: "market", size: 0.01 });
+      addBubble("bot", "Pre-filled a **0.01 BTC** market buy on the Trading ticket — review and sign it yourself when ready.");
+      flagSuggestionSeen();
+  } },
+];
+
+function renderChips(items){
+  const wrap = document.createElement("div");
+  wrap.className = "cm-chips";
+  items.forEach((c, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "cm-chip";
+    b.style.animationDelay = reduce() ? "0s" : (0.05 + i * 0.06) + "s";
+    b.innerHTML = `<span class="cm-chip-ic">${ICONS[c.icon] || ICONS.nav}</span><span>${escapeHtml(c.label)}</span>`;
+    b.addEventListener("click", () => c.run());
+    wrap.appendChild(b);
+  });
+  body.appendChild(wrap);
+  autoscroll(true);
+}
+
+/* ─── command palette ('/') ────────────────────────────────── */
+function navCmd(route, name, icon){
+  return { name, desc: "Go to " + route, icon, run: () => window.LZ?.navigate?.(route) };
+}
+function buildCommands(){
+  return [
+    { group: "Navigate", items: [
+      navCmd("trade", "Trading", "trade"),
+      navCmd("wallet", "Wallet", "wallet"),
+      navCmd("markets", "Markets", "markets"),
+      navCmd("chat", "Chat", "chat"),
+      navCmd("network", "Network", "net"),
+      navCmd("identity", "Identity", "identity"),
+      navCmd("recovery", "Recovery", "recovery"),
+    ]},
+    { group: "Actions", items: [
+      { name: "Toggle network", desc: "Switch Hyperliquid testnet ⇆ mainnet", icon: "net", run: toggleNetwork },
+      { name: "Clear chat", desc: "Start a fresh conversation", icon: "clear", run: clearChat },
+      { name: getKey() ? "Manage Claude key" : "Connect Claude", desc: "Open assistant settings", icon: "key", run: openSettings },
+    ]},
+  ];
+}
+
+function toggleNetwork(){
+  const cur = window.LZ?.hl?.network?.() || "testnet";
+  const next = cur === "mainnet" ? "testnet" : "mainnet";
+  window.LZ?.navigate?.("trade");
+  // drive the real network toggle in the Trading view
+  const btn = document.querySelector(`#hlNetToggle button[data-net="${next}"]`);
+  if (btn){ btn.click(); addBubble("bot", `Switching Hyperliquid to **${next}**.`); }
+  else addBubble("bot", "Open the Trading tab first, then I can flip the network.");
+}
+function clearChat(){
+  history = [];
+  body.innerHTML = "";
+  greet();
+}
+function openSettings(){
+  if (settingsEl.hidden) settingsBtn.click();
+}
+
+let cmdOpen = false, cmdActive = -1, cmdFlat = [];
+function flatCommands(filter){
+  const groups = buildCommands();
+  const q = (filter || "").toLowerCase();
+  const out = [];
+  for (const g of groups){
+    const items = q ? g.items.filter(it => (it.name + " " + it.desc).toLowerCase().includes(q)) : g.items;
+    if (items.length) out.push({ group: g.group, items });
+  }
+  return out;
+}
+function openCmd(filter){
+  cmdOpen = true; cmdActive = 0;
+  slashBtn.classList.add("on");
+  input.setAttribute("aria-expanded", "true");
+  renderCmd(filter);
+  cmdEl.hidden = false;
+}
+function closeCmd(){
+  if (!cmdOpen) return;
+  cmdOpen = false; cmdActive = -1;
+  cmdEl.hidden = true;
+  slashBtn.classList.remove("on");
+  input.setAttribute("aria-expanded", "false");
+}
+function renderCmd(filter){
+  const groups = flatCommands(filter);
+  cmdFlat = groups.flatMap(g => g.items);
+  if (!cmdFlat.length){ cmdEl.innerHTML = `<div class="cmd-empty">No commands match “${escapeHtml(filter || "")}”.</div>`; return; }
+  let i = 0, html = "";
+  for (const g of groups){
+    html += `<div class="cmd-group">${escapeHtml(g.group)}</div>`;
+    for (const it of g.items){
+      const idx = i++;
+      const key = it.run === toggleNetwork ? "net" : "";
+      html += `<div class="cmd-row${idx === cmdActive ? " active" : ""}" role="option" data-i="${idx}" aria-selected="${idx === cmdActive}">
+        <span class="cmd-ic">${ICONS[it.icon] || ICONS.nav}</span>
+        <span class="cmd-txt"><span class="cmd-name">${escapeHtml(it.name)}</span><span class="cmd-desc">${escapeHtml(it.desc)}</span></span>
+        ${key ? `<span class="cmd-key">${key}</span>` : ""}</div>`;
+    }
+  }
+  cmdEl.innerHTML = html;
+}
+function cmdSetActive(i){
+  cmdActive = Math.max(0, Math.min(i, cmdFlat.length - 1));
+  cmdEl.querySelectorAll(".cmd-row").forEach((r, idx) => {
+    const on = idx === cmdActive;
+    r.classList.toggle("active", on); r.setAttribute("aria-selected", String(on));
+    if (on) r.scrollIntoView({ block: "nearest" });
+  });
+}
+function cmdRun(i){
+  const it = cmdFlat[i];
+  if (!it) return;
+  closeCmd();
+  input.value = "";
+  it.run();
+}
+
+slashBtn?.addEventListener("click", () => {
+  if (cmdOpen){ closeCmd(); input.focus(); }
+  else { input.value = ""; openCmd(""); input.focus(); }
+});
+cmdEl?.addEventListener("click", (e) => {
+  const row = e.target.closest(".cmd-row");
+  if (row) cmdRun(Number(row.dataset.i));
+});
+cmdEl?.addEventListener("mousemove", (e) => {
+  const row = e.target.closest(".cmd-row");
+  if (row) cmdSetActive(Number(row.dataset.i));
+});
+
+input?.addEventListener("input", () => {
+  const v = input.value;
+  if (v.startsWith("/")){ if (!cmdOpen) openCmd(v.slice(1)); else renderCmd(v.slice(1)); }
+  else if (cmdOpen) closeCmd();
+});
+input?.addEventListener("keydown", (e) => {
+  if (cmdOpen){
+    if (e.key === "ArrowDown"){ e.preventDefault(); cmdSetActive(cmdActive + 1); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); cmdSetActive(cmdActive - 1); }
+    else if (e.key === "Enter"){ e.preventDefault(); cmdRun(cmdActive); }
+    else if (e.key === "Escape"){ e.preventDefault(); closeCmd(); }
+  }
+});
+
 /* ─── open / close + welcome ───────────────────────────────── */
 let welcomed = false;
+function greet(){
+  addBubble("bot", getKey()
+    ? "Hey — I'm your LZ copilot. Ask me anything, tell me where to go, or hit `/` for commands."
+    : "Hey — I'm your LZ copilot. I can walk you through any tab right now. Add an Anthropic API key (gear icon) and I'll unlock the full Claude assistant.");
+  renderChips(GREET_CHIPS);
+}
 function openPanel(){
+  if (!panel.hidden) return;
+  panel.classList.remove("closing");
   panel.hidden = false;
   fab.classList.add("on");
-  if (!welcomed){
-    welcomed = true;
-    addBubble("bot", getKey()
-      ? "Hey — I'm your LZ copilot. Ask me anything, or tell me where to go: “open trading”, “show my balances”, “set up a 0.01 BTC long”."
-      : "Hey — I'm your LZ copilot. I can walk you through any tab right now. Add an Anthropic API key (gear icon) and I'll unlock the full Claude assistant.");
-  }
+  fab.classList.remove("attn");
+  fab.setAttribute("aria-expanded", "true");
+  flagSuggestionSeen();
+  if (!welcomed){ welcomed = true; greet(); }
   setTimeout(() => input.focus(), 80);
 }
-function closePanel(){ panel.hidden = true; fab.classList.remove("on"); }
+function closePanel(){
+  if (panel.hidden) return;
+  closeCmd();
+  fab.classList.remove("on");
+  fab.setAttribute("aria-expanded", "false");
+  if (reduce()){ panel.hidden = true; return; }
+  panel.classList.add("closing");
+  setTimeout(() => { panel.classList.remove("closing"); panel.hidden = true; }, 240);
+  fab.focus();
+}
+
+/* attention pulse — call when there's a suggestion worth surfacing */
+function flagSuggestion(){ if (panel.hidden) fab.classList.add("attn"); }
+function flagSuggestionSeen(){ fab.classList.remove("attn"); }
+
+/* ─── FAB magnetic hover ───────────────────────────────────── */
+if (fab && !reduce()){
+  const strength = 0.22;
+  fab.addEventListener("pointermove", (e) => {
+    if (!panel.hidden) return;
+    const r = fab.getBoundingClientRect();
+    const mx = e.clientX - (r.left + r.width / 2);
+    const my = e.clientY - (r.top + r.height / 2);
+    fab.style.transform = `translate(${mx * strength}px, ${my * strength}px) scale(1.05)`;
+  });
+  fab.addEventListener("pointerleave", () => { fab.style.transform = ""; });
+}
 
 /* ─── wiring ───────────────────────────────────────────────── */
 fab?.addEventListener("click", () => panel.hidden ? openPanel() : closePanel());
 $("copilotClose")?.addEventListener("click", closePanel);
-form?.addEventListener("submit", (e) => { e.preventDefault(); send(input.value); });
+form?.addEventListener("submit", (e) => { e.preventDefault(); if (cmdOpen){ cmdRun(cmdActive); return; } send(input.value); });
+
+// global Esc closes the panel when open
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !panel.hidden && !cmdOpen){ closePanel(); }
+});
 
 settingsBtn?.addEventListener("click", () => {
   settingsEl.hidden = !settingsEl.hidden;
-  if (!settingsEl.hidden){ keyInput.value = getKey(); modelSel.value = getModel(); }
+  if (!settingsEl.hidden){ keyInput.value = getKey(); modelSelect?.setValue(getModel()); }
 });
 $("copilotKeySave")?.addEventListener("click", () => {
   const k = keyInput.value.trim();
@@ -295,9 +559,22 @@ $("copilotKeyClear")?.addEventListener("click", () => {
   localStorage.removeItem(LS.KEY); keyInput.value = ""; reflectMode();
 });
 
+/* upgrade the native model <select> to a CustomSelect (simple rows) */
+let modelSelect = null;
+if (modelSel){
+  modelSel.value = getModel();
+  try {
+    modelSelect = new CustomSelect({ select: modelSel, searchable: false, bottomSheet: false, title: "Model" });
+  } catch { modelSelect = null; }
+}
+
 reflectMode();
 
 /* expose for other modules / the app */
 window.LZ = Object.assign(window.LZ || {}, {
-  assistant: { open: openPanel, close: closePanel, ask: (t) => { openPanel(); send(t); } },
+  assistant: {
+    open: openPanel, close: closePanel,
+    ask: (t) => { openPanel(); send(t); },
+    suggest: flagSuggestion,   // pulse the FAB when there's something to offer
+  },
 });
