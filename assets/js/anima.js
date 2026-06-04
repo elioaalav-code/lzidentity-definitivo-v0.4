@@ -38,7 +38,10 @@
 (() => {
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const pars = document.querySelectorAll('.am-prose .par');
-  if (!pars.length) return;
+  // The pull-quote drifts a touch further (12px) than the prose (8px) so it
+  // floats slightly against the paragraphs — a quiet depth cue (P4).
+  const quote = document.querySelector('.am-quote');
+  if (!pars.length && !quote) return;
   let ticking = false;
   const update = () => {
     const vh = window.innerHeight;
@@ -49,6 +52,12 @@
       const dy = Math.max(-8, Math.min(8, -dist * 8));
       p.style.transform = `translate3d(0, ${dy}px, 0)`;
     });
+    if (quote) {
+      const rect = quote.getBoundingClientRect();
+      const dist = ((rect.top + rect.height / 2) - vh / 2) / vh;
+      const dy = Math.max(-12, Math.min(12, -dist * 12));
+      quote.style.transform = `translate3d(0, ${dy}px, 0)`;
+    }
     ticking = false;
   };
   window.addEventListener('scroll', () => {
