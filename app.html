@@ -365,7 +365,7 @@
 
       <div class="trade-top">
         <div class="trade-symbol">
-          <select id="hlCoin" aria-label="Market"><option>BTC</option></select>
+          <div class="market-switcher"><select id="hlCoin" aria-label="Market"><option>BTC</option></select></div>
           <div class="sym-price"><span class="last" id="hlLast">—</span><span class="ch" id="hlChange">—</span></div>
         </div>
         <div class="trade-stats">
@@ -409,10 +409,19 @@
             <button data-type="limit">Limit</button>
           </div>
           <label class="ticket-field"><span>Size <em id="hlSzUnit">BTC</em></span><input id="hlSize" inputmode="decimal" autocomplete="off" placeholder="0.0" /></label>
+          <div class="size-chips" id="hlSizeChips" role="group" aria-label="Quick size">
+            <button type="button" data-pct="25">25%</button>
+            <button type="button" data-pct="50">50%</button>
+            <button type="button" data-pct="75">75%</button>
+            <button type="button" data-pct="max">Max</button>
+          </div>
           <label class="ticket-field" id="hlPriceField" hidden><span>Limit price · USD</span><input id="hlPrice" inputmode="decimal" autocomplete="off" placeholder="0.0" /></label>
           <div class="ticket-lev">
             <div class="lev-row"><span>Leverage</span><span id="hlLevVal">5×</span></div>
-            <input type="range" id="hlLev" min="1" max="20" value="5" />
+            <div class="lev-slider">
+              <input type="range" id="hlLev" min="1" max="20" value="5" aria-label="Leverage" />
+              <output class="lev-bubble" id="hlLevBubble" aria-hidden="true">5×</output>
+            </div>
             <button class="btn ghost xs" id="hlLevApply">Set leverage on-chain</button>
           </div>
           <label class="ticket-reduce"><input type="checkbox" id="hlReduce" /> <span>Reduce only</span></label>
