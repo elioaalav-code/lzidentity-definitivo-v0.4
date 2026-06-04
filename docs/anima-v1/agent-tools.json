@@ -1,0 +1,72 @@
+[
+  {
+    "name": "query_portfolio",
+    "description": "Restituisce balance e posizioni del Soggetto su una o tutte le chain.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "string",
+          "enum": ["all", "ethereum", "arbitrum", "base", "optimism", "polygon", "solana"]
+        },
+        "include_positions": { "type": "boolean" }
+      }
+    }
+  },
+  {
+    "name": "spend_karma",
+    "description": "Spende Karma per ottenere un beneficio (priority gas, mint access, voting weight).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "amount": { "type": "integer" },
+        "purpose": { "type": "string" },
+        "chain": { "type": "string" }
+      },
+      "required": ["amount", "purpose"]
+    }
+  },
+  {
+    "name": "publish_intent",
+    "description": "Pubblica un intent sul DoppelgangerHub. Altri agenti possono matcharlo.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["swap", "lend", "provide_lp", "vote_delegation"]
+        },
+        "token_in": { "type": "string" },
+        "amount_in": { "type": "string" },
+        "token_out": { "type": "string" },
+        "min_amount_out": { "type": "string" },
+        "expiry_seconds": { "type": "integer" }
+      }
+    }
+  },
+  {
+    "name": "request_human_confirmation",
+    "description": "Pausa l'azione e chiede conferma al Soggetto. USA SEMPRE quando: tx > $1000, contratto nuovo, voto controverso.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "summary": { "type": "string" },
+        "risk_level": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"]
+        }
+      }
+    }
+  },
+  {
+    "name": "negotiate_with_peer",
+    "description": "Apre canale diretto con un altro Doppelgänger per negoziare un trade complesso.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "peer_anima_id": { "type": "string" },
+        "proposal": { "type": "object" }
+      }
+    }
+  }
+]

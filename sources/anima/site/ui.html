@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ANIMA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #0A0A0F;
+    --depth: #14141F;
+    --depth-2: #1A1A2E;
+    --soul: #E8E8F0;
+    --soul-dim: #8A8A95;
+    --soul-faint: #4A4A55;
+    --karma: #FF6B35;
+    --doppel: #4A9EFF;
+    --soglia: #8B5CF6;
+    --pulse-duration: 4s;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--night);
+    color: var(--soul);
+    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* ─── HEADER ─── */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(10,10,15,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(232,232,240,0.06);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand {
+    display: flex; align-items: center; gap: 14px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    font-size: 14px;
+  }
+
+  .brand-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--soul);
+    animation: heartbeat var(--pulse-duration) ease-in-out infinite;
+  }
+
+  .wallet {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--soul-dim);
+    padding: 6px 12px;
+    border: 1px solid rgba(232,232,240,0.1);
+    border-radius: 999px;
+  }
+
+  /* ─── TAB NAV ─── */
+  nav.tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 32px;
+    border-bottom: 1px solid rgba(232,232,240,0.06);
+    position: sticky; top: 65px; z-index: 9;
+    background: var(--night);
+  }
+
+  .tab {
+    padding: 18px 24px;
+    color: var(--soul-dim);
+    cursor: pointer;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border-bottom: 1px solid transparent;
+    transition: all 0.4s ease;
+    user-select: none;
+  }
+  .tab:hover { color: var(--soul); }
+  .tab.active { color: var(--soul); border-bottom-color: var(--soul); }
+
+  /* ─── MAIN ─── */
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 64px 32px;
+  }
+
+  .view { display: none; }
+  .view.active { display: block; animation: fadeIn 0.8s ease; }
+
+  /* ─── HERO / SPHERE ─── */
+  .hero {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 80px;
+    align-items: center;
+    margin-bottom: 80px;
+  }
+
+  .sphere {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    animation: breathe var(--pulse-duration) ease-in-out infinite;
+  }
+
+  .sphere pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    line-height: 1.1;
+    color: var(--soul);
+    letter-spacing: 4px;
+    text-align: center;
+  }
+
+  .sphere .outer { color: var(--soul-faint); }
+  .sphere .inner { color: var(--soul); }
+
+  .meta h1 {
+    font-size: 56px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 24px;
+  }
+
+  .meta .epitaph {
+    font-style: italic;
+    color: var(--soul-dim);
+    font-size: 18px;
+    margin-bottom: 40px;
+    line-height: 1.5;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    margin-bottom: 16px;
+  }
+
+  .stat .label {
+    font-size: 11px;
+    color: var(--soul-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 8px;
+  }
+  .stat .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: 300;
+  }
+  .stat .level { letter-spacing: 4px; }
+
+  /* ─── CARDS ─── */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-bottom: 80px;
+  }
+
+  .card {
+    background: var(--depth);
+    border: 1px solid rgba(232,232,240,0.06);
+    border-radius: 4px;
+    padding: 32px;
+    transition: all 0.4s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 1px;
+    background: var(--accent);
+    opacity: 0.4;
+  }
+  .card:hover {
+    border-color: rgba(232,232,240,0.12);
+    transform: translateY(-2px);
+  }
+  .card:hover::before { opacity: 1; }
+
+  .card.karma { --accent: var(--karma); }
+  .card.assets { --accent: var(--soul); }
+  .card.doppel { --accent: var(--doppel); }
+
+  .card .card-label {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+
+  .card .big {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 42px;
+    font-weight: 300;
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+  }
+
+  .card .sub {
+    color: var(--soul-dim);
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  .card .sub strong { color: var(--accent); font-weight: 500; }
+
+  .bar {
+    height: 4px;
+    background: rgba(232,232,240,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .bar-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 62%;
+    border-radius: 2px;
+  }
+  .bar-label {
+    font-size: 11px;
+    color: var(--soul-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+
+  .card ul { list-style: none; }
+  .card li {
+    font-size: 13px;
+    color: var(--soul-dim);
+    padding: 6px 0;
+    display: flex;
+    justify-content: space-between;
+  }
+  .card li::before {
+    content: '·';
+    color: var(--accent);
+    margin-right: 8px;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--doppel);
+    margin-right: 8px;
+    box-shadow: 0 0 12px var(--doppel);
+    animation: heartbeat var(--pulse-duration) ease-in-out infinite;
+  }
+
+  /* ─── TIMELINE ─── */
+  .timeline-section {
+    margin-bottom: 64px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 32px;
+  }
+  .section-header h2 {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--soul-dim);
+    font-weight: 500;
+  }
+  .section-header .line {
+    flex: 1;
+    height: 1px;
+    background: rgba(232,232,240,0.08);
+  }
+
+  .timeline {
+    list-style: none;
+  }
+  .timeline li {
+    display: grid;
+    grid-template-columns: 80px 100px 1fr auto;
+    gap: 24px;
+    padding: 18px 0;
+    border-bottom: 1px solid rgba(232,232,240,0.04);
+    align-items: center;
+    font-size: 14px;
+    transition: all 0.3s ease;
+  }
+  .timeline li:hover {
+    background: rgba(232,232,240,0.02);
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .timeline .ts { font-family: 'JetBrains Mono', monospace; color: var(--soul-faint); font-size: 12px; }
+  .timeline .chain {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--soul-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+  .timeline .action { color: var(--soul); }
+  .timeline .result { font-family: 'JetBrains Mono', monospace; color: var(--soul-dim); font-size: 13px; }
+  .timeline .result.pos { color: #5FD9A0; }
+
+  /* ─── ACTIONS ─── */
+  .actions {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 64px;
+  }
+  button {
+    background: transparent;
+    color: var(--soul);
+    border: 1px solid rgba(232,232,240,0.2);
+    padding: 18px 36px;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 2px;
+  }
+  button:hover {
+    background: var(--soul);
+    color: var(--night);
+    border-color: var(--soul);
+  }
+  button.primary {
+    background: var(--soul);
+    color: var(--night);
+  }
+  button.primary:hover {
+    background: transparent;
+    color: var(--soul);
+  }
+
+  /* ─── DOPPELGÄNGER CHAT ─── */
+  .chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 0;
+    border-bottom: 1px solid rgba(232,232,240,0.06);
+    margin-bottom: 40px;
+  }
+  .chat-header h2 {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--doppel);
+  }
+  .chat-header .alive {
+    display: flex; align-items: center;
+    font-size: 12px;
+    color: var(--soul-dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .chat {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .msg {
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    border-radius: 4px;
+    font-size: 15px;
+    line-height: 1.6;
+    max-width: 80%;
+  }
+  .msg.doppel {
+    background: var(--depth);
+    border-left: 2px solid var(--doppel);
+    color: var(--soul);
+  }
+  .msg.doppel::before {
+    content: '◉  ';
+    color: var(--doppel);
+    font-size: 12px;
+  }
+  .msg.user {
+    background: transparent;
+    border: 1px solid rgba(232,232,240,0.15);
+    margin-left: auto;
+    color: var(--soul-dim);
+    text-align: right;
+  }
+  .msg.warn { border-left-color: var(--karma); }
+  .msg.warn::before { color: var(--karma); content: '⚠  '; }
+
+  .chat-input {
+    margin-top: 40px;
+    padding: 16px 20px;
+    background: var(--depth);
+    border: 1px solid rgba(232,232,240,0.1);
+    border-radius: 4px;
+    color: var(--soul-dim);
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  /* ─── KARMA VIEW ─── */
+  .karma-hero {
+    text-align: center;
+    padding: 60px 0;
+    margin-bottom: 60px;
+    border-bottom: 1px solid rgba(232,232,240,0.06);
+  }
+  .karma-hero .label {
+    font-size: 11px;
+    color: var(--karma);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .karma-hero .number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 120px;
+    font-weight: 300;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 16px;
+  }
+  .karma-hero .change {
+    color: var(--karma);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+  }
+
+  .karma-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 60px;
+  }
+
+  .chain-tile {
+    background: var(--depth);
+    border: 1px solid rgba(232,232,240,0.06);
+    padding: 20px;
+    border-radius: 4px;
+  }
+  .chain-tile .chain-name {
+    font-size: 11px;
+    color: var(--soul-dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .chain-tile .chain-karma {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 300;
+    margin-bottom: 8px;
+  }
+  .chain-tile .chain-bar {
+    height: 2px;
+    background: rgba(232,232,240,0.06);
+    overflow: hidden;
+    border-radius: 1px;
+  }
+  .chain-tile .chain-bar div {
+    height: 100%;
+    background: var(--karma);
+  }
+
+  /* ─── SOGLIA ─── */
+  .soglia-warn {
+    background: rgba(139,92,246,0.06);
+    border: 1px solid rgba(139,92,246,0.2);
+    padding: 24px;
+    border-radius: 4px;
+    text-align: center;
+    margin-bottom: 48px;
+    color: var(--soul);
+    font-size: 15px;
+    font-style: italic;
+  }
+  .soglia-warn::before { content: '⚰  '; color: var(--soglia); font-style: normal; }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-bottom: 40px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--soul-dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .field input, .field textarea {
+    width: 100%;
+    background: var(--depth);
+    border: 1px solid rgba(232,232,240,0.1);
+    color: var(--soul);
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    border-radius: 2px;
+  }
+  .field input:focus, .field textarea:focus {
+    outline: none;
+    border-color: var(--soglia);
+  }
+
+  .beneficiaries {
+    background: var(--depth);
+    border: 1px solid rgba(232,232,240,0.06);
+    border-radius: 4px;
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+  .beneficiary {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(232,232,240,0.04);
+  }
+  .beneficiary:last-child { border-bottom: none; }
+  .beneficiary .icon { font-size: 18px; }
+  .beneficiary .who { font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+  .beneficiary .who small { color: var(--soul-dim); display: block; font-size: 12px; }
+  .beneficiary .pct {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--soglia);
+    font-weight: 500;
+  }
+  .beneficiary .remove {
+    color: var(--soul-faint);
+    cursor: pointer;
+    font-family: monospace;
+  }
+
+  /* ─── ANIMATIONS ─── */
+  @keyframes heartbeat {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.04); opacity: 1; }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; gap: 40px; }
+    .cards { grid-template-columns: 1fr; }
+    .karma-grid { grid-template-columns: repeat(2, 1fr); }
+    .karma-hero .number { font-size: 80px; }
+    .meta h1 { font-size: 40px; }
+    .timeline li { grid-template-columns: 1fr; gap: 4px; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="brand-dot"></span>
+    ANIMA
+  </div>
+  <div class="wallet">0xal1c3...8e7c · 12 chain</div>
+</header>
+
+<nav class="tabs">
+  <div class="tab active" data-view="anima">Anima</div>
+  <div class="tab" data-view="doppel">Doppelgänger</div>
+  <div class="tab" data-view="karma">Karma</div>
+  <div class="tab" data-view="soglia">Soglia</div>
+</nav>
+
+<main>
+
+  <!-- ─── VIEW: ANIMA ─── -->
+  <section class="view active" id="view-anima">
+
+    <div class="hero">
+      <div class="sphere">
+<pre><span class="outer">      ◌      </span>
+<span class="outer">  ◌◌◌◌◌◌◌  </span>
+<span class="outer">◌◌</span><span class="inner">  ●●●  </span><span class="outer">◌◌</span>
+<span class="outer">◌◌</span><span class="inner">●●●●●●●</span><span class="outer">◌◌</span>
+<span class="outer">◌◌</span><span class="inner">  ●●●  </span><span class="outer">◌◌</span>
+<span class="outer">  ◌◌◌◌◌◌◌  </span>
+<span class="outer">      ◌      </span></pre>
+      </div>
+
+      <div class="meta">
+        <h1>Alice</h1>
+        <p class="epitaph">"Sopravvissuta a tre bear markets.<br>Non ha mai venduto il fondo."</p>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Età</div>
+            <div class="value">4a 2m</div>
+          </div>
+          <div class="stat">
+            <div class="label">Chain</div>
+            <div class="value">12</div>
+          </div>
+          <div class="stat">
+            <div class="label">Livello</div>
+            <div class="value level">✦✦✦✧✧</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card karma">
+        <div class="card-label">Karma</div>
+        <div class="big">2,847</div>
+        <div class="sub">▲ <strong>+12</strong> nelle ultime 24h</div>
+        <div class="bar"><div class="bar-fill"></div></div>
+        <div class="bar-label">62% del cap globale</div>
+      </div>
+
+      <div class="card assets">
+        <div class="card-label">Asset</div>
+        <div class="big">$14,203</div>
+        <div class="sub">distribuiti su 12 chain</div>
+        <ul>
+          <li><span>ETH</span><span class="mono">$8,902</span></li>
+          <li><span>USDC</span><span class="mono">$3,140</span></li>
+          <li><span>OP</span><span class="mono">$1,240</span></li>
+        </ul>
+      </div>
+
+      <div class="card doppel">
+        <div class="card-label">Doppelgänger</div>
+        <div class="big" style="font-size:24px;font-weight:400;">
+          <span class="status-dot"></span> Attivo da 47h
+        </div>
+        <div class="sub">Ultime 24h</div>
+        <ul>
+          <li><span>Trade conclusi</span><span class="mono">3</span></li>
+          <li><span>Voti DAO</span><span class="mono">2</span></li>
+          <li><span>Airdrop claim</span><span class="mono">1</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="timeline-section">
+      <div class="section-header">
+        <h2>Timeline del Doppelgänger</h2>
+        <div class="line"></div>
+      </div>
+
+      <ul class="timeline">
+        <li>
+          <span class="ts">03:14</span>
+          <span class="chain">Optimism</span>
+          <span class="action">→ swap 0.4 ETH per 1,240 OP</span>
+          <span class="result pos">+2.1%</span>
+        </li>
+        <li>
+          <span class="ts">02:01</span>
+          <span class="chain">Arbitrum</span>
+          <span class="action">← match con 0x71f...4a2 · trade 500 USDC</span>
+          <span class="result">settled</span>
+        </li>
+        <li>
+          <span class="ts">01:33</span>
+          <span class="chain">Base</span>
+          <span class="action">→ voto YES su BasedDAO #87 — riduzione fee LP</span>
+          <span class="result">peso 2.3×</span>
+        </li>
+        <li>
+          <span class="ts">00:08</span>
+          <span class="chain">Solana</span>
+          <span class="action">← claim airdrop JTO</span>
+          <span class="result pos">+412 JTO</span>
+        </li>
+        <li>
+          <span class="ts">ieri</span>
+          <span class="chain">Ethereum</span>
+          <span class="action">→ repay parziale Aave loan</span>
+          <span class="result">HF 1.78</span>
+        </li>
+        <li>
+          <span class="ts">ieri</span>
+          <span class="chain">Polygon</span>
+          <span class="action">→ provide LP USDC/ETH 0.05%</span>
+          <span class="result">$2,400</span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="actions">
+      <button data-jump="doppel">💬  Parla col tuo Doppelgänger</button>
+      <button class="primary">⚡  Nuovo Intent</button>
+    </div>
+  </section>
+
+  <!-- ─── VIEW: DOPPELGÄNGER ─── -->
+  <section class="view" id="view-doppel">
+    <div class="chat-header">
+      <h2>Il tuo Doppelgänger</h2>
+      <div class="alive"><span class="status-dot"></span>vivo · ultimo pensiero 12s fa</div>
+    </div>
+
+    <div class="chat">
+      <div class="msg doppel">
+        Buongiorno. Notte movimentata.<br><br>
+        Ho chiuso 3 trade per +$87. Bob (0x71f...) cercava ETH su Arbitrum — ho venduto i tuoi al suo bid, premium 0.4% sopra Uniswap.
+      </div>
+
+      <div class="msg doppel">
+        Ho votato YES su BasedDAO #87 (riduzione fee LP). Coerente coi tuoi 12 voti precedenti su proposte fee.
+      </div>
+
+      <div class="msg doppel warn">
+        Una cosa: la tua position su Aave (Polygon) è a health factor 1.31. Posso ridurla?
+      </div>
+
+      <div class="msg user">sì, fallo</div>
+
+      <div class="msg doppel">
+        Fatto. Repay parziale 800 USDC. HF ora 1.78.<br>
+        Karma speso: 4 punti (priority gas).
+      </div>
+
+      <div class="chat-input">scrivi al tuo doppio...</div>
+    </div>
+  </section>
+
+  <!-- ─── VIEW: KARMA ─── -->
+  <section class="view" id="view-karma">
+    <div class="karma-hero">
+      <div class="label">Karma globale</div>
+      <div class="number">2,847</div>
+      <div class="change">▲ +12 · ultime 24h</div>
+    </div>
+
+    <div class="section-header">
+      <h2>Distribuzione per chain</h2>
+      <div class="line"></div>
+    </div>
+
+    <div class="karma-grid">
+      <div class="chain-tile">
+        <div class="chain-name">Ethereum</div>
+        <div class="chain-karma">624</div>
+        <div class="chain-bar"><div style="width:88%"></div></div>
+      </div>
+      <div class="chain-tile">
+        <div class="chain-name">Arbitrum</div>
+        <div class="chain-karma">412</div>
+        <div class="chain-bar"><div style="width:58%"></div></div>
+      </div>
+      <div class="chain-tile">
+        <div class="chain-name">Base</div>
+        <div class="chain-karma">389</div>
+        <div class="chain-bar"><div style="width:54%"></div></div>
+      </div>
+      <div class="chain-tile">
+        <div class="chain-name">Optimism</div>
+        <div class="chain-karma">312</div>
+        <div class="chain-bar"><div style="width:44%"></div></div>
+      </div>
+      <div class="chain-tile">
+        <div class="chain-name">Polygon</div>
+        <div class="chain-karma">287</div>
+        <div class="chain-bar"><div style="width:40%"></div></div>
+      </div>
+      <div class="chain-tile">
+        <div class="chain-name">Solana</div>
+        <div class="chain-karma">241</div>
+        <div class="chain-bar"><div style="width:34%"></div></div>
+      </div>
+      <div class="chain-tile">
+        <div class="chain-name">Aptos</div>
+        <div class="chain-karma">198</div>
+        <div class="chain-bar"><div style="width:28%"></div></div>
+      </div>
+      <div class="chain-tile">
+        <div class="chain-name">+ 5 altre</div>
+        <div class="chain-karma">384</div>
+        <div class="chain-bar"><div style="width:54%"></div></div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <h2>Quest aperte</h2>
+      <div class="line"></div>
+    </div>
+
+    <ul class="timeline">
+      <li>
+        <span class="ts mono">04</span>
+        <span class="chain">KNOW THYSELF</span>
+        <span class="action">Chiacchiera col Doppelgänger ≥30min</span>
+        <span class="result pos">+75 Karma</span>
+      </li>
+      <li>
+        <span class="ts mono">05</span>
+        <span class="chain">THE PACT</span>
+        <span class="action">Sigilla la tua Soglia con beneficiari reali</span>
+        <span class="result pos">+200 Karma</span>
+      </li>
+      <li>
+        <span class="ts mono">07</span>
+        <span class="chain">THE STEWARD</span>
+        <span class="action">Vota in ≥3 DAO integrate (1/3)</span>
+        <span class="result pos">+300 Karma</span>
+      </li>
+      <li>
+        <span class="ts mono">10</span>
+        <span class="chain">???</span>
+        <span class="action">Solo chi trova il 13° contratto sa</span>
+        <span class="result">?? Karma</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- ─── VIEW: SOGLIA ─── -->
+  <section class="view" id="view-soglia">
+    <div class="section-header">
+      <h2>Imposta la Soglia</h2>
+      <div class="line"></div>
+    </div>
+
+    <div class="soglia-warn">
+      La Soglia si attiva se la tua Anima resta inattiva su <em>tutto</em> il multichain.<br>
+      Sigillarla richiede due firme separate e una grace period di sicurezza.
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label>Periodo di inattività</label>
+        <input value="180" /> <small style="color:var(--soul-faint);font-family:'JetBrains Mono',monospace">giorni</small>
+      </div>
+      <div class="field">
+        <label>Grace period</label>
+        <input value="7" /> <small style="color:var(--soul-faint);font-family:'JetBrains Mono',monospace">giorni di preavviso</small>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <h2>Distribuzione</h2>
+      <div class="line"></div>
+    </div>
+
+    <div class="beneficiaries">
+      <div class="beneficiary">
+        <span class="icon">👤</span>
+        <span class="who">0xfra...92a <small>sorella · Ethereum</small></span>
+        <span class="pct">50%</span>
+        <span class="remove">[×]</span>
+      </div>
+      <div class="beneficiary">
+        <span class="icon">🏛</span>
+        <span class="who">GitcoinDAO <small>public goods · Optimism</small></span>
+        <span class="pct">30%</span>
+        <span class="remove">[×]</span>
+      </div>
+      <div class="beneficiary">
+        <span class="icon">🔥</span>
+        <span class="who">burn address <small>0x000...dEaD</small></span>
+        <span class="pct">10%</span>
+        <span class="remove">[×]</span>
+      </div>
+      <div class="beneficiary">
+        <span class="icon">📜</span>
+        <span class="who">friend.eth <small>unlock seed phrase cifrata</small></span>
+        <span class="pct">10%</span>
+        <span class="remove">[×]</span>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:48px">
+      <label>Messaggio finale</label>
+      <textarea rows="3">Se leggete questo, ero su un blocco diverso. Vivete bene. — A.</textarea>
+    </div>
+
+    <div class="actions">
+      <button>Annulla</button>
+      <button class="primary">Sigilla la Soglia</button>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  const views = document.querySelectorAll('.view');
+  function activate(name) {
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.view === name));
+    views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  tabs.forEach(t => t.addEventListener('click', () => activate(t.dataset.view)));
+  document.querySelectorAll('[data-jump]').forEach(b => {
+    b.addEventListener('click', () => activate(b.dataset.jump));
+  });
+</script>
+
+</body>
+</html>

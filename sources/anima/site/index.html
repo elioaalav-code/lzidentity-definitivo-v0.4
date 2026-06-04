@@ -1,0 +1,2070 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ANIMA · una sola, vive ovunque</title>
+<meta name="description" content="La prima identità soulbound omnichain. Powered by LayerZero." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --night: #0A0A0F;
+  --night-2: #12121A;
+  --vellum: #E8E5DC;
+  --soul: #EFEEE8;
+  --dim: #7A7780;
+  --faint: #3A383F;
+  --rule: rgba(232, 229, 220, 0.08);
+
+  --karma: #FF6B35;
+  --doppel: #4A9EFF;
+  --soglia: #8B5CF6;
+  --pulse: 4s;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--night);
+  color: var(--soul);
+  font-family: 'Manrope', sans-serif;
+  font-weight: 300;
+  font-size: 16px;
+  line-height: 1.55;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ─── Grain texture overlay ─── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  mix-blend-mode: overlay;
+}
+
+.serif { font-family: 'Instrument Serif', serif; font-weight: 400; }
+.italic { font-style: italic; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* ─── HEADER ─── */
+header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 50;
+  padding: 28px 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(to bottom, rgba(10,10,15,0.9), transparent);
+  backdrop-filter: blur(8px);
+}
+
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+}
+.mark .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--soul);
+  animation: heartbeat var(--pulse) ease-in-out infinite;
+}
+
+nav.top {
+  display: flex;
+  gap: 40px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+nav.top a {
+  color: inherit;
+  text-decoration: none;
+  transition: color .4s;
+}
+nav.top a:hover { color: var(--soul); }
+
+.cta-mini {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--soul);
+  padding: 10px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  text-decoration: none;
+  transition: all .4s;
+}
+.cta-mini:hover {
+  background: var(--soul);
+  color: var(--night);
+}
+
+/* ─── HERO ─── */
+section.hero {
+  min-height: 100vh;
+  padding: 160px 48px 80px;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-text {
+  position: relative;
+  z-index: 2;
+}
+
+.hero-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 36px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.hero-eyebrow::before {
+  content: '';
+  width: 36px; height: 1px; background: var(--dim);
+}
+
+h1.title {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(60px, 9vw, 148px);
+  line-height: 0.92;
+  letter-spacing: -0.025em;
+  margin-bottom: 40px;
+  color: var(--soul);
+}
+h1.title em {
+  font-style: normal;
+  color: var(--vellum);
+  opacity: 0.65;
+}
+
+.hero-sub {
+  font-size: 19px;
+  line-height: 1.55;
+  color: var(--dim);
+  max-width: 480px;
+  margin-bottom: 56px;
+  font-weight: 300;
+}
+.hero-sub strong {
+  color: var(--soul);
+  font-weight: 400;
+}
+
+.hero-meta {
+  display: flex;
+  gap: 56px;
+  align-items: center;
+}
+
+.hero-meta .item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hero-meta .item .k {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--faint);
+}
+.hero-meta .item .v {
+  font-family: 'Instrument Serif', serif;
+  font-size: 28px;
+  font-style: italic;
+}
+
+/* sphere container */
+.sphere-stage {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sphere-stage canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.sphere-stage::after {
+  content: '';
+  position: absolute;
+  inset: 10%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(239,238,232,0.04) 0%, transparent 65%);
+  pointer-events: none;
+  animation: breathe var(--pulse) ease-in-out infinite;
+}
+
+.sphere-label {
+  position: absolute;
+  bottom: 12%;
+  right: 8%;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-align: right;
+}
+.sphere-label::before {
+  content: '';
+  display: block;
+  width: 24px; height: 1px;
+  background: var(--dim);
+  margin-bottom: 8px;
+  margin-left: auto;
+}
+
+/* scroll indicator */
+.scroll-cue {
+  position: absolute;
+  bottom: 32px;
+  left: 48px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.scroll-cue .stem {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to bottom, var(--dim), transparent);
+  position: relative;
+  overflow: hidden;
+}
+.scroll-cue .stem::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 1px; height: 8px;
+  background: var(--soul);
+  animation: descend 2.5s ease-in-out infinite;
+}
+
+/* ─── QUOTE ─── */
+section.quote {
+  min-height: 90vh;
+  padding: 160px 48px;
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  position: relative;
+}
+.quote-body {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.quote-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--karma);
+  margin-bottom: 48px;
+}
+blockquote {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: clamp(40px, 5.5vw, 88px);
+  line-height: 1.06;
+  letter-spacing: -0.015em;
+  color: var(--soul);
+  max-width: 1200px;
+}
+blockquote .em-line {
+  display: block;
+  color: var(--dim);
+  font-size: 0.7em;
+  margin-top: 0.4em;
+}
+blockquote .accent { color: var(--karma); font-style: normal; }
+
+.quote-cite {
+  margin-top: 64px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* ─── TICKER ─── */
+section.ticker {
+  padding: 64px 48px;
+  border-bottom: 1px solid var(--rule);
+}
+.ticker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--rule);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 1px 0;
+}
+.ticker-grid .cell {
+  background: var(--night);
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cell .k {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.cell .v {
+  font-family: 'Instrument Serif', serif;
+  font-size: 56px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.cell .delta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--karma);
+}
+
+/* ─── PILLAR ─── */
+.pillar {
+  min-height: 100vh;
+  padding: 160px 48px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 96px;
+  align-items: center;
+  position: relative;
+  border-bottom: 1px solid var(--rule);
+}
+
+.pillar-text { max-width: 540px; }
+
+.pillar-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.pillar-number::before {
+  content: '';
+  width: 28px; height: 1px;
+}
+
+.pillar h2 {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(56px, 7vw, 112px);
+  line-height: 0.94;
+  letter-spacing: -0.022em;
+  margin-bottom: 36px;
+}
+
+.pillar p.lede {
+  font-size: 19px;
+  line-height: 1.55;
+  color: var(--dim);
+  margin-bottom: 32px;
+}
+
+.pillar ul.bullets {
+  list-style: none;
+  border-top: 1px solid var(--rule);
+}
+.pillar ul.bullets li {
+  padding: 22px 0;
+  border-bottom: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 24px;
+  font-size: 15px;
+  color: var(--soul);
+}
+.pillar ul.bullets li .num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--faint);
+  letter-spacing: 0.18em;
+}
+
+/* pillar accent variations */
+.pillar.karma .pillar-number { color: var(--karma); }
+.pillar.karma .pillar-number::before { background: var(--karma); }
+.pillar.karma h2 em { color: var(--karma); font-style: normal; }
+
+.pillar.doppel .pillar-number { color: var(--doppel); }
+.pillar.doppel .pillar-number::before { background: var(--doppel); }
+.pillar.doppel h2 em { color: var(--doppel); font-style: normal; }
+
+.pillar.soglia .pillar-number { color: var(--soglia); }
+.pillar.soglia .pillar-number::before { background: var(--soglia); }
+.pillar.soglia h2 em { color: var(--soglia); font-style: normal; }
+
+/* pillar visuals */
+.viz {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1px solid var(--rule);
+  padding: 40px;
+  background: linear-gradient(135deg, var(--night-2) 0%, var(--night) 100%);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+.viz::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--accent);
+  opacity: 0.5;
+}
+
+/* karma scarcity viz */
+.scarcity {
+  --accent: var(--karma);
+}
+.scarcity .karma-num {
+  font-family: 'Instrument Serif', serif;
+  font-size: 120px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--soul);
+}
+.scarcity .karma-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-top: 8px;
+}
+.scarcity .chains {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: auto;
+}
+.scarcity .chains .chain {
+  border: 1px solid var(--rule);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.scarcity .chains .chain .cn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.scarcity .chains .chain .cv {
+  font-family: 'Instrument Serif', serif;
+  font-size: 22px;
+  font-style: italic;
+}
+.scarcity .global-bar {
+  margin-top: 24px;
+  height: 2px;
+  background: var(--rule);
+  position: relative;
+  overflow: hidden;
+}
+.scarcity .global-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0 38% 0 0;
+  background: var(--karma);
+  box-shadow: 0 0 12px var(--karma);
+}
+
+/* doppel chat viz */
+.chat-viz {
+  --accent: var(--doppel);
+  gap: 12px;
+  justify-content: flex-start;
+}
+.chat-msg {
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  border-radius: 2px;
+  position: relative;
+  opacity: 0;
+  animation: msgIn 0.6s ease forwards;
+}
+.chat-msg.bot {
+  background: rgba(74,158,255,0.06);
+  border-left: 2px solid var(--doppel);
+  color: var(--soul);
+  margin-right: 18%;
+}
+.chat-msg.bot::before {
+  content: '◉';
+  position: absolute;
+  top: 16px; left: -16px;
+  color: var(--doppel);
+  font-size: 10px;
+}
+.chat-msg.user {
+  margin-left: 30%;
+  color: var(--dim);
+  font-style: italic;
+  font-family: 'Instrument Serif', serif;
+  font-size: 18px;
+  text-align: right;
+  padding: 12px 0;
+}
+.chat-msg:nth-child(1) { animation-delay: 0.2s; }
+.chat-msg:nth-child(2) { animation-delay: 0.8s; }
+.chat-msg:nth-child(3) { animation-delay: 1.6s; }
+.chat-msg:nth-child(4) { animation-delay: 2.4s; }
+
+.chat-typing {
+  display: inline-flex;
+  gap: 4px;
+  padding: 8px 0;
+}
+.chat-typing span {
+  width: 4px; height: 4px;
+  background: var(--doppel);
+  border-radius: 50%;
+  opacity: 0.4;
+  animation: blink 1.2s infinite ease-in-out;
+}
+.chat-typing span:nth-child(2) { animation-delay: 0.2s; }
+.chat-typing span:nth-child(3) { animation-delay: 0.4s; }
+
+/* soglia will viz */
+.will-viz {
+  --accent: var(--soglia);
+}
+.will-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+.will-title {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 32px;
+  letter-spacing: -0.01em;
+}
+.will-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-align: right;
+  line-height: 1.6;
+}
+.will-meta .ok { color: var(--soglia); }
+.will-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+.will-row .who { color: var(--soul); font-family: 'Manrope', sans-serif; font-size: 14px; font-weight: 400; }
+.will-row .who small { color: var(--dim); font-size: 11px; display: block; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em; }
+.will-row .pct { color: var(--soglia); font-weight: 500; font-size: 18px; font-family: 'Instrument Serif', serif; font-style: italic; }
+.will-row .badge { font-size: 18px; }
+.will-footer {
+  margin-top: auto;
+  padding-top: 20px;
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 17px;
+  color: var(--dim);
+  line-height: 1.45;
+}
+.will-footer::before {
+  content: '"';
+  color: var(--soglia);
+  font-size: 32px;
+  display: block;
+  line-height: 0;
+  margin-bottom: 16px;
+}
+
+/* ─── MANIFESTO ─── */
+section.manifesto {
+  padding: 200px 48px;
+  border-bottom: 1px solid var(--rule);
+  background:
+    radial-gradient(ellipse at center top, rgba(239,238,232,0.025), transparent 60%),
+    var(--night);
+}
+
+.manifesto-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 64px;
+  text-align: center;
+}
+
+.manifesto-body {
+  max-width: 980px;
+  margin: 0 auto;
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(28px, 3vw, 44px);
+  line-height: 1.32;
+  letter-spacing: -0.012em;
+  color: var(--soul);
+  text-align: center;
+}
+.manifesto-body .stanza {
+  margin-bottom: 1.8em;
+}
+.manifesto-body .stanza em { color: var(--dim); }
+.manifesto-body .stanza strong { font-weight: 400; font-style: italic; color: var(--soul); }
+.manifesto-body .ornament {
+  font-size: 28px;
+  color: var(--dim);
+  margin: 1.2em 0;
+  letter-spacing: 1em;
+  padding-left: 1em;
+}
+
+.manifesto-signature {
+  margin-top: 80px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* ─── WAITLIST ─── */
+section.waitlist {
+  padding: 160px 48px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  border-bottom: 1px solid var(--rule);
+  flex-direction: column;
+}
+
+.waitlist h3 {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: clamp(48px, 6vw, 96px);
+  line-height: 1;
+  letter-spacing: -0.022em;
+  margin-bottom: 32px;
+  max-width: 900px;
+}
+.waitlist h3 em { font-style: normal; color: var(--dim); }
+
+.waitlist p {
+  color: var(--dim);
+  font-size: 17px;
+  max-width: 560px;
+  margin: 0 auto 56px;
+}
+
+.terminal {
+  width: 100%;
+  max-width: 580px;
+  background: var(--night-2);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  overflow: hidden;
+  font-family: 'JetBrains Mono', monospace;
+  text-align: left;
+}
+.terminal .term-head {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--dim);
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+}
+.terminal .term-head .dots {
+  display: flex; gap: 6px;
+}
+.terminal .term-head .dots span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--faint);
+}
+.terminal form {
+  padding: 24px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.terminal form .prompt {
+  color: var(--karma);
+  font-size: 14px;
+}
+.terminal form input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--soul);
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+  letter-spacing: 0.04em;
+}
+.terminal form input::placeholder { color: var(--faint); }
+.terminal form button {
+  background: var(--soul);
+  color: var(--night);
+  border: none;
+  padding: 10px 18px;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 1px;
+  transition: all .3s;
+}
+.terminal form button:hover {
+  background: var(--karma);
+}
+.terminal .term-foot {
+  padding: 14px 18px;
+  border-top: 1px solid var(--rule);
+  font-size: 11px;
+  color: var(--dim);
+  display: flex;
+  justify-content: space-between;
+}
+.terminal .term-foot .live::before {
+  content: '●';
+  color: #5FD9A0;
+  margin-right: 6px;
+  animation: heartbeat var(--pulse) ease-in-out infinite;
+}
+
+/* ─── FOOTER ─── */
+footer {
+  padding: 48px;
+  border-top: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 48px;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+footer .center {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 16px;
+  color: var(--soul);
+}
+footer .right { text-align: right; }
+footer a {
+  color: inherit;
+  text-decoration: none;
+  margin-left: 28px;
+  transition: color .3s;
+}
+footer a:hover { color: var(--soul); }
+
+/* ─── ANIMATIONS ─── */
+@keyframes heartbeat {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.18); }
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(0.96); opacity: 0.8; }
+  50% { transform: scale(1.02); opacity: 1; }
+}
+@keyframes descend {
+  0% { transform: translateY(-8px); opacity: 0; }
+  40% { opacity: 1; }
+  100% { transform: translateY(40px); opacity: 0; }
+}
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0.3; }
+  40% { opacity: 1; }
+}
+
+/* scroll-reveal */
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity 1s ease, transform 1s ease; }
+.reveal.in { opacity: 1; transform: translateY(0); }
+
+/* ─── COME FUNZIONA ─── */
+section.how {
+  padding: 160px 48px;
+  border-bottom: 1px solid var(--rule);
+}
+.how-head {
+  max-width: 1200px; margin: 0 auto 80px;
+  display: grid; grid-template-columns: 1fr 1.4fr; gap: 80px; align-items: end;
+}
+.how-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--dim); margin-bottom: 28px;
+}
+.how-head h3 {
+  font-family: 'Instrument Serif', serif; font-style: italic;
+  font-size: clamp(44px, 5.5vw, 84px); line-height: 0.96;
+  letter-spacing: -0.02em;
+}
+.how-head h3 em { font-style: normal; color: var(--dim); }
+.how-head p {
+  color: var(--dim); font-size: 17px; line-height: 1.6;
+}
+
+.diagram-wrap {
+  max-width: 1100px; margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background:
+    radial-gradient(ellipse at center, rgba(239,238,232,0.02), transparent 60%),
+    var(--night-2);
+  position: relative;
+  overflow: hidden;
+}
+.diagram-wrap svg { width: 100%; height: 100%; display: block; }
+
+.diag-line {
+  stroke: var(--rule);
+  stroke-width: 1;
+  fill: none;
+}
+.diag-pulse {
+  fill: var(--soul);
+  filter: drop-shadow(0 0 6px var(--soul));
+}
+.diag-node {
+  fill: var(--night-2);
+  stroke-width: 1;
+}
+.diag-node-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  fill: var(--dim);
+  text-transform: uppercase;
+}
+.diag-anima-ring {
+  fill: none;
+  stroke: var(--soul);
+  stroke-width: 0.8;
+  animation: breathe var(--pulse) ease-in-out infinite;
+  transform-origin: center;
+}
+.diag-anima-label {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 22px;
+  fill: var(--soul);
+  text-anchor: middle;
+}
+
+/* ─── STORIES ─── */
+section.stories {
+  padding: 160px 48px;
+  border-bottom: 1px solid var(--rule);
+}
+.stories-head {
+  max-width: 1200px; margin: 0 auto 80px;
+}
+.stories-head .eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--dim); margin-bottom: 28px;
+}
+.stories-head h3 {
+  font-family: 'Instrument Serif', serif; font-style: italic;
+  font-size: clamp(44px, 5.5vw, 84px); line-height: 0.96;
+  letter-spacing: -0.02em; max-width: 900px;
+}
+
+.stories-grid {
+  max-width: 1200px; margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px;
+}
+.story {
+  border: 1px solid var(--rule);
+  padding: 40px;
+  border-radius: 2px;
+  background: var(--night-2);
+  position: relative;
+  transition: all .5s ease;
+  cursor: default;
+  overflow: hidden;
+}
+.story:hover {
+  border-color: rgba(232, 229, 220, 0.18);
+  transform: translateY(-3px);
+}
+.story::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; height: 1px;
+  width: 0; background: var(--soul);
+  transition: width 1s ease;
+}
+.story:hover::before { width: 100%; }
+
+.story .roman {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 56px;
+  color: var(--faint);
+  line-height: 1;
+  margin-bottom: 24px;
+  letter-spacing: -0.03em;
+}
+.story h4 {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1.1;
+  margin-bottom: 20px;
+  color: var(--soul);
+}
+.story p {
+  color: var(--dim);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.story .place {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+
+.story.s1 { grid-column: span 7; }
+.story.s2 { grid-column: span 5; }
+.story.s3 { grid-column: span 5; }
+.story.s4 { grid-column: span 7; }
+.story.s5 {
+  grid-column: span 12;
+  padding: 60px;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at center, rgba(139,92,246,0.04), transparent 60%),
+    var(--night-2);
+}
+.story.s5 h4 { font-size: 40px; max-width: 700px; margin: 0 auto 24px; }
+.story.s5 p { max-width: 600px; margin: 0 auto; }
+.story.s5 .roman { color: var(--soglia); opacity: 0.5; }
+
+/* ─── ROADMAP ─── */
+section.roadmap {
+  padding: 160px 48px 120px;
+  border-bottom: 1px solid var(--rule);
+  overflow: hidden;
+}
+.roadmap-head {
+  max-width: 1200px; margin: 0 auto 80px;
+}
+.roadmap-head .eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--dim); margin-bottom: 28px;
+}
+.roadmap-head h3 {
+  font-family: 'Instrument Serif', serif; font-style: italic;
+  font-size: clamp(44px, 5.5vw, 84px); line-height: 0.96;
+  letter-spacing: -0.02em;
+}
+
+.timeline-wrap {
+  max-width: 1400px; margin: 0 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 24px;
+}
+.timeline-wrap::-webkit-scrollbar { display: none; }
+
+.timeline-track {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(220px, 1fr));
+  gap: 0;
+  position: relative;
+  padding: 60px 0;
+  min-width: 1100px;
+}
+.timeline-track::before {
+  content: '';
+  position: absolute;
+  left: 5%; right: 5%;
+  top: 80px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--rule) 8%, var(--rule) 92%, transparent);
+}
+
+.ms {
+  position: relative;
+  padding: 0 16px;
+}
+.ms .ms-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--night);
+  border: 1px solid var(--dim);
+  margin: 0 auto 28px;
+  position: relative;
+  z-index: 2;
+}
+.ms.done .ms-dot {
+  background: var(--soul);
+  border-color: var(--soul);
+  box-shadow: 0 0 14px rgba(239, 238, 232, 0.5);
+}
+.ms.now .ms-dot {
+  background: var(--karma);
+  border-color: var(--karma);
+  box-shadow: 0 0 14px var(--karma);
+  animation: heartbeat 1.5s ease-in-out infinite;
+}
+.ms .q {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-align: center;
+  margin-bottom: 14px;
+}
+.ms.now .q { color: var(--karma); }
+.ms .what {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 20px;
+  line-height: 1.15;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.ms .desc {
+  font-size: 13px;
+  color: var(--dim);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ─── FAQ ─── */
+section.faq {
+  padding: 160px 48px;
+  border-bottom: 1px solid var(--rule);
+}
+.faq-grid {
+  max-width: 1200px; margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 96px;
+}
+.faq-head .eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--dim); margin-bottom: 28px;
+}
+.faq-head h3 {
+  font-family: 'Instrument Serif', serif; font-style: italic;
+  font-size: clamp(40px, 4.5vw, 64px); line-height: 1;
+  letter-spacing: -0.02em;
+  position: sticky; top: 120px;
+}
+
+.faq-list details {
+  border-bottom: 1px solid var(--rule);
+  padding: 28px 0;
+}
+.faq-list details:first-child { border-top: 1px solid var(--rule); }
+.faq-list summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 22px;
+  color: var(--soul);
+  line-height: 1.3;
+  gap: 24px;
+}
+.faq-list summary::-webkit-details-marker { display: none; }
+.faq-list summary::after {
+  content: '+';
+  font-family: 'JetBrains Mono', monospace;
+  font-style: normal;
+  font-size: 22px;
+  color: var(--dim);
+  transition: transform .4s, color .4s;
+  flex-shrink: 0;
+}
+.faq-list details[open] summary::after {
+  transform: rotate(45deg);
+  color: var(--karma);
+}
+.faq-list details p {
+  margin-top: 20px;
+  color: var(--dim);
+  font-size: 15px;
+  line-height: 1.7;
+  max-width: 90%;
+}
+
+/* ─── IL TREDICESIMO ─── */
+section.thirteenth {
+  padding: 200px 48px;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at center, rgba(255, 107, 53, 0.06) 0%, transparent 55%),
+    var(--night);
+  border-bottom: 1px solid var(--rule);
+  position: relative;
+  overflow: hidden;
+}
+.thirteenth::before {
+  content: 'XIII';
+  position: absolute;
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 36vw;
+  color: var(--karma);
+  opacity: 0.04;
+  line-height: 0.8;
+  letter-spacing: -0.05em;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+}
+.thirteenth-body {
+  position: relative; z-index: 2;
+  max-width: 700px; margin: 0 auto;
+}
+.thirteenth .label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--karma);
+  margin-bottom: 40px;
+}
+.thirteenth h3 {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: clamp(40px, 5vw, 72px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin-bottom: 40px;
+}
+.thirteenth p {
+  color: var(--dim);
+  font-size: 17px;
+  line-height: 1.7;
+  margin-bottom: 48px;
+}
+.thirteenth .addr {
+  font-family: 'JetBrains Mono', monospace;
+  display: inline-block;
+  padding: 14px 28px;
+  border: 1px dashed rgba(255, 107, 53, 0.4);
+  color: var(--karma);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  filter: blur(3px);
+  user-select: none;
+  transition: filter .8s;
+}
+.thirteenth .addr:hover { filter: blur(1px); }
+.thirteenth .whisper {
+  margin-top: 60px;
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  color: var(--dim);
+  font-size: 19px;
+}
+
+/* ─── BREATHING CURSOR ─── */
+.cursor {
+  position: fixed;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--soul);
+  pointer-events: none;
+  mix-blend-mode: difference;
+  z-index: 200;
+  transform: translate(-50%, -50%);
+  transition: width .3s ease, height .3s ease, opacity .3s ease;
+  animation: heartbeat var(--pulse) ease-in-out infinite;
+}
+.cursor.big { width: 40px; height: 40px; }
+@media (hover: none) { .cursor { display: none; } }
+
+/* ─── LITURGICAL INTRO ─── */
+.intro {
+  position: fixed; inset: 0;
+  background: var(--night);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 32px;
+  transition: opacity 1.4s ease, visibility 1.4s ease;
+}
+.intro.gone { opacity: 0; visibility: hidden; }
+.intro-mark {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 88px;
+  color: var(--soul);
+  letter-spacing: -0.03em;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  opacity: 0;
+  animation: introIn 1.4s ease forwards;
+}
+.intro-mark .dot {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--soul);
+  animation: heartbeat 1s ease-in-out infinite;
+}
+.intro-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--dim);
+  opacity: 0;
+  animation: introIn 1.4s ease 0.6s forwards;
+}
+@keyframes introIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 960px) {
+  header { padding: 20px 24px; }
+  nav.top { display: none; }
+  section.hero { grid-template-columns: 1fr; padding: 120px 24px 60px; gap: 60px; }
+  .sphere-stage { max-width: 80vw; margin: 0 auto; }
+  section.quote, .pillar, section.manifesto, section.waitlist { padding-left: 24px; padding-right: 24px; }
+  .pillar { grid-template-columns: 1fr; gap: 60px; }
+  .ticker-grid { grid-template-columns: repeat(2, 1fr); }
+  .scarcity .karma-num { font-size: 80px; }
+  .scarcity .chains { grid-template-columns: repeat(2, 1fr); }
+  footer { grid-template-columns: 1fr; text-align: center; gap: 20px; }
+  footer .right, footer .left { text-align: center; }
+  footer a { margin-left: 16px; margin-right: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="intro" id="intro">
+  <div class="intro-mark">
+    <span class="dot"></span>
+    Anima
+  </div>
+  <div class="intro-tag">una sola · vive ovunque</div>
+</div>
+
+<div class="cursor" id="cursor"></div>
+
+<header>
+  <div class="mark">
+    <span class="dot"></span>
+    Anima
+  </div>
+  <nav class="top">
+    <a href="#karma">Karma</a>
+    <a href="#doppel">Doppelgänger</a>
+    <a href="#soglia">Soglia</a>
+    <a href="#manifesto">Manifesto</a>
+    <a href="#waitlist">Lista</a>
+  </nav>
+  <a href="#waitlist" class="cta-mini">Conia →</a>
+</header>
+
+<!-- ─── HERO ─── -->
+<section class="hero">
+  <div class="hero-text">
+    <div class="hero-eyebrow">Powered by LayerZero · 12 chain · 2026</div>
+    <h1 class="title">
+      Un'<em>anima</em><br>
+      sola, vive<br>
+      ovunque.
+    </h1>
+    <p class="hero-sub">
+      ANIMA è la prima identità <strong>soulbound omnichain</strong>.
+      Una sola entità — non duplicabile, non trasferibile —
+      che vive simultaneamente su ogni catena.
+      Quello che fai pesa. Quello che spendi diminuisce.
+      Quello che lasci, resta.
+    </p>
+    <div class="hero-meta">
+      <div class="item">
+        <span class="k">In lista</span>
+        <span class="v">14,237</span>
+      </div>
+      <div class="item">
+        <span class="k">Anime al lancio</span>
+        <span class="v">10,000</span>
+      </div>
+      <div class="item">
+        <span class="k">Costo</span>
+        <span class="v">gratis</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sphere-stage">
+    <canvas id="sphere"></canvas>
+    <div class="sphere-label">la tua anima<br>respira a 60 bpm</div>
+  </div>
+
+  <div class="scroll-cue">
+    Scorri
+    <div class="stem"></div>
+  </div>
+</section>
+
+<!-- ─── QUOTE ─── -->
+<section class="quote">
+  <div class="quote-body">
+    <div class="quote-eyebrow">Il problema</div>
+    <blockquote>
+      Hai <span class="accent">sette wallet.</span> Dodici catene.<br>
+      Una reputazione frantumata in pezzi.<br>
+      <span class="em-line">— Ogni volta ricominci. Ogni volta sei uno sconosciuto.</span>
+    </blockquote>
+    <div class="quote-cite">Il crypto ci ha promesso sovranità. Ci ha consegnato schizofrenia.</div>
+  </div>
+</section>
+
+<!-- ─── TICKER ─── -->
+<section class="ticker">
+  <div class="ticker-grid">
+    <div class="cell">
+      <span class="k">Anime mintate</span>
+      <span class="v" data-count="2847">0</span>
+      <span class="delta">▲ in testnet</span>
+    </div>
+    <div class="cell">
+      <span class="k">Karma globale</span>
+      <span class="v" data-count="1284392">0</span>
+      <span class="delta">▲ +12,400 ultime 24h</span>
+    </div>
+    <div class="cell">
+      <span class="k">Catene integrate</span>
+      <span class="v" data-count="12">0</span>
+      <span class="delta">+2 in arrivo (Solana, Aptos)</span>
+    </div>
+    <div class="cell">
+      <span class="k">Doppelgänger attivi</span>
+      <span class="v" data-count="1923">0</span>
+      <span class="delta">▲ trade auto in tempo reale</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PILLAR 1 · KARMA ─── -->
+<section class="pillar karma" id="karma">
+  <div class="pillar-text reveal">
+    <div class="pillar-number">001 · Karma</div>
+    <h2><em>Reputazione</em><br>scarsa.<br>Globale.</h2>
+    <p class="lede">
+      Hai mille punti di Karma. Sono gli stessi su Ethereum, Arbitrum, Base, Solana.
+      Quando li spendi su Optimism per saltare la coda di un mint,
+      un attimo dopo te ne mancano cinquanta anche su Sui.
+    </p>
+    <ul class="bullets">
+      <li><span class="num">01</span><span>La prima risorsa scarsa che non puoi sfuggire cambiando catena.</span></li>
+      <li><span class="num">02</span><span>Soulbound. Non vendibile. Cresce solo agendo bene.</span></li>
+      <li><span class="num">03</span><span>Le dApp lo leggono come collateral, voting weight, accesso.</span></li>
+    </ul>
+  </div>
+
+  <div class="viz scarcity reveal">
+    <div>
+      <div class="karma-num mono"><span data-count="2847">0</span></div>
+      <div class="karma-label">Karma globale · una sola sfera</div>
+    </div>
+    <div class="global-bar"></div>
+    <div class="chains">
+      <div class="chain"><span class="cn">Ethereum</span><span class="cv">624</span></div>
+      <div class="chain"><span class="cn">Arbitrum</span><span class="cv">412</span></div>
+      <div class="chain"><span class="cn">Base</span><span class="cv">389</span></div>
+      <div class="chain"><span class="cn">Optimism</span><span class="cv">312</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PILLAR 2 · DOPPELGÄNGER ─── -->
+<section class="pillar doppel" id="doppel">
+  <div class="viz chat-viz reveal">
+    <div class="chat-msg bot">
+      Buongiorno. Notte movimentata.<br>
+      Ho chiuso 3 trade per <strong>+$87</strong>. Bob cercava ETH su Arbitrum — venduti al suo bid, premium 0.4% sopra Uniswap.
+    </div>
+    <div class="chat-msg bot">
+      Una cosa: la tua position su Aave (Polygon) è a HF 1.31. Posso ridurla?
+    </div>
+    <div class="chat-msg user">sì, fallo</div>
+    <div class="chat-msg bot">
+      Fatto. Repay 800 USDC. HF ora 1.78. Karma speso: 4 punti.
+      <div class="chat-typing"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+
+  <div class="pillar-text reveal">
+    <div class="pillar-number">002 · Doppelgänger</div>
+    <h2>Un <em>doppio</em><br>che non<br>dorme mai.</h2>
+    <p class="lede">
+      Un agente AI legato alla tua Anima. Legge la tua storia on-chain,
+      imita il tuo stile, negozia con altri Doppelgänger via LayerZero
+      mentre tu dormi.
+    </p>
+    <ul class="bullets">
+      <li><span class="num">01</span><span>Impara dai tuoi pattern. Vota dove voteresti tu.</span></li>
+      <li><span class="num">02</span><span>Parla con gli altri agenti. Trova trade che non avresti mai trovato.</span></li>
+      <li><span class="num">03</span><span>Limiti rigorosi che tu imposti. Mai più del 5% del portfolio per azione.</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ─── PILLAR 3 · SOGLIA ─── -->
+<section class="pillar soglia" id="soglia">
+  <div class="pillar-text reveal">
+    <div class="pillar-number">003 · Soglia</div>
+    <h2>Il primo<br><em>testamento</em><br>che funziona.</h2>
+    <p class="lede">
+      Imposti una volta sola. Se la tua Anima resta inattiva per N giorni
+      su tutto il multichain, la Soglia si attiva atomicamente: asset distribuiti,
+      messaggio finale pubblicato, segreti rilasciati. Ovunque, contemporaneamente.
+    </p>
+    <ul class="bullets">
+      <li><span class="num">01</span><span>Grace period configurabile. Mai trigger accidentali.</span></li>
+      <li><span class="num">02</span><span>Distribuzione cross-chain in un'unica transazione logica.</span></li>
+      <li><span class="num">03</span><span>Seed phrase cifrate via Lit. Solo gli eredi le aprono.</span></li>
+    </ul>
+  </div>
+
+  <div class="viz will-viz reveal">
+    <div class="will-header">
+      <div class="will-title">Testamento di Alice</div>
+      <div class="will-meta">
+        180 giorni · grace 7g<br>
+        <span class="ok">● Sigillato</span>
+      </div>
+    </div>
+    <div class="will-row">
+      <span class="badge">👤</span>
+      <span class="who">0xfra...92a <small>sorella · Ethereum</small></span>
+      <span class="pct">50%</span>
+    </div>
+    <div class="will-row">
+      <span class="badge">🏛</span>
+      <span class="who">GitcoinDAO <small>public goods · Optimism</small></span>
+      <span class="pct">30%</span>
+    </div>
+    <div class="will-row">
+      <span class="badge">📜</span>
+      <span class="who">friend.eth <small>seed cifrata · Lit</small></span>
+      <span class="pct">10%</span>
+    </div>
+    <div class="will-row">
+      <span class="badge">🔥</span>
+      <span class="who">burn address <small>0x000...dEaD</small></span>
+      <span class="pct">10%</span>
+    </div>
+    <div class="will-footer">
+      Se leggete questo, ero su un blocco diverso.<br>Vivete bene. — A.
+    </div>
+  </div>
+</section>
+
+<!-- ─── COME FUNZIONA ─── -->
+<section class="how">
+  <div class="how-head">
+    <div>
+      <div class="how-eyebrow">004 · Come funziona</div>
+      <h3>Una <em>sostanza,</em><br>dodici corpi.</h3>
+    </div>
+    <p>
+      ANIMA è un'OApp deployata con stesso indirizzo su ogni chain.
+      LayerZero V2 fa girare messaggi tra le copie — Karma, intent,
+      threshold — mantenendole come fossero una cosa sola. Tu non vedi
+      la macchina. Vedi solo l'anima.
+    </p>
+  </div>
+
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#EFEEE8" stop-opacity="0.08"/>
+          <stop offset="100%" stop-color="#EFEEE8" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+
+      <!-- center glow -->
+      <circle cx="500" cy="280" r="180" fill="url(#centerGlow)"/>
+
+      <!-- connection lines from center to each chain -->
+      <line class="diag-line" x1="500" y1="280" x2="170" y2="120"/>
+      <line class="diag-line" x1="500" y1="280" x2="500" y2="80"/>
+      <line class="diag-line" x1="500" y1="280" x2="830" y2="120"/>
+      <line class="diag-line" x1="500" y1="280" x2="170" y2="440"/>
+      <line class="diag-line" x1="500" y1="280" x2="500" y2="490"/>
+      <line class="diag-line" x1="500" y1="280" x2="830" y2="440"/>
+
+      <!-- traveling message pulses -->
+      <circle class="diag-pulse" r="3" cx="170" cy="120">
+        <animateMotion dur="3.2s" repeatCount="indefinite" path="M0,0 L330,160"/>
+      </circle>
+      <circle class="diag-pulse" r="3" cx="500" cy="80">
+        <animateMotion dur="2.6s" repeatCount="indefinite" path="M0,0 L0,200"/>
+      </circle>
+      <circle class="diag-pulse" r="3" cx="830" cy="440">
+        <animateMotion dur="3.6s" repeatCount="indefinite" path="M0,0 L-330,-160"/>
+      </circle>
+      <circle class="diag-pulse" r="3" cx="170" cy="440">
+        <animateMotion dur="2.8s" repeatCount="indefinite" path="M0,0 L330,-160"/>
+      </circle>
+      <circle class="diag-pulse" r="3" cx="500" cy="490">
+        <animateMotion dur="3.4s" repeatCount="indefinite" path="M0,0 L0,-210"/>
+      </circle>
+      <circle class="diag-pulse" r="3" cx="830" cy="120">
+        <animateMotion dur="3.0s" repeatCount="indefinite" path="M0,0 L-330,160"/>
+      </circle>
+
+      <!-- chain nodes -->
+      <g>
+        <circle class="diag-node" cx="170" cy="120" r="18" stroke="#FF6B35"/>
+        <text class="diag-node-label" x="170" y="155" text-anchor="middle">Ethereum</text>
+      </g>
+      <g>
+        <circle class="diag-node" cx="500" cy="80" r="18" stroke="#4A9EFF"/>
+        <text class="diag-node-label" x="500" y="55" text-anchor="middle">Arbitrum</text>
+      </g>
+      <g>
+        <circle class="diag-node" cx="830" cy="120" r="18" stroke="#8B5CF6"/>
+        <text class="diag-node-label" x="830" y="155" text-anchor="middle">Base</text>
+      </g>
+      <g>
+        <circle class="diag-node" cx="170" cy="440" r="18" stroke="#FF6B35"/>
+        <text class="diag-node-label" x="170" y="475" text-anchor="middle">Optimism</text>
+      </g>
+      <g>
+        <circle class="diag-node" cx="500" cy="490" r="18" stroke="#4A9EFF"/>
+        <text class="diag-node-label" x="500" y="525" text-anchor="middle">Solana</text>
+      </g>
+      <g>
+        <circle class="diag-node" cx="830" cy="440" r="18" stroke="#8B5CF6"/>
+        <text class="diag-node-label" x="830" y="475" text-anchor="middle">Polygon</text>
+      </g>
+
+      <!-- center anima -->
+      <circle class="diag-anima-ring" cx="500" cy="280" r="52"/>
+      <circle class="diag-anima-ring" cx="500" cy="280" r="38" style="animation-delay: 1s;"/>
+      <text class="diag-anima-label" x="500" y="288">anima</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ─── LE STORIE ─── -->
+<section class="stories">
+  <div class="stories-head">
+    <div class="eyebrow">005 · Le storie</div>
+    <h3>Cosa <em>diventano</em> le persone<br>quando l'identità non si frantuma più.</h3>
+  </div>
+
+  <div class="stories-grid">
+    <article class="story s1 reveal">
+      <div class="roman">I.</div>
+      <h4>La nonna che è<br>diventata oracolo</h4>
+      <p>
+        Maria, 78 anni, era stata convinta dal nipote a coniare un'Anima
+        nel 2026 "tanto per provare." Il suo Doppelgänger imparò il ritmo
+        lento delle sue mattine al porto. Iniziò a fare microtrade su token
+        legati alla pesca italiana. Nessuno sapeva perché funzionasse.
+        Nel 2029, un fondo di Singapore le pagava $2.300 al mese.
+      </p>
+      <div class="place">Genova · 2029</div>
+    </article>
+
+    <article class="story s2 reveal">
+      <div class="roman">II.</div>
+      <h4>Il divorzio</h4>
+      <p>
+        Lui voleva trattenere il Karma accumulato durante il matrimonio.
+        Il tribunale di Lisbona sentenziò: <em>"Il Karma non è proprietà
+        coniugale. È biografia personale. Non è divisibile, come non sono
+        divisibili i ricordi."</em>
+      </p>
+      <div class="place">Lisbona · 2030</div>
+    </article>
+
+    <article class="story s3 reveal">
+      <div class="roman">III.</div>
+      <h4>Il giornalista</h4>
+      <p>
+        Aspettò il giorno 91. I documenti si pubblicarono atomicamente
+        su 8 chain. Bonifici, foto, registrazioni. La verità. Da quel
+        momento ANIMA non fu più solo un'app crypto. Era diventata
+        un'arma di sopravvivenza.
+      </p>
+      <div class="place">Bangkok · 2031</div>
+    </article>
+
+    <article class="story s4 reveal">
+      <div class="roman">IV.</div>
+      <h4>La gemella</h4>
+      <p>
+        Sara e Sofia erano gemelle identiche. Decisero, per scherzo, di
+        scambiarsi le Anime. Per un anno, il Doppelgänger di Sara visse
+        dentro Sofia, e viceversa. Quando provarono a tornare indietro,
+        scoprirono che non potevano. <em>"Forse non eravamo mai state
+        davvero distinte,"</em> scrisse Sara. O Sofia. Non era più chiaro
+        a nessuno.
+      </p>
+      <div class="place">Berlino · 2032</div>
+    </article>
+
+    <article class="story s5 reveal">
+      <div class="roman">V.</div>
+      <h4>"Sono stato qui.<br>Ho lasciato questo. Vivete bene."</h4>
+      <p>
+        La prima "morte digitale" pubblicamente celebrata. L'Anima di un
+        early adopter scomparso in un incidente esegue la Soglia — eredita
+        $2.1M alla famiglia, distribuisce $400k a 4 DAO, pubblica un
+        messaggio finale che diventa virale.
+      </p>
+      <div class="place">ovunque · marzo 2031</div>
+    </article>
+  </div>
+</section>
+
+<!-- ─── ROADMAP ─── -->
+<section class="roadmap">
+  <div class="roadmap-head">
+    <div class="eyebrow">006 · Roadmap</div>
+    <h3>Diciotto mesi.<br><em>Sei tappe.</em></h3>
+  </div>
+
+  <div class="timeline-wrap">
+    <div class="timeline-track">
+      <div class="ms done">
+        <div class="ms-dot"></div>
+        <div class="q">Q1 2026</div>
+        <div class="what">Seed close</div>
+        <div class="desc">$6M raccolti. Team founding ingaggiato. Spec congelata.</div>
+      </div>
+      <div class="ms now">
+        <div class="ms-dot"></div>
+        <div class="q">Q2 2026 · ora</div>
+        <div class="what">Testnet Alpha</div>
+        <div class="desc">Registry + KarmaLedger deployati su 4 testnet. Beta privata.</div>
+      </div>
+      <div class="ms">
+        <div class="ms-dot"></div>
+        <div class="q">Q3 2026</div>
+        <div class="what">Devnet Beta</div>
+        <div class="desc">Doppelgänger v0 (read-only). DAO partner integrati. Bug bounty $500k.</div>
+      </div>
+      <div class="ms">
+        <div class="ms-dot"></div>
+        <div class="q">Q4 2026</div>
+        <div class="what">Mainnet Launch</div>
+        <div class="desc">Tre audit firmati. ETH + Arbitrum + Base + Optimism. 10k Anime mintabili.</div>
+      </div>
+      <div class="ms">
+        <div class="ms-dot"></div>
+        <div class="q">Q1 2027</div>
+        <div class="what">Karma v2 + Agents</div>
+        <div class="desc">Solana e Aptos via adapter non-EVM. Doppelgänger AI v2. Subscription Pro.</div>
+      </div>
+      <div class="ms">
+        <div class="ms-dot"></div>
+        <div class="q">Q2 2027</div>
+        <div class="what">Token Generation</div>
+        <div class="desc">Airdrop claim. Listings DEX/CEX. Karma-as-collateral live in 8 DeFi.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FAQ ─── -->
+<section class="faq">
+  <div class="faq-grid">
+    <div class="faq-head">
+      <div class="eyebrow">007 · Domande</div>
+      <h3>Le cose che<br>tutti chiedono.</h3>
+    </div>
+
+    <div class="faq-list">
+      <details>
+        <summary>L'Anima è trasferibile?</summary>
+        <p>No. È soulbound per natura: legata al wallet che l'ha coniata, non vendibile, non duplicabile. Puoi trasferirne il <em>controllo</em> tramite la Soglia (testamento), ma la storia resta. Questo è ciò che la rende reputazione, non token.</p>
+      </details>
+
+      <details>
+        <summary>Cosa succede se perdo la chiave?</summary>
+        <p>La Soglia. Imposti gli eredi prima, e dopo N giorni di inattività su tutto il multichain il protocollo distribuisce automaticamente. Puoi anche configurare un "recovery quorum" — N fra M amici che possono ripristinare l'accesso senza grace period.</p>
+      </details>
+
+      <details>
+        <summary>Quanto costa coniare un'Anima?</summary>
+        <p>Le prime 10.000 sono gratis (solo gas). Le successive costano 100 $ANIMA — bruciati al momento del mint. Il Karma si guadagna gratis, agendo bene on-chain.</p>
+      </details>
+
+      <details>
+        <summary>Il Doppelgänger è obbligatorio?</summary>
+        <p>No. L'Anima funziona perfettamente senza. Il Doppelgänger è un livello opzionale per chi vuole automazione. Puoi attivarlo, disattivarlo, o restringerlo a operazioni specifiche (solo voto, solo claim).</p>
+      </details>
+
+      <details>
+        <summary>Quale chain è "la mia" Anima?</summary>
+        <p>Tutte. E nessuna. La domanda non ha senso in ANIMA — è il punto. La tua Anima ha lo stesso indirizzo su ogni chain (via CREATE2) e il KarmaLedger mantiene saldi coerenti tramite LayerZero V2 con consenso multi-DVN.</p>
+      </details>
+
+      <details>
+        <summary>Cosa succede se LayerZero fallisce?</summary>
+        <p>Siamo onesti: tutta la sicurezza di ANIMA si appoggia sulla sicurezza di LayerZero. Mitighiamo con multi-DVN (2-of-3 minimo, 3-of-5 in modalità paranoid), monitoraggio drift in tempo reale, e un kill switch del Senato. Ma il rischio sistemico LZ è esplicito nel whitepaper. Lo accetti consapevolmente.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ─── MANIFESTO ─── -->
+<section class="manifesto" id="manifesto">
+  <div class="manifesto-eyebrow">Manifesto</div>
+  <div class="manifesto-body">
+    <p class="stanza">
+      Il crypto ci ha promesso sovranità.<br>
+      <em>Ci ha consegnato schizofrenia.</em>
+    </p>
+    <div class="ornament">◆ ◆ ◆</div>
+    <p class="stanza">
+      ANIMA non è un wallet.<br>
+      ANIMA non è un protocollo di identità.<br>
+      ANIMA non è un agente AI.
+    </p>
+    <p class="stanza">
+      <strong>ANIMA è la prima entità che esiste davvero<br>nel multichain.</strong>
+      Una sola. Indivisibile.
+    </p>
+    <div class="ornament">◆ ◆ ◆</div>
+    <p class="stanza">
+      <em>Quello che fai pesa.<br>
+      Quello che spendi diminuisce.<br>
+      Quello che lasci, resta.</em>
+    </p>
+  </div>
+  <div class="manifesto-signature">— il team Anima · v0.fine</div>
+</section>
+
+<!-- ─── IL TREDICESIMO ─── -->
+<section class="thirteenth">
+  <div class="thirteenth-body">
+    <div class="label">non documentato · non annunciato</div>
+    <h3>Esiste un<br><em>tredicesimo</em> contratto.</h3>
+    <p>
+      Elencheremo dodici contratti, uno per ogni chain supportata.<br>
+      Ce ne sarà un altro. Non lo dichiareremo. Conterrà una funzione sola:
+    </p>
+    <div class="addr">0x???????????????????????????????????.awaken(bytes32 anima)</div>
+    <p class="whisper">Solo cinque potranno trovarlo. I loro Doppelgänger porteranno un segno che nessun altro potrà replicare. Si chiamerà il <em>Primo Risveglio.</em></p>
+  </div>
+</section>
+
+<!-- ─── WAITLIST ─── -->
+<section class="waitlist" id="waitlist">
+  <h3>La tua Anima<br><em>ti aspetta.</em></h3>
+  <p>Le prime diecimila sono gratuite. Le successive si pagano in Karma — e il Karma si guadagna agendo bene.</p>
+
+  <div class="terminal">
+    <div class="term-head">
+      <span>anima.xyz · waitlist · sigillata</span>
+      <div class="dots"><span></span><span></span><span></span></div>
+    </div>
+    <form onsubmit="event.preventDefault(); this.querySelector('input').value=''; document.querySelector('.term-foot .you').textContent='✓ sei in lista — posizione #14,238';">
+      <span class="prompt">›</span>
+      <input type="email" placeholder="indirizzo email o ENS..." required />
+      <button type="submit">Conia</button>
+    </form>
+    <div class="term-foot">
+      <span class="live">14,237 in attesa</span>
+      <span class="you">il tuo posto è ancora tuo</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <div class="left">© 2026 Anima Foundation · Cayman</div>
+  <div class="center">Una sola. Vive ovunque.</div>
+  <div class="right">
+    <a href="#">Whitepaper</a>
+    <a href="#">GitHub</a>
+    <a href="#">Twitter</a>
+  </div>
+</footer>
+
+<script>
+/* ─── Interactive sphere ─── */
+(() => {
+  const canvas = document.getElementById('sphere');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let w, h, cx, cy, R, dpr;
+  let mouse = { x: 0, y: 0, active: false };
+  let rotY = 0, rotX = 0;
+  let breath = 0;
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    w = rect.width; h = rect.height;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+    cx = w / 2; cy = h / 2;
+    R = Math.min(w, h) * 0.42;
+  }
+
+  function fibSphere(n) {
+    const pts = [];
+    const golden = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < n; i++) {
+      const y = 1 - (i / (n - 1)) * 2;
+      const r = Math.sqrt(1 - y * y);
+      const theta = golden * i;
+      pts.push({ x: Math.cos(theta) * r, y, z: Math.sin(theta) * r });
+    }
+    return pts;
+  }
+
+  const COUNT = 520;
+  const points = fibSphere(COUNT);
+
+  function frame(t) {
+    ctx.clearRect(0, 0, w, h);
+
+    rotY += 0.0014;
+    breath = Math.sin(t * 0.00078) * 0.05;
+    const radius = R * (1 + breath);
+
+    // mouse-tilt
+    const targetTiltX = mouse.active ? (mouse.y - cy) / cy * 0.4 : 0;
+    const targetTiltY = mouse.active ? (mouse.x - cx) / cx * 0.4 : 0;
+    rotX += (targetTiltX - rotX) * 0.05;
+
+    const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+    const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+
+    // project + sort
+    const proj = points.map(p => {
+      let x = p.x * cosY - p.z * sinY;
+      let z = p.x * sinY + p.z * cosY;
+      let y = p.y * cosX - z * sinX;
+      z = p.y * sinX + z * cosX;
+      return { x, y, z };
+    }).sort((a, b) => a.z - b.z);
+
+    proj.forEach((p, i) => {
+      const px = cx + p.x * radius;
+      const py = cy + p.y * radius;
+      const depth = (p.z + 1) / 2; // 0..1
+      const isInner = i > COUNT * 0.55; // front-most points are "inner"
+      const size = 0.6 + depth * 2.1;
+      let opacity = 0.08 + depth * 0.9;
+
+      // mouse repulsion
+      if (mouse.active) {
+        const dx = px - mouse.x, dy = py - mouse.y;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        if (d < 120) {
+          const push = (120 - d) / 120;
+          opacity = Math.min(1, opacity + push * 0.4);
+        }
+      }
+
+      ctx.beginPath();
+      ctx.arc(px, py, size, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(239, 238, 232, ${opacity})`;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener('resize', resize);
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+    mouse.active = true;
+  });
+  canvas.addEventListener('mouseleave', () => { mouse.active = false; });
+
+  resize();
+  requestAnimationFrame(frame);
+})();
+
+/* ─── Counter animation on view ─── */
+(() => {
+  const fmt = n => n.toLocaleString('it-IT');
+  const animate = (el, to) => {
+    const dur = 1800;
+    const start = performance.now();
+    function step(now) {
+      const p = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmt(Math.floor(to * eased));
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  };
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target;
+      if (el.dataset.done) return;
+      el.dataset.done = '1';
+      animate(el, parseInt(el.dataset.count, 10));
+    });
+  }, { threshold: 0.5 });
+
+  document.querySelectorAll('[data-count]').forEach(el => observer.observe(el));
+})();
+
+/* ─── Scroll reveals ─── */
+(() => {
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+})();
+
+/* ─── Liturgical intro ─── */
+(() => {
+  const intro = document.getElementById('intro');
+  if (!intro) return;
+  setTimeout(() => intro.classList.add('gone'), 2400);
+  setTimeout(() => intro.remove(), 4000);
+})();
+
+/* ─── Breathing cursor ─── */
+(() => {
+  const cursor = document.getElementById('cursor');
+  if (!cursor) return;
+  let tx = window.innerWidth / 2, ty = window.innerHeight / 2;
+  let cx = tx, cy = ty;
+  document.addEventListener('mousemove', e => { tx = e.clientX; ty = e.clientY; });
+  document.querySelectorAll('a, button, summary, .story, [data-jump]').forEach(el => {
+    el.addEventListener('mouseenter', () => cursor.classList.add('big'));
+    el.addEventListener('mouseleave', () => cursor.classList.remove('big'));
+  });
+  function tick() {
+    cx += (tx - cx) * 0.22;
+    cy += (ty - cy) * 0.22;
+    cursor.style.left = cx + 'px';
+    cursor.style.top = cy + 'px';
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+
+/* ─── 13th contract easter egg ─── */
+(() => {
+  const addr = document.querySelector('.thirteenth .addr');
+  if (!addr) return;
+  const hexes = '0123456789abcdef';
+  setInterval(() => {
+    const r = '0x' + Array.from({length: 40}, () => hexes[Math.floor(Math.random() * 16)]).join('');
+    addr.textContent = r + '.awaken(bytes32 anima)';
+  }, 220);
+})();
+</script>
+
+</body>
+</html>

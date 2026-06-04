@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#050505" />
+<link rel="icon" type="image/png" href="/assets/img/logo.png" />
+<link rel="apple-touch-icon" href="/assets/img/logo.png" />
+<title>LZidentity — One you, every chain</title>
+<meta name="description" content="LZidentity is one identity that works on every chain. Sign once, and it follows you across Ethereum, Arbitrum, Optimism, Base — and the rest. Recover it without a seed phrase, trade perps on Hyperliquid signed by your own wallet, and an assistant that helps you use all of it." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@1&display=swap" />
+
+<link rel="stylesheet" href="/assets/css/base.css" />
+<link rel="stylesheet" href="/assets/css/landing.css" />
+<link rel="stylesheet" href="/assets/css/anima.css" />
+</head>
+<body>
+
+<a class="skip-link" href="#top">Skip to content</a>
+
+<div class="grain" aria-hidden="true"></div>
+
+<div class="preloader" id="preloader">
+  <div class="ring"></div>
+  <div class="pl-label">waking your identity · lz</div>
+</div>
+<script>
+  (function(){
+    var hide = function(){ var p = document.getElementById("preloader"); if (p) p.classList.add("gone"); };
+    if (document.readyState === "complete") setTimeout(hide, 400);
+    else window.addEventListener("load", function(){ setTimeout(hide, 400); });
+    setTimeout(hide, 2500);
+  })();
+</script>
+
+<header class="nav" id="nav">
+  <a class="brand" href="#top">
+    <span class="b-mark"><img src="/assets/img/logo.png" alt="LZidentity" /></span>
+    <span>LZIDENTITY</span>
+    <span class="b-dot"></span>
+  </a>
+  <nav class="nav-links">
+    <a href="#unified">Identity</a>
+    <a href="#manifest">Manifest</a>
+    <a href="#pillars">What you get</a>
+    <a href="#walkthrough">Product</a>
+    <a href="#transports">How it travels</a>
+  </nav>
+  <div class="nav-right">
+    <span class="gmt" id="gmt">— UTC —</span>
+    <a href="/app.html" class="btn ghost">Launch App ↗</a>
+    <button id="connectBtn" class="btn ghost"><span class="dot" style="display:none" id="connDot"></span><span id="connLabel">Connect Wallet</span></button>
+  </div>
+</header>
+
+<section class="hero" id="top">
+  <canvas id="glCanvas" aria-hidden="true"></canvas>
+  <div class="hero-coord tl" aria-hidden="true">Q 53.483 · W 002.244</div>
+  <div class="hero-coord bl" aria-hidden="true">network · 20,484 nodes</div>
+
+  <div class="hero-inner">
+    <span class="eyebrow"><span class="bar"></span>[01] · one identity · every chain</span>
+    <h1 class="title">One you,<br><span class="ital">every chain.</span></h1>
+    <p class="lede">LZidentity is one identity that works wherever you do. Sign once with your wallet and it follows you across Ethereum, Arbitrum, Optimism, Base, Solana — and whatever ships next month. A way to <em style="font-family:var(--serif);color:#ff6b35">recover</em> it without the seed phrase, real <em style="font-family:var(--serif);color:#5eead4">trading</em> on Hyperliquid, and an <em style="font-family:var(--serif);color:#b39aff">assistant</em> that helps with all of it.</p>
+    <div class="cta-row">
+      <a href="/app.html" class="btn accent">Open the app →</a>
+      <a href="#manifest" class="btn ghost">Read the manifest</a>
+    </div>
+  </div>
+
+  <div class="hero-meta">
+    <div class="cell"><span>[ chains ]</span><span class="val" id="m1">5 connected</span></div>
+    <div class="cell"><span>[ identity ]</span><span class="val" id="m2">EVM → Nostr</span></div>
+    <div class="cell"><span>[ routes ]</span><span class="val" id="m3">ARB ⇄ OP · 240 ms</span></div>
+    <div class="cell"><span>[ block ]</span><span class="val" id="m4">#229,841,007</span></div>
+  </div>
+</section>
+
+<div class="marquee" aria-hidden="true"><div class="marquee-track" id="mqTrack"></div></div>
+
+<section class="unified" id="unified">
+  <div class="wrap">
+    <div class="section-label"><span class="num">[ 02 ]</span> SIGN ONCE · USE EVERYWHERE</div>
+    <h2 class="h2" data-reveal>One signature,<br><span class="ital">two networks.</span></h2>
+    <p class="h-lede" data-reveal>Your wallet lives on Ethereum. Your messages live on Nostr. They speak different languages — so we make them rhyme. Sign one message with the wallet you already have, and a matching Nostr identity is born. Same wallet, same Nostr name, forever.</p>
+
+    <div class="unified-grid">
+      <div class="magic-box" data-reveal>
+        <div class="mb-flow">
+          <div class="mb-node" id="nodeEvm">
+            <span class="label">[ A ] EVM wallet</span>
+            <div class="val dim" id="evmAddr">— not connected —</div>
+            <span class="chip"><span class="d"></span><span id="evmChip">awaiting connect</span></span>
+          </div>
+          <div class="arrow" id="arr1">→</div>
+          <div class="mb-node" id="nodeHash">
+            <span class="label">[ B ] sha256 ( signature )</span>
+            <div class="val dim" id="hashOut">···</div>
+            <span class="chip"><span class="d"></span><span id="hashChip">idle</span></span>
+          </div>
+          <div class="arrow" id="arr2">→</div>
+          <div class="mb-node" id="nodeNpub">
+            <span class="label">[ C ] Nostr identity</span>
+            <div class="val dim" id="npubOut">npub1···</div>
+            <span class="chip"><span class="d"></span><span id="npubChip">idle</span></span>
+          </div>
+        </div>
+        <div class="mb-actions">
+          <button class="btn accent" id="deriveBtn">Sign &amp; derive →</button>
+          <button class="btn ghost" id="resetBtn" style="display:none">Reset</button>
+          <span class="mb-status" id="mbStatus">Connect a wallet, then click "Sign &amp; derive" to generate your Nostr key.</span>
+        </div>
+      </div>
+
+      <div class="mb-explain">
+        <div class="row" data-reveal><div class="n">1</div><p><strong>Connect your wallet.</strong> MetaMask, Rabby, Frame — whatever you already use. No new app to install.</p></div>
+        <div class="row" data-reveal><div class="n">2</div><p><strong>Sign one short message.</strong> Always the same one. Your wallet pops up, you tap once, that's it.</p></div>
+        <div class="row" data-reveal><div class="n">3</div><p><strong>Your Nostr name is born.</strong> Behind the scenes we turn that signature into a Nostr key — the public name (an <code>npub</code>) becomes your identity on a second network.</p></div>
+        <div class="row" data-reveal><div class="n">4</div><p><strong>Same wallet, same name. Always.</strong> Switch device, sign again, you're back. Your Nostr name is the echo of your wallet — nothing to write down, nothing to lose.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- [03] MANIFEST                                                 -->
+<!-- ============================================================ -->
+<section class="anima-manifest" id="manifest">
+  <div class="wrap">
+    <div class="section-label"><span class="num">[ 03 ]</span> MANIFEST · ONE YOU, EVERYWHERE</div>
+
+    <div class="am-head">
+      <h2 data-reveal>One you.<br><span class="ital">Everywhere.</span></h2>
+      <p class="am-lede" data-reveal>
+        Today, every chain treats you like a stranger. You connect, you prove yourself,
+        you start over. New wallet on Base, new name on Solana, no memory of the
+        thousand things you've already done elsewhere. <strong>LZidentity is the
+        opposite of that.</strong> One identity that belongs only to you — and remembers
+        you on every chain you've ever touched, and every one that's still on the way.
+      </p>
+    </div>
+
+    <div class="am-prose">
+      <div class="par k" data-reveal>
+        <div class="num"></div>
+        <span class="tag">recovery</span>
+        <h4>If you lose the keys, you don't lose yourself.</h4>
+        <p>
+          Pick the people (or devices) you trust the most — friends, a hardware wallet
+          in a drawer, a second phone. If you ever lose access, two of them together
+          can bring you back. <em>No seed phrase to hide, no twelve words to forget</em> —
+          your identity is built around the people you'd actually call in a panic.
+        </p>
+      </div>
+      <div class="par d" data-reveal>
+        <div class="num"></div>
+        <span class="tag">trading</span>
+        <h4>Real markets, without leaving home.</h4>
+        <p>
+          Trade perpetuals on <em>Hyperliquid</em> from inside your identity — a live
+          order book, candles that move with the market, your positions and balance in
+          one place. Every order is <em>signed by your own wallet</em> and settles
+          on-chain. Start on testnet, switch to mainnet when it feels right.
+        </p>
+      </div>
+      <div class="par s" data-reveal>
+        <div class="num"></div>
+        <span class="tag">assistant</span>
+        <h4>Someone who knows the whole app.</h4>
+        <p>
+          An assistant tied to your identity that actually understands the app. Ask it
+          to explain a feature, open a tab, read your balances, or <em>set up a trade
+          for you to sign</em>. Bring your own Claude key for the full thing, or lean on
+          the built-in guide. <em>It never signs anything for you.</em>
+        </p>
+      </div>
+    </div>
+
+    <div class="am-quote" data-reveal>
+      <p class="q">"An identity is not a token you hold. It's a self you keep."</p>
+      <span class="src">— LZidentity</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- [04] THREE PILLARS                                           -->
+<!-- ============================================================ -->
+<section class="pillars" id="pillars">
+  <div class="wrap">
+    <div class="pillars-head">
+      <div>
+        <div class="section-label"><span class="num">[ 04 ]</span> WHAT YOU GET</div>
+        <h2 class="h2" data-reveal>Recovery · Trading ·<br><span class="ital">Assistant.</span></h2>
+      </div>
+      <p class="h-lede" data-reveal>
+        Three things, built into the same identity. A way back without the seed phrase,
+        real on-chain trading on Hyperliquid, and an assistant that helps you use all of
+        it. Each one stands on its own — and they're stronger together.
+      </p>
+    </div>
+
+    <div class="pillars-grid">
+      <!-- ─── RECOVERY ─── -->
+      <article class="pillar recovery" data-reveal>
+        <div class="pillar-viz">
+          <svg viewBox="0 0 360 220" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="kg1" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#ff6b35" stop-opacity=".55"/>
+                <stop offset="100%" stop-color="#ff6b35" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <circle cx="180" cy="110" r="44" fill="url(#kg1)"/>
+            <circle cx="180" cy="110" r="14" fill="none" stroke="#ff6b35" stroke-width="1.5"/>
+            <text x="180" y="115" fill="#ff6b35" font-family="Geist Mono" font-size="11" font-weight="700" text-anchor="middle">you</text>
+            <g fill="none" stroke="#ff6b35" stroke-opacity=".5" stroke-width="1">
+              <line x1="180" y1="110" x2="80"  y2="50"><animate attributeName="stroke-opacity" values=".2;.7;.2" dur="4s" repeatCount="indefinite"/></line>
+              <line x1="180" y1="110" x2="280" y2="50"><animate attributeName="stroke-opacity" values=".2;.7;.2" dur="4s" begin="-1.3s" repeatCount="indefinite"/></line>
+              <line x1="180" y1="110" x2="180" y2="200"><animate attributeName="stroke-opacity" values=".2;.7;.2" dur="4s" begin="-2.6s" repeatCount="indefinite"/></line>
+            </g>
+            <g fill="#ff6b35">
+              <circle cx="80"  cy="50"  r="9"/>
+              <circle cx="280" cy="50"  r="9"/>
+              <circle cx="180" cy="200" r="9"/>
+            </g>
+            <g fill="rgba(255,107,53,.7)" font-family="Geist Mono" font-size="9" text-anchor="middle">
+              <text x="80"  y="34">friend</text>
+              <text x="280" y="34">device</text>
+              <text x="180" y="180">backup</text>
+            </g>
+            <text x="180" y="30" fill="#ff6b35" font-family="Geist Mono" font-size="10" text-anchor="middle" opacity=".7">2-of-3 brings you back</text>
+          </svg>
+        </div>
+        <div class="tag-line"><span class="d"></span>[ pillar 01 · recovery ]</div>
+        <h3>Recovery <span class="ital">— a way back, without the seed phrase.</span></h3>
+        <span class="pillar-sub">a few people you trust · two are enough</span>
+        <p>
+          Pick a handful of guardians — a friend, a hardware wallet in a drawer, a
+          second phone of yours. If you ever lose access to your main wallet, two of
+          them sign and you're <em>back to being yourself</em> on every chain at once.
+          No twelve words to memorize, no panic when your phone breaks.
+        </p>
+        <div class="specs">
+          <div class="sp"><span class="k">how</span><span class="v hl">2-of-3 guardians · or your rule</span></div>
+          <div class="sp"><span class="k">scope</span><span class="v">every chain, at the same time</span></div>
+          <div class="sp"><span class="k">runs on</span><span class="v">LayerZero · atomic</span></div>
+        </div>
+        <a href="/app.html#/recovery" class="pillar-cta">Open Recovery →</a>
+      </article>
+
+      <!-- ─── TRADING ─── -->
+      <article class="pillar trade" data-reveal>
+        <div class="pillar-viz">
+          <svg viewBox="0 0 360 220" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="tg1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#5eead4" stop-opacity=".5"/>
+                <stop offset="100%" stop-color="#5eead4" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <polyline points="20,150 60,132 100,142 140,96 180,112 220,74 260,86 300,46 340,60" fill="none" stroke="#5eead4" stroke-width="1.5" stroke-opacity=".85">
+              <animate attributeName="stroke-opacity" values=".4;.9;.4" dur="4s" repeatCount="indefinite"/>
+            </polyline>
+            <g>
+              <line x1="70"  y1="106" x2="70"  y2="162" stroke="#3fb98a" stroke-width="6"/>
+              <line x1="130" y1="92"  x2="130" y2="138" stroke="#e0556b" stroke-width="6"/>
+              <line x1="190" y1="80"  x2="190" y2="124" stroke="#3fb98a" stroke-width="6"/>
+              <line x1="250" y1="62"  x2="250" y2="104" stroke="#3fb98a" stroke-width="6"/>
+              <line x1="310" y1="50"  x2="310" y2="98"  stroke="#e0556b" stroke-width="6"/>
+            </g>
+            <rect x="20" y="186" width="320" height="16" fill="url(#tg1)"/>
+            <text x="20" y="30" fill="#5eead4" font-family="Geist Mono" font-size="10" opacity=".8">BTC-PERP · live · hyperliquid</text>
+          </svg>
+        </div>
+        <div class="tag-line"><span class="d"></span>[ pillar 02 · trading ]</div>
+        <h3>Trading <span class="ital">— real markets, signed by you.</span></h3>
+        <span class="pillar-sub">live order book · candles · your wallet signs</span>
+        <p>
+          Trade perps on <em>Hyperliquid</em> without leaving your identity. Live
+          prices, a real order book, and a chart that moves with the market. Every
+          order is <em>signed by your own wallet</em> and settles on-chain — start on
+          testnet, flip to mainnet when you're ready.
+        </p>
+        <div class="specs">
+          <div class="sp"><span class="k">venue</span><span class="v hl">Hyperliquid · perps</span></div>
+          <div class="sp"><span class="k">signs</span><span class="v">your wallet, every order</span></div>
+          <div class="sp"><span class="k">safety</span><span class="v">testnet first · then mainnet</span></div>
+        </div>
+        <a href="/app.html#/trade" class="pillar-cta">Open Trading →</a>
+      </article>
+
+      <!-- ─── ASSISTANT ─── -->
+      <article class="pillar assist" data-reveal>
+        <div class="pillar-viz">
+          <svg viewBox="0 0 360 220" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="ag1" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#b39aff" stop-opacity=".5"/>
+                <stop offset="100%" stop-color="#b39aff" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <circle cx="180" cy="116" r="48" fill="url(#ag1)"/>
+            <rect x="118" y="90" width="124" height="56" rx="15" fill="rgba(179,154,255,.12)" stroke="#b39aff" stroke-width="1"/>
+            <g fill="#b39aff">
+              <circle cx="152" cy="118" r="4"><animate attributeName="opacity" values=".3;1;.3" dur="1.4s" repeatCount="indefinite"/></circle>
+              <circle cx="180" cy="118" r="4"><animate attributeName="opacity" values=".3;1;.3" dur="1.4s" begin="-.2s" repeatCount="indefinite"/></circle>
+              <circle cx="208" cy="118" r="4"><animate attributeName="opacity" values=".3;1;.3" dur="1.4s" begin="-.4s" repeatCount="indefinite"/></circle>
+            </g>
+            <path d="M180 34 l6 16 16 6 -16 6 -6 16 -6 -16 -16 -6 16 -6 z" fill="#5eead4"><animate attributeName="opacity" values=".5;1;.5" dur="3s" repeatCount="indefinite"/></path>
+            <text x="180" y="190" fill="#b39aff" font-family="Geist Mono" font-size="9" text-anchor="middle" opacity=".7">ask · it knows the whole app</text>
+          </svg>
+        </div>
+        <div class="tag-line"><span class="d"></span>[ pillar 03 · assistant ]</div>
+        <h3>Assistant <span class="ital">— help with every corner.</span></h3>
+        <span class="pillar-sub">ask in plain words · it does the rest</span>
+        <p>
+          An assistant that actually knows the app. Ask it to <em>explain a feature,
+          open a tab, read your balances, or set up a trade</em> for you to sign. Bring
+          your own Claude key for the full thing, or use the built-in guide offline.
+          It never signs anything for you — it just gets you there faster.
+        </p>
+        <div class="specs">
+          <div class="sp"><span class="k">does</span><span class="v hl">navigate · explain · set up</span></div>
+          <div class="sp"><span class="k">powered by</span><span class="v">Claude · your key</span></div>
+          <div class="sp"><span class="k">never</span><span class="v">signs on your behalf</span></div>
+        </div>
+        <a href="/app.html" class="pillar-cta">Try the assistant →</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- [05] PRODUCT WALKTHROUGH                                     -->
+<!-- ============================================================ -->
+<section class="walkthrough" id="walkthrough">
+  <div class="wt-intro" data-reveal>
+    <div class="section-label"><span class="num">[ 05 ]</span> A QUICK TOUR</div>
+    <h2 class="h2">Four screens.<br><span class="ital">One identity.</span></h2>
+    <p>What the app feels like in your pocket. Scroll to walk through it.</p>
+    <div class="cta-row" style="justify-content:center;margin-top:24px"><a href="/app.html" class="btn accent">Open the app →</a></div>
+  </div>
+
+  <div class="wt-pin-wrap">
+    <div class="wt-pin">
+      <div class="wt-phone-stage">
+        <div class="wt-phone">
+          <div class="wt-screen on" data-scene="0">
+            <div class="sb"><span id="sbT0">10:42</span><span class="sb-r"><span class="sb-bars"><i></i><i></i><i></i><i></i></span><span class="sb-batt"><i></i></span></span></div>
+            <div class="wt-screen-head"><span class="pre">[ inbox · 6 active ]</span><h4>Chat<small>via auto-route</small></h4></div>
+            <div class="wt-screen-body">
+              <div class="chat-row"><div class="av">MC</div><div class="col"><div class="top"><span class="name">Maya Chen</span><span class="time">2m</span></div><span class="msg">Routing via Optimism. Cost under budget.</span><div class="meta"><span class="tag mesh">MESH</span></div></div><span class="unread">2</span></div>
+              <div class="chat-row"><div class="av b">AD</div><div class="col"><div class="top"><span class="name">Atlas DAO</span><span class="time">18m</span></div><span class="msg">New NIP-28 channel checkpoint published.</span><div class="meta"><span class="tag nostr">NOSTR</span></div></div></div>
+              <div class="chat-row"><div class="av c">RO</div><div class="col"><div class="top"><span class="name">River Ops</span><span class="time">1h</span></div><span class="msg">LayerZero receipt finalized on Arbitrum.</span><div class="meta"><span class="tag lz">LZ</span></div></div><span class="unread">1</span></div>
+              <div class="chat-row"><div class="av">DK</div><div class="col"><div class="top"><span class="name">Deck Crew</span><span class="time">3h</span></div><span class="msg">Mesh test passed at -54 dBm.</span><div class="meta"><span class="tag mesh">MESH</span></div></div></div>
+              <div class="chat-row"><div class="av b">SG</div><div class="col"><div class="top"><span class="name">Stargate Relay</span><span class="time">5h</span></div><span class="msg">Encrypted payload archived to relay.</span><div class="meta"><span class="tag nostr">NOSTR</span></div></div></div>
+            </div>
+          </div>
+
+          <div class="wt-screen" data-scene="1">
+            <div class="sb"><span id="sbT1">10:42</span><span class="sb-r"><span class="sb-bars"><i></i><i></i><i></i><i></i></span><span class="sb-batt"><i></i></span></span></div>
+            <div class="wt-screen-head"><span class="pre">[ 3 chains · ledger nano x ]</span><h4>Wallet<small>0x7A2d…91F0</small></h4></div>
+            <div class="wt-screen-body">
+              <div class="wal-bal"><div class="lab">total balance</div><div class="v">$11,615.42 <small>+ 3.1%</small></div></div>
+              <div class="tok-row"><div class="tok-icon eth">Ξ</div><div class="col"><span class="sym">ETH</span><span class="nm">Ethereum · 2.418</span></div><div><div class="price">$8,942.10</div><div class="ch up">+ 2.4%</div></div></div>
+              <div class="tok-row"><div class="tok-icon arb">AR</div><div class="col"><span class="sym">ARB</span><span class="nm">Arbitrum · 1,842</span></div><div><div class="price">$1,529.42</div><div class="ch up">+ 5.8%</div></div></div>
+              <div class="tok-row"><div class="tok-icon op">OP</div><div class="col"><span class="sym">OP</span><span class="nm">Optimism · 930</span></div><div><div class="price">$1,143.90</div><div class="ch dn">− 0.6%</div></div></div>
+            </div>
+          </div>
+
+          <div class="wt-screen" data-scene="2">
+            <div class="sb"><span id="sbT2">10:42</span><span class="sb-r"><span class="sb-bars"><i></i><i></i><i></i><i></i></span><span class="sb-batt"><i></i></span></span></div>
+            <div class="wt-screen-head"><span class="pre">[ coingecko · live ]</span><h4>Markets<small>top by mkt cap</small></h4></div>
+            <div class="wt-screen-body">
+              <div class="mk-row"><div class="ic b">BT</div><div class="col"><span class="sym">BTC</span><span class="nm">Bitcoin</span></div><svg class="mk-spark" viewBox="0 0 48 18"><polyline fill="none" stroke="#86efac" stroke-width="1.4" points="0,14 6,10 12,12 18,7 24,8 30,4 36,5 42,2 48,3"/></svg><div><div class="p">$92,140</div><div class="ch up">+ 1.4%</div></div></div>
+              <div class="mk-row"><div class="ic c">ET</div><div class="col"><span class="sym">ETH</span><span class="nm">Ethereum</span></div><svg class="mk-spark" viewBox="0 0 48 18"><polyline fill="none" stroke="#86efac" stroke-width="1.4" points="0,12 6,9 12,11 18,6 24,7 30,5 36,3 42,4 48,2"/></svg><div><div class="p">$3,698</div><div class="ch up">+ 2.4%</div></div></div>
+              <div class="mk-row"><div class="ic d">US</div><div class="col"><span class="sym">USDT</span><span class="nm">Tether</span></div><svg class="mk-spark" viewBox="0 0 48 18"><polyline fill="none" stroke="#a0a0a8" stroke-width="1.4" points="0,9 6,9 12,9 18,9 24,9 30,9 36,9 42,9 48,9"/></svg><div><div class="p">$1.00</div><div class="ch up">+ 0.0%</div></div></div>
+              <div class="mk-row"><div class="ic e">SO</div><div class="col"><span class="sym">SOL</span><span class="nm">Solana</span></div><svg class="mk-spark" viewBox="0 0 48 18"><polyline fill="none" stroke="#fda4af" stroke-width="1.4" points="0,4 6,6 12,5 18,7 24,9 30,11 36,10 42,12 48,13"/></svg><div><div class="p">$184.21</div><div class="ch dn">− 1.8%</div></div></div>
+            </div>
+          </div>
+
+          <div class="wt-screen" data-scene="3">
+            <div class="sb"><span id="sbT3">10:42</span><span class="sb-r"><span class="sb-bars"><i></i><i></i><i></i><i></i></span><span class="sb-batt"><i></i></span></span></div>
+            <div class="wt-screen-head"><span class="pre">[ live · last 24 h ]</span><h4>Network<small>explorer</small></h4></div>
+            <div class="wt-screen-body">
+              <div class="kpi-strip">
+                <div class="kpi-c"><div class="lab">Msgs 24h</div><div class="v">18.4k</div><div class="tr">+ 12%</div></div>
+                <div class="kpi-c"><div class="lab">Peers</div><div class="v">71</div><div class="tr">+ 8</div></div>
+                <div class="kpi-c"><div class="lab">Avg fee</div><div class="v">$0.031</div><div class="tr" style="color:var(--error)">− 4%</div></div>
+              </div>
+              <div class="nw-msg live"><div class="row"><span class="stat inf">Inflight</span><span class="t">now</span></div><span class="h">0x9f12…a88c</span><span class="rt">Arbitrum → Optimism</span><span class="lyr">LayerZero</span></div>
+              <div class="nw-msg"><div class="row"><span class="stat dly">Delivered</span><span class="t">12s</span></div><span class="h">mesh:7h3…91b</span><span class="rt">3 hops · #mesh</span><span class="lyr">BLE Mesh</span></div>
+              <div class="nw-msg"><div class="row"><span class="stat wrp">Wrapped</span><span class="t">41s</span></div><span class="h">nevent1…q4m</span><span class="rt">relay.damus.io</span><span class="lyr">Nostr</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wt-caption">
+        <div class="wt-scene-panel on" data-panel="0">
+          <span class="pre"><span class="b"></span>SCENE 01 · CHAT</span>
+          <h3>Conversations that<br><span class="ital">find their own way.</span></h3>
+          <p>Every message picks the best way to travel. Bluetooth when your friends are near. A public relay when they're not. A cross-chain bridge when they're on another network. You write — the app figures out the rest.</p>
+          <ul>
+            <li><span class="b"></span>Auto-route, with manual override on long-press</li>
+            <li><span class="b"></span>End-to-end encrypted, every message</li>
+            <li><span class="b"></span>Reads work even when you're offline</li>
+          </ul>
+        </div>
+        <div class="wt-scene-panel" data-panel="1">
+          <span class="pre"><span class="b"></span>SCENE 02 · WALLET</span>
+          <h3>One balance.<br><span class="ital">Many chains.</span></h3>
+          <p>All your assets in one view: Ethereum, Arbitrum, Optimism, more on the way. Move value between chains in a tap. Hardware wallet support for anything that matters.</p>
+          <ul>
+            <li><span class="b"></span>Hardware-wallet signing</li>
+            <li><span class="b"></span>Live prices, fresh every minute</li>
+            <li><span class="b"></span>Cross-chain transfers, one tap</li>
+          </ul>
+        </div>
+        <div class="wt-scene-panel" data-panel="2">
+          <span class="pre"><span class="b"></span>SCENE 03 · MARKETS</span>
+          <h3>Markets you can<br><span class="ital">act on right here.</span></h3>
+          <p>Live prices, real charts, top coins by market cap. Tap a row and swap from the same thread you were chatting in. No detour to another app.</p>
+          <ul>
+            <li><span class="b"></span>Top coins with seven-day sparklines</li>
+            <li><span class="b"></span>Chain and protocol leaderboards</li>
+            <li><span class="b"></span>Search that just works</li>
+          </ul>
+        </div>
+        <div class="wt-scene-panel" data-panel="3">
+          <span class="pre"><span class="b"></span>SCENE 04 · NETWORK</span>
+          <h3>The whole network,<br><span class="ital">on one screen.</span></h3>
+          <p>Every message in flight, every hop, every cross-chain receipt. Tap any line to see where it came from, where it's going, and what it cost.</p>
+          <ul>
+            <li><span class="b"></span>Live activity feed</li>
+            <li><span class="b"></span>Messages, peers, fees at a glance</li>
+            <li><span class="b"></span>Drill into anything in one tap</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="wt-progress" id="wtProg">
+        <div class="seg" data-seg="0"></div>
+        <div class="seg" data-seg="1"></div>
+        <div class="seg" data-seg="2"></div>
+        <div class="seg" data-seg="3"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="transports" id="transports">
+  <div class="wrap">
+    <div class="tp-head">
+      <div>
+        <div class="section-label"><span class="num">[ 06 ]</span> HOW IT TRAVELS</div>
+        <h2 class="h2" data-reveal>Three ways out.<br><span class="ital">Always one in.</span></h2>
+      </div>
+      <p class="h-lede" data-reveal>The app speaks three "languages" so your message can always find a way through. You don't have to choose — it picks the best one for each message. Or override with a long-press.</p>
+    </div>
+
+    <div class="tp-grid">
+      <div class="tp-card mesh" data-reveal>
+        <div class="viz">
+          <svg viewBox="0 0 360 220" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs><radialGradient id="mg1" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#5eead4" stop-opacity=".8"/><stop offset="100%" stop-color="#5eead4" stop-opacity="0"/></radialGradient></defs>
+            <g stroke="rgba(94,234,212,.25)" stroke-width="1"><line x1="60" y1="50" x2="180" y2="110"/><line x1="180" y1="110" x2="300" y2="60"/><line x1="60" y1="50" x2="120" y2="170"/><line x1="120" y1="170" x2="180" y2="110"/><line x1="180" y1="110" x2="240" y2="180"/><line x1="240" y1="180" x2="300" y2="60"/><line x1="120" y1="170" x2="240" y2="180"/></g>
+            <g fill="#5eead4"><circle cx="180" cy="110" r="22" fill="url(#mg1)"/><circle cx="180" cy="110" r="6"><animate attributeName="r" values="6;8;6" dur="2s" repeatCount="indefinite"/></circle><circle cx="60" cy="50" r="4"/><circle cx="300" cy="60" r="4"/><circle cx="120" cy="170" r="4"/><circle cx="240" cy="180" r="4"/></g>
+          </svg>
+        </div>
+        <div class="tag-line"><span class="d"></span>[ near you · offline ]</div>
+        <h3>Mesh</h3>
+        <p>Bluetooth hops from phone to phone. For concerts, festivals, basements — anywhere the cell signal gives up. No internet needed.</p>
+        <div class="specs">
+          <div class="sp"><span class="k">range</span><span class="v">~80 m per hop</span></div>
+          <div class="sp"><span class="k">latency</span><span class="v">120–400 ms</span></div>
+          <div class="sp"><span class="k">privacy</span><span class="v">end-to-end encrypted</span></div>
+        </div>
+      </div>
+
+      <div class="tp-card nostr" data-reveal>
+        <div class="viz">
+          <svg viewBox="0 0 360 220" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs><radialGradient id="ng1"><stop offset="0%" stop-color="#ff7a59" stop-opacity=".7"/><stop offset="100%" stop-color="#ff7a59" stop-opacity="0"/></radialGradient></defs>
+            <circle cx="180" cy="110" r="90" fill="none" stroke="rgba(255,122,89,.18)" stroke-width="1"/>
+            <circle cx="180" cy="110" r="60" fill="none" stroke="rgba(255,122,89,.28)" stroke-width="1"/>
+            <circle cx="180" cy="110" r="30" fill="url(#ng1)"/>
+            <circle cx="180" cy="110" r="8" fill="#ff7a59"><animate attributeName="r" values="8;11;8" dur="2.4s" repeatCount="indefinite"/></circle>
+            <g fill="#ff7a59"><circle cx="180" cy="20" r="3.5"/><circle cx="270" cy="110" r="3.5"/><circle cx="180" cy="200" r="3.5"/><circle cx="90" cy="110" r="3.5"/><circle cx="244" cy="46" r="3.5"/><circle cx="244" cy="174" r="3.5"/><circle cx="116" cy="174" r="3.5"/><circle cx="116" cy="46" r="3.5"/></g>
+          </svg>
+        </div>
+        <div class="tag-line"><span class="d"></span>[ online · stored for you ]</div>
+        <h3>Nostr</h3>
+        <p>Public, censorship-resistant relays hold your encrypted messages until the other side comes back online. Same identity as your wallet — derived once, used forever.</p>
+        <div class="specs">
+          <div class="sp"><span class="k">relays</span><span class="v">4 by default · pick your own</span></div>
+          <div class="sp"><span class="k">privacy</span><span class="v">encrypted · sender-hidden</span></div>
+          <div class="sp"><span class="k">identity</span><span class="v">your wallet, second name</span></div>
+        </div>
+      </div>
+
+      <div class="tp-card lz" data-reveal>
+        <div class="viz">
+          <svg viewBox="0 0 360 220" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs><linearGradient id="lg1" x1="0" x2="1"><stop offset="0%" stop-color="#28a0f0"/><stop offset="100%" stop-color="#ff0420"/></linearGradient></defs>
+            <text x="40" y="40" fill="rgba(255,255,255,.55)" font-family="Geist Mono" font-size="9" letter-spacing="1">arbitrum · src</text>
+            <text x="320" y="40" fill="rgba(255,255,255,.55)" font-family="Geist Mono" font-size="9" letter-spacing="1" text-anchor="end">optimism · dst</text>
+            <rect x="40" y="56" width="280" height="28" rx="8" fill="rgba(40,160,240,.08)" stroke="rgba(40,160,240,.4)"/>
+            <text x="180" y="74" fill="#28a0f0" font-family="Geist Mono" font-size="10" text-anchor="middle">OFTv2 · encrypted payload</text>
+            <path d="M 40 100 C 120 100, 240 160, 320 160" fill="none" stroke="url(#lg1)" stroke-width="2" stroke-dasharray="4 4"><animate attributeName="stroke-dashoffset" from="0" to="-32" dur="1.4s" repeatCount="indefinite"/></path>
+            <rect x="40" y="136" width="280" height="28" rx="8" fill="rgba(255,4,32,.08)" stroke="rgba(255,4,32,.4)"/>
+            <text x="180" y="154" fill="#ff0420" font-family="Geist Mono" font-size="10" text-anchor="middle">OFTv2 · receipt + ack</text>
+            <circle cx="180" cy="130" r="5" fill="#b39aff"><animate attributeName="cx" from="40" to="320" dur="2s" repeatCount="indefinite"/></circle>
+          </svg>
+        </div>
+        <div class="tag-line"><span class="d"></span>[ across chains · verified ]</div>
+        <h3>LayerZero</h3>
+        <p>The cross-chain layer that ties all of this together. Messages and value move between chains with a signed receipt on both sides — no bridge gymnastics, no waiting half an hour.</p>
+        <div class="specs">
+          <div class="sp"><span class="k">chains</span><span class="v">ETH · ARB · OP · BASE · SOL</span></div>
+          <div class="sp"><span class="k">finality</span><span class="v">14–90 s</span></div>
+          <div class="sp"><span class="k">fee</span><span class="v">~ $0.02 / message</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="stats" id="stats">
+  <div class="wrap">
+    <div class="section-label"><span class="num">[ 07 ]</span> BY THE NUMBERS</div>
+    <h2 class="h2" data-reveal style="margin-bottom:64px">Last twenty-four hours,<br><span class="ital">on the network.</span></h2>
+    <div class="stat-grid">
+      <div class="stat-cell"><div class="lab">Messages sent</div><div class="val" data-counter="18432">0</div><div class="note">Across every route · last 24 hours</div></div>
+      <div class="stat-cell"><div class="lab">People nearby</div><div class="val" data-counter="71">0</div><div class="note">Phones within Bluetooth range right now</div></div>
+      <div class="stat-cell"><div class="lab">Cross-chain hops</div><div class="val" data-counter="14820">0</div><div class="note">Messages that crossed at least one chain</div></div>
+      <div class="stat-cell"><div class="lab">Average fee · ¢</div><div class="val" data-counter="3.1" data-decimals="1">0</div><div class="note">Per message · all routes combined</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="finale">
+  <div class="wrap">
+    <h2 data-reveal>Carry<br><span class="ital">yourself.</span></h2>
+    <p class="lede" data-reveal>Encrypted by default. On every chain by design. Yours by signature.</p>
+    <div class="cta-row" data-reveal>
+      <a href="/app.html" class="btn accent">Open the app →</a>
+      <a href="https://github.com/elioaalav-code/lzidentity" target="_blank" rel="noopener" class="btn ghost">View on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="fwrap">
+    <div class="fcol">
+      <div class="brand" style="margin-bottom:18px">
+        <span class="b-mark"><img src="/assets/img/logo.png" alt="LZidentity" /></span>
+        <span>LZIDENTITY</span>
+      </div>
+      <p>One identity that works on every chain. Sign once, and it follows you wherever you go — with a way back without the seed phrase, real trading on Hyperliquid, and an assistant that helps you use all of it.</p>
+    </div>
+    <div class="fcol">
+      <h5>Product</h5>
+      <a href="/app.html">Open app</a>
+      <a href="#unified">Identity</a>
+      <a href="#manifest">Manifest</a>
+      <a href="#pillars">What you get</a>
+      <a href="#walkthrough">Tour</a>
+      <a href="#transports">How it travels</a>
+    </div>
+    <div class="fcol">
+      <h5>Built on</h5>
+      <a href="https://layerzero.network" target="_blank" rel="noopener">LayerZero</a>
+      <a href="https://nostr.com" target="_blank" rel="noopener">Nostr</a>
+      <a href="https://github.com/elioaalav-code/lzidentity" target="_blank" rel="noopener">Source on GitHub</a>
+    </div>
+    <div class="fcol">
+      <h5>Legal</h5>
+      <a href="#" data-soon>Privacy</a>
+      <a href="#" data-soon>Terms</a>
+      <a href="#" data-soon>Security</a>
+    </div>
+  </div>
+  <div class="fbot">
+    <span>© 2026 LZidentity — one you, every chain.</span>
+    <span class="sys"><span class="d"></span><span id="footStat">all routes operational · v1.0.0 · 20,484 nodes online</span></span>
+  </div>
+</footer>
+
+<div class="toast"><span class="lab">LZ</span><span class="msg">—</span></div>
+
+<script type="module" src="/assets/js/landing.js"></script>
+<script type="module" src="/assets/js/anima.js"></script>
+</body>
+</html>

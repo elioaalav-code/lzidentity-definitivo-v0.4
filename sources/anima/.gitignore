@@ -1,0 +1,11 @@
+.DS_Store
+node_modules/
+.env
+.env.local
+*.log
+.idea/
+.vscode/
+dist/
+build/
+out/
+.cache/
