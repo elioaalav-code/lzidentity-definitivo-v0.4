@@ -2,6 +2,10 @@ import {
   awaitCrypto, bootstrapWallet, connectWallet, disconnectWallet, deriveNostr,
   onChange, state, shortAddr, shortNpub, toast, fmt, copyToClipboard,
 } from "./shared.js";
+import { CustomSelect, coinAvatarHTML, skeleton, emptyState } from "./ui.js";
+
+const prefersReduced = () =>
+  window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* =================================================================== *
  *  CLOCK
@@ -18,8 +22,31 @@ tickClock(); setInterval(tickClock, 1000);
  * =================================================================== */
 const ROUTES = ["chat","wallet","markets","trade","network","identity","recovery"];
 const views = Object.fromEntries(ROUTES.map(r => [r, document.querySelector(`.view[data-view="${r}"]`)]));
+const sideNav  = document.getElementById("sideNav");
 const navLinks = [...document.querySelectorAll(".side-nav a")];
 const crumbHere = document.getElementById("crumbHere");
+
+/* Sliding active-route indicator: a single pill that animates between
+   nav items. Positioned absolutely inside .side-nav (which is position
+   relative). On phones the nav is horizontal, so we track both axes. */
+let navPill = null;
+function ensureNavPill(){
+  if (navPill || !sideNav) return;
+  navPill = document.createElement("span");
+  navPill.className = "side-nav-pill";
+  navPill.setAttribute("aria-hidden", "true");
+  sideNav.prepend(navPill);
+}
+function moveNavPill(link){
+  ensureNavPill();
+  if (!navPill || !link) return;
+  // measure relative to the scrollable nav, accounting for its scroll offset
+  navPill.style.transform =
+    `translate(${link.offsetLeft}px, ${link.offsetTop}px)`;
+  navPill.style.width  = `${link.offsetWidth}px`;
+  navPill.style.height = `${link.offsetHeight}px`;
+  navPill.classList.add("on");
+}
 
 function getRoute(){
   const h = (location.hash || "#/chat").replace(/^#\/?/, "");
@@ -28,12 +55,21 @@ function getRoute(){
 }
 function setActive(route){
   for (const k of ROUTES){ views[k]?.classList.toggle("active", k === route); }
+  let activeLink = null;
   navLinks.forEach(a => {
     const on = a.dataset.route === route;
     a.classList.toggle("active", on);
-    if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    if (on){ a.setAttribute("aria-current", "page"); activeLink = a; }
+    else a.removeAttribute("aria-current");
   });
-  crumbHere.textContent = route;
+  moveNavPill(activeLink);
+  // crumb transition: brief swap animation on change
+  if (crumbHere.textContent !== route){
+    crumbHere.classList.remove("swap");
+    void crumbHere.offsetWidth; // reflow to restart the animation
+    crumbHere.textContent = route;
+    crumbHere.classList.add("swap");
+  }
   document.title = `LZidentity · ${route}`;
   // each view's onEnter hook (app.js-owned views)
   ONROUTE[route]?.();
@@ -41,6 +77,11 @@ function setActive(route){
   window.dispatchEvent(new CustomEvent("lz:route", { detail: { route } }));
 }
 window.addEventListener("hashchange", () => setActive(getRoute()));
+// keep the pill aligned through layout shifts (resize, font load)
+window.addEventListener("resize", () => {
+  const cur = navLinks.find(a => a.classList.contains("active"));
+  if (cur) moveNavPill(cur);
+});
 if (!location.hash) location.hash = "#/chat";
 
 /* =================================================================== *
@@ -89,9 +130,17 @@ async function connectFlow(){
   if (state.account){ disconnectWallet(); toast("disconnected"); return; }
   if (!window.ethereum){ toast("install MetaMask or Rabby", "err"); return; }
   try {
+    connectBtn.classList.add("is-connecting");
+    connectBtn.setAttribute("aria-busy", "true");
+    connLabel.textContent = "Connecting…";
     const a = await connectWallet();
     toast(`connected · ${shortAddr(a)}`, "ok");
   } catch { toast("connect rejected", "err"); }
+  finally {
+    connectBtn.classList.remove("is-connecting");
+    connectBtn.removeAttribute("aria-busy");
+    reflectWalletButton();
+  }
 }
 connectBtn.addEventListener("click", connectFlow);
 
@@ -135,8 +184,17 @@ let composeLayer = "auto";
 function renderChatList(filter=""){
   const items = document.getElementById("chatItems");
   const q = filter.toLowerCase();
-  items.innerHTML = CONVS.filter(c => !q || c.name.toLowerCase().includes(q) || c.last.toLowerCase().includes(q)).map(c => `
-    <div class="chat-item ${c.id===activeConv?"active":""}" data-id="${c.id}">
+  const matched = CONVS.filter(c => !q || c.name.toLowerCase().includes(q) || c.last.toLowerCase().includes(q));
+  if (!matched.length){
+    items.replaceChildren(emptyState({
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>`,
+      title: "No conversations",
+      body: q ? `Nothing matches “${filter}”.` : "Your inbox is empty.",
+    }));
+    return;
+  }
+  items.innerHTML = matched.map((c, i) => `
+    <div class="chat-item stagger-in ${c.id===activeConv?"active":""}" data-id="${c.id}" style="--i:${i}">
       <div class="av ${c.cls}">${c.av}</div>
       <div class="col">
         <div class="top"><span class="name">${c.name}</span><span class="time">${c.time}</span></div>
@@ -239,15 +297,17 @@ const TXS = [
   { kind:"out",  t:"Fee · gas",        s:"Arbitrum gas refill",            amt:"− $0.18",      dir:"dn" },
 ];
 
+let walletRendered = false;
 function totalUSD(){
   return TOKENS.reduce((s,t) => s + (walletPrices[t.key] || 0) * t.amount, 0);
 }
 function renderWallet(){
   document.getElementById("walletTotal").innerHTML = `${fmt.usd(totalUSD())} <small id="walletDelta">+ 3.1%</small>`;
   const list = document.getElementById("tokenList");
-  list.innerHTML = TOKENS.map(t => {
+  list.innerHTML = TOKENS.map((t, i) => {
     const usd = walletPrices[t.key] * t.amount;
-    return `<div class="token-row">
+    const fresh = walletRendered ? "" : "stagger-in";
+    return `<div class="token-row ${fresh}" style="--i:${i}">
       <div class="ic ${t.cls}">${t.icon}</div>
       <div class="col"><span class="sym">${t.sym}</span><span class="nm">${t.nm} · ${t.amount.toLocaleString("en-US")} ${t.sym}</span></div>
       <div class="amount"><span class="v">${fmt.usd(usd)}</span><span class="usd">@ ${fmt.usd(walletPrices[t.key])}</span></div>
@@ -255,12 +315,13 @@ function renderWallet(){
   }).join("");
 
   const txl = document.getElementById("txList");
-  txl.innerHTML = TXS.map(tx => `
-    <div class="tx-row">
+  txl.innerHTML = TXS.map((tx, i) => `
+    <div class="tx-row ${walletRendered ? "" : "stagger-in"}" style="--i:${i}">
       <div class="ic ${tx.kind}">${tx.kind === "in" ? "↓" : tx.kind === "out" ? "↑" : "⇄"}</div>
       <div class="col"><div class="t">${tx.t}</div><div class="s">${tx.s}</div></div>
       <div class="amt ${tx.dir}">${tx.amt}</div>
     </div>`).join("");
+  walletRendered = true;
 }
 
 async function fetchWalletPrices(){
@@ -275,6 +336,23 @@ async function fetchWalletPrices(){
     };
     renderWallet();
   } catch { /* keep demo prices */ }
+}
+
+/* Replace the native <select>s with the shared CustomSelect. The hidden
+   native element stays the source of truth, so the existing reads of
+   `sendAsset.value` / `sendVia.value` keep working unchanged. */
+const sendAssetSel = document.getElementById("sendAsset");
+const sendViaSel   = document.getElementById("sendVia");
+if (sendAssetSel){
+  new CustomSelect({
+    select: sendAssetSel,
+    title: "Select asset",
+    renderRow: (it) => `${coinAvatarHTML(it.value, 22)}<span class="lz-select-label">${it.label}</span>`,
+    renderTrigger: (it) => `${coinAvatarHTML(it.value, 20)}<span class="lz-select-label">${it.label}</span>`,
+  });
+}
+if (sendViaSel){
+  new CustomSelect({ select: sendViaSel, title: "Select route" });
 }
 
 document.getElementById("walletRefresh")?.addEventListener("click", () => { fetchWalletPrices(); toast("prices refreshed", "ok"); });
@@ -308,8 +386,10 @@ const DEMO_MARKETS = [
   { market_cap_rank:7, image:"", symbol:"usdc", name:"USD Coin", current_price:1.00,  price_change_percentage_24h:0.0,  market_cap:3.3e10,  sparkline_in_7d:{price:wave(1,0.001)} },
   { market_cap_rank:8, image:"", symbol:"ada",  name:"Cardano",  current_price:0.45,  price_change_percentage_24h:1.1,  market_cap:1.6e10,  sparkline_in_7d:{price:wave(0.44,0.01)} },
 ];
+let marketsDemo = false;
 function useDemoMarkets(){
   marketsRows = DEMO_MARKETS;
+  marketsDemo = true;
   renderMarkets();
   document.getElementById("kpiMcap").textContent = fmt.usd(2.41e12);
   document.getElementById("kpiVol").textContent  = fmt.usd(9.8e10);
@@ -333,12 +413,14 @@ function sparkSVG(values, up){
 
 async function fetchMarkets(){
   try {
-    document.getElementById("marketsRows").classList.add("market-skel");
-    document.getElementById("marketsRows").textContent = "loading coins from coingecko…";
+    const rowsEl = document.getElementById("marketsRows");
+    rowsEl.classList.remove("market-skel");
+    rowsEl.innerHTML = skeleton({ rows: 8, height: 44, gap: 0, radius: 0 });
     const r = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&page=1&sparkline=true&price_change_percentage=24h");
     if (!r.ok) throw new Error("rate-limited");
     marketsRows = await r.json();
     marketsLoaded = true;
+    marketsDemo = false;
     renderMarkets();
     // KPIs from global endpoint
     try {
@@ -362,10 +444,23 @@ async function fetchMarkets(){
 function renderMarkets(){
   const root = document.getElementById("marketsRows");
   root.classList.remove("market-skel");
-  root.innerHTML = marketsRows.map(c => {
+  // honest indicator on the table head when we're on fallback data
+  document.querySelector('[data-view="markets"] .markets-table')
+    ?.classList.toggle("is-demo", marketsDemo);
+  if (!marketsRows.length){
+    root.replaceChildren(emptyState({
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17 9 11l4 4 8-8"/><path d="M14 7h7v7"/></svg>`,
+      title: "No market data",
+      body: "Couldn't load coins right now.",
+      actionLabel: "Retry",
+      onAction: fetchMarkets,
+    }));
+    return;
+  }
+  root.innerHTML = marketsRows.map((c, i) => {
     const up = (c.price_change_percentage_24h || 0) >= 0;
     const sparkUp = (c.sparkline_in_7d?.price?.[0] || 0) <= (c.sparkline_in_7d?.price?.at(-1) || 0);
-    return `<div class="row" data-id="${c.id}">
+    return `<div class="row stagger-in" data-id="${c.id}" style="--i:${i}">
       <span class="rk">#${c.market_cap_rank}</span>
       <div class="coin">${c.image ? `<img src="${c.image}" alt="" loading="lazy"/>` : `<span class="coin-badge">${c.symbol.slice(0,1).toUpperCase()}</span>`}<div class="nm"><span class="s">${c.symbol.toUpperCase()}</span><span class="n">${c.name}</span></div></div>
       <span class="pr">${fmt.usd(c.current_price)}</span>
@@ -402,16 +497,18 @@ const initialStream = [
 ];
 let streamPaused = false;
 
+let streamRendered = false;
 function renderStream(items){
   const root = document.getElementById("streamList");
   root.innerHTML = items.map((s,i) => `
-    <div class="stream-item ${s.st==='inf'?'live':''}">
+    <div class="stream-item ${s.st==='inf'?'live':''} ${streamRendered ? "" : "stagger-in"}" style="--i:${i}">
       <span class="st ${s.st}">${s.lab}</span>
       <div class="col"><span class="h">${s.hash}</span><span class="r">${s.route}</span></div>
       <span class="lyr">${s.layer}</span>
       <span class="ag">${s.age||"now"}</span>
     </div>
   `).join("");
+  streamRendered = true;
 }
 let stream = [...initialStream];
 renderStream(stream);
@@ -526,12 +623,21 @@ function reflectIdentityDetails(){
   }
 }
 
+const mbFlow = document.querySelector('[data-view="identity"] .mb-flow');
+function setDeriving(on){
+  mbFlow?.classList.toggle("deriving", on);
+  if (deriveBtn) deriveBtn.classList.toggle("is-deriving", on);
+}
+
 deriveBtn?.addEventListener("click", async () => {
   if (!(await awaitCrypto())){ setMB("Crypto libraries failed to load.", "err"); toast("crypto libs not loaded", "err"); return; }
   if (!state.account){
     try { await connectWallet(); } catch { toast("connect rejected", "err"); return; }
   }
   try {
+    // Anticipatory success: light up the pipeline the moment the wallet
+    // popup opens, not only once the signature returns.
+    setDeriving(true);
     setMB("Open your wallet and sign the message …", "busy");
     await deriveNostr();
     toast(`derived · ${state.derived.npub.slice(0,16)}…`, "ok");
@@ -539,23 +645,45 @@ deriveBtn?.addEventListener("click", async () => {
     console.error(e);
     setMB(/reject/i.test(e?.message || "") ? "Signature rejected." : "Derivation failed: " + (e?.message || e), "err");
     toast("derivation failed", "err");
+  } finally {
+    setDeriving(false);
   }
 });
 
 resetBtn?.addEventListener("click", () => { disconnectWallet(); toast("identity cleared"); });
 
+async function copyKind(k, host){
+  let txt = "";
+  if (k === "addr") txt = state.account || "";
+  if (k === "npub") txt = state.derived?.npub || "";
+  if (k === "priv") txt = state.derived ? "0x" + state.derived.priv : "";
+  if (!txt){ toast("nothing to copy", "err"); return; }
+  const ok = await copyToClipboard(txt);
+  if (ok && host){
+    host.classList.remove("copied"); void host.offsetWidth; host.classList.add("copied");
+    setTimeout(() => host.classList.remove("copied"), 900);
+  }
+  toast(ok ? "copied to clipboard" : "copy failed", ok ? "ok" : "err");
+}
+
 document.querySelectorAll("[data-copy]").forEach(btn => {
-  btn.addEventListener("click", async () => {
-    let txt = "";
-    const k = btn.dataset.copy;
-    if (k === "addr") txt = state.account || "";
-    if (k === "npub") txt = state.derived?.npub || "";
-    if (k === "priv") txt = state.derived ? "0x" + state.derived.priv : "";
-    if (!txt){ toast("nothing to copy", "err"); return; }
-    const ok = await copyToClipboard(txt);
-    toast(ok ? "copied to clipboard" : "copy failed", ok ? "ok" : "err");
-  });
+  btn.addEventListener("click", () => copyKind(btn.dataset.copy, btn.closest(".id-row")));
 });
+
+/* Direct copy-to-clipboard affordance on the value chips themselves. */
+function makeValueCopyable(el, kind){
+  if (!el) return;
+  el.classList.add("copyable");
+  el.setAttribute("role", "button");
+  el.setAttribute("tabindex", "0");
+  el.setAttribute("aria-label", `Copy ${kind === "addr" ? "EVM address" : "npub"}`);
+  el.addEventListener("click", () => copyKind(kind, el.closest(".id-row")));
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); copyKind(kind, el.closest(".id-row")); }
+  });
+}
+makeValueCopyable(idAddr, "addr");
+makeValueCopyable(idNpub, "npub");
 
 /* =================================================================== *
  *  ROUTE HOOKS — onEnter
@@ -577,6 +705,17 @@ renderWallet();
 bootstrapWallet().then(() => { reflectWalletButton(); });
 
 setActive(getRoute());
+// re-align the nav pill once fonts/layout settle (web-font swap shifts widths)
+requestAnimationFrame(() => {
+  const cur = navLinks.find(a => a.classList.contains("active"));
+  if (cur) moveNavPill(cur);
+});
+if (document.fonts && document.fonts.ready){
+  document.fonts.ready.then(() => {
+    const cur = navLinks.find(a => a.classList.contains("active"));
+    if (cur) moveNavPill(cur);
+  });
+}
 
 /* =================================================================== *
  *  GLOBAL APP API — window.LZ
