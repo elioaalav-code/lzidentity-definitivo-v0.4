@@ -288,11 +288,12 @@ document.getElementById("chatSearch")?.addEventListener("input", (e) => renderCh
 /* Real on-chain balances: native ETH + native USDC across L1 + major L2s,
    read straight from public RPCs in the browser. No backend, no demo data. */
 const WALLET_CHAINS = [
-  { key:"eth",  name:"Ethereum", rpc:"https://ethereum-rpc.publicnode.com",     usdc:"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
-  { key:"arb",  name:"Arbitrum", rpc:"https://arbitrum-one-rpc.publicnode.com", usdc:"0xaf88d065e77c8cC2239327C5EDb3A432268e5831" },
-  { key:"op",   name:"Optimism", rpc:"https://optimism-rpc.publicnode.com",     usdc:"0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" },
-  { key:"base", name:"Base",     rpc:"https://base-rpc.publicnode.com",          usdc:"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
+  { key:"eth",  name:"Ethereum", scout:"https://eth.blockscout.com",      rpc:"https://ethereum-rpc.publicnode.com",     usdc:"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
+  { key:"arb",  name:"Arbitrum", scout:"https://arbitrum.blockscout.com", rpc:"https://arbitrum-one-rpc.publicnode.com", usdc:"0xaf88d065e77c8cC2239327C5EDb3A432268e5831" },
+  { key:"op",   name:"Optimism", scout:"https://optimism.blockscout.com", rpc:"https://optimism-rpc.publicnode.com",     usdc:"0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" },
+  { key:"base", name:"Base",     scout:"https://base.blockscout.com",     rpc:"https://base-rpc.publicnode.com",          usdc:"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
 ];
+const SPAM_RX = /https?:|www\.|\.(com|io|xyz|app|org|net|fi|to|vip)\b|claim|reward|airdrop|voucher|visit|access|\$\s|\s/i;
 const WALLET_ICN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/><circle cx="17" cy="15" r="1.2"/></svg>`;
 let walletTokens = [];        // [{sym,nm,chain,amount,price,usd}]
 let walletLoading = false;
@@ -311,6 +312,47 @@ const hexToNum = (hex, dec) => { try { return Number(BigInt(hex || "0x0")) / 10 
 
 function totalUSD(){ return walletTokens.reduce((s,t) => s + t.usd, 0); }
 
+/* Blockscout v2 (keyless): every ERC-20 the address holds, with symbol,
+   decimals and a USD exchange rate — plus the native coin balance. */
+const okJson = (r) => { if (!r.ok) throw new Error("scout " + r.status); return r.json(); };
+async function scoutBalances(c, addr){
+  const [acc, toks] = await Promise.all([
+    fetch(`${c.scout}/api/v2/addresses/${addr}`).then(okJson),
+    fetch(`${c.scout}/api/v2/addresses/${addr}/token-balances`).then(okJson),
+  ]);
+  const out = [];
+  const nativeAmt = Number(acc?.coin_balance || 0) / 1e18;
+  const nativeRate = Number(acc?.exchange_rate) || ethPrice;
+  if (nativeAmt > 1e-6) out.push({ sym: "ETH", nm: c.name, chain: c.key, amount: nativeAmt, price: nativeRate, usd: nativeAmt * nativeRate });
+  for (const t of (Array.isArray(toks) ? toks : [])){
+    const tk = t.token || {};
+    if ((tk.type || "") !== "ERC-20") continue;             // skip NFTs / ERC-1155
+    const rate = Number(tk.exchange_rate);
+    const dec = Number(tk.decimals);
+    if (!rate || !Number.isFinite(dec)) continue;           // unpriced → almost always spam
+    const sym = String(tk.symbol || "").trim();
+    if (!sym || SPAM_RX.test(sym) || sym.length > 12) continue;
+    const amt = Number(t.value) / 10 ** dec;
+    const usd = amt * rate;
+    if (!(usd >= 1) || usd > 1e7 || amt > 1e12) continue;   // dust + absurd-valuation/junk-supply guards
+    out.push({ sym, nm: c.name, chain: c.key, amount: amt, price: rate, usd });
+  }
+  return out;
+}
+/* fallback when a chain's Blockscout is unavailable: native ETH + USDC via RPC */
+async function rpcBalances(c, addr){
+  const balData = "0x70a08231" + addr.slice(2).toLowerCase().padStart(64, "0");
+  const [nativeHex, usdcHex] = await Promise.all([
+    rpcCall(c.rpc, "eth_getBalance", [addr, "latest"]).catch(() => "0x0"),
+    rpcCall(c.rpc, "eth_call", [{ to: c.usdc, data: balData }, "latest"]).catch(() => "0x0"),
+  ]);
+  const eth = hexToNum(nativeHex, 18), usdc = hexToNum(usdcHex, 6);
+  const out = [];
+  if (eth  > 1e-6) out.push({ sym: "ETH",  nm: c.name, chain: c.key, amount: eth,  price: ethPrice, usd: eth * ethPrice });
+  if (usdc > 0.01) out.push({ sym: "USDC", nm: c.name, chain: c.key, amount: usdc, price: 1,        usd: usdc });
+  return out;
+}
+
 async function loadWallet(){
   if (!state.account){ walletTokens = []; walletLoading = false; renderWallet(); return; }
   walletLoading = true; renderWallet();
@@ -319,19 +361,14 @@ async function loadWallet(){
     if (pr.ok){ const pj = await pr.json(); ethPrice = pj.ethereum?.usd ?? ethPrice; }
   } catch { /* keep last */ }
   const addr = state.account;
-  const balData = "0x70a08231" + addr.slice(2).toLowerCase().padStart(64, "0");
-  const found = [];
+  const all = [];
   await Promise.all(WALLET_CHAINS.map(async (c) => {
-    const [nativeHex, usdcHex] = await Promise.all([
-      rpcCall(c.rpc, "eth_getBalance", [addr, "latest"]).catch(() => "0x0"),
-      rpcCall(c.rpc, "eth_call", [{ to: c.usdc, data: balData }, "latest"]).catch(() => "0x0"),
-    ]);
-    const eth = hexToNum(nativeHex, 18), usdc = hexToNum(usdcHex, 6);
-    if (eth  > 1e-6) found.push({ sym:"ETH",  nm:c.name, chain:c.key, amount:eth,  price:ethPrice, usd:eth * ethPrice });
-    if (usdc > 0.01) found.push({ sym:"USDC", nm:c.name, chain:c.key, amount:usdc, price:1,        usd:usdc });
+    try { all.push(...await scoutBalances(c, addr)); }
+    catch { try { all.push(...await rpcBalances(c, addr)); } catch {} }
   }));
-  found.sort((a, b) => b.usd - a.usd);
-  walletTokens = found; walletLoading = false;
+  all.sort((a, b) => b.usd - a.usd);
+  walletTokens = all.slice(0, 30);
+  walletLoading = false;
   renderWallet();
 }
 
