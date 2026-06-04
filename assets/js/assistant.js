@@ -16,6 +16,8 @@
  * ============================================================ */
 
 import { CustomSelect } from "./ui.js";
+import * as HL from "./hyperliquid.js";
+import * as MD from "./marketdata.js";
 
 const LS = { KEY: "lz:ai:key", MODEL: "lz:ai:model" };
 const API = "https://api.anthropic.com/v1/messages";
@@ -52,7 +54,9 @@ let history = [];        // Anthropic messages[]
 let busy = false;
 
 /* ─── app tools the copilot can call ───────────────────────── */
+const HL_INTERVALS = ["1m","5m","15m","1h","4h","1d"];
 const TOOLS = [
+  /* ── app control ── */
   { name: "navigate", description: "Open one of the app's tabs for the user.",
     input_schema: { type: "object", properties: { tab: { type: "string", enum: ["chat","wallet","markets","trade","network","identity","recovery"] } }, required: ["tab"] } },
   { name: "get_app_state", description: "Read a live snapshot of the app: current tab, connected wallet, derived Nostr identity, wallet balances, top market prices.",
@@ -66,15 +70,145 @@ const TOOLS = [
       size: { type: "number", description: "Order size in the coin's units" },
       price: { type: "number", description: "Limit price (omit for market orders)" },
     }, required: ["side"] } },
+
+  /* ── Hyperliquid live market data (real, current network: testnet/mainnet toggle) ── */
+  { name: "get_ticker", description: "Hyperliquid: mark price, oracle price, 24h change, 24h volume, open interest and funding rate for one perp market.",
+    input_schema: { type: "object", properties: { coin: { type: "string" } }, required: ["coin"] } },
+  { name: "get_orderbook", description: "Hyperliquid live L2 order book (bids/asks with price & size) for a perp market.",
+    input_schema: { type: "object", properties: { coin: { type: "string" }, depth: { type: "number", description: "levels per side, default 10" } }, required: ["coin"] } },
+  { name: "get_trades", description: "Hyperliquid most recent public trades for a perp market.",
+    input_schema: { type: "object", properties: { coin: { type: "string" }, limit: { type: "number" } }, required: ["coin"] } },
+  { name: "get_candles", description: "Hyperliquid OHLCV candles for a perp market.",
+    input_schema: { type: "object", properties: { coin: { type: "string" }, interval: { type: "string", enum: HL_INTERVALS }, limit: { type: "number" } }, required: ["coin","interval"] } },
+  { name: "get_all_markets", description: "Hyperliquid: every perp market with price, 24h change, 24h volume, open interest and funding (sorted by volume).",
+    input_schema: { type: "object", properties: {} } },
+  { name: "get_funding_history", description: "Hyperliquid historical funding rates (last 7 days) for a perp market.",
+    input_schema: { type: "object", properties: { coin: { type: "string" }, limit: { type: "number" } }, required: ["coin"] } },
+  { name: "get_positions", description: "Hyperliquid open perp positions for a wallet (size, entry, uPnL, liquidation px, leverage). Omit wallet to use the connected one.",
+    input_schema: { type: "object", properties: { wallet: { type: "string" } } } },
+  { name: "get_open_orders", description: "Hyperliquid open/resting limit orders for a wallet. Omit wallet to use the connected one.",
+    input_schema: { type: "object", properties: { wallet: { type: "string" } } } },
+  { name: "get_trade_history", description: "Hyperliquid past executed fills for a wallet. Omit wallet to use the connected one.",
+    input_schema: { type: "object", properties: { wallet: { type: "string" }, limit: { type: "number" } } } },
+
+  /* ── CoinGecko (spot market data, no key) ── */
+  { name: "cg_market_data", description: "CoinGecko full market data for a coin by id (e.g. 'bitcoin','ethereum','solana'): price, market cap, volume, supply, ATH, 24h/7d/30d change.",
+    input_schema: { type: "object", properties: { coin_id: { type: "string" } }, required: ["coin_id"] } },
+  { name: "cg_chart", description: "CoinGecko OHLC price history for a coin id over N days (1,7,14,30,90,365).",
+    input_schema: { type: "object", properties: { coin_id: { type: "string" }, days: { type: "number" } }, required: ["coin_id"] } },
+  { name: "cg_top_coins", description: "CoinGecko top coins by market cap with price, 24h change, market cap and volume.",
+    input_schema: { type: "object", properties: { limit: { type: "number" } } } },
+  { name: "cg_trending", description: "CoinGecko trending coins over the last 24h.",
+    input_schema: { type: "object", properties: {} } },
+  { name: "cg_global", description: "Global crypto market: total market cap, 24h volume, BTC/ETH dominance, market-cap change.",
+    input_schema: { type: "object", properties: {} } },
+  { name: "fear_greed", description: "Crypto Fear & Greed index (0-100) with its classification.",
+    input_schema: { type: "object", properties: {} } },
+
+  /* ── DefiLlama (DeFi/TVL, no key) ── */
+  { name: "defi_protocols", description: "DefiLlama top DeFi protocols by TVL (name, category, chains, TVL, 1d/7d change).",
+    input_schema: { type: "object", properties: { limit: { type: "number" } } } },
+  { name: "defi_protocol", description: "DefiLlama details for one protocol by slug (e.g. 'aave','uniswap','lido'): current TVL, category, per-chain breakdown.",
+    input_schema: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] } },
+  { name: "defi_chains", description: "DefiLlama TVL by chain (top chains by total value locked).",
+    input_schema: { type: "object", properties: { limit: { type: "number" } } } },
+  { name: "defi_stablecoins", description: "DefiLlama top stablecoins by circulating supply, with price and peg.",
+    input_schema: { type: "object", properties: { limit: { type: "number" } } } },
+  { name: "defi_yields", description: "DefiLlama highest-APY yield pools (TVL > $1M) with project, chain and TVL.",
+    input_schema: { type: "object", properties: { limit: { type: "number" } } } },
 ];
 
-function runTool(name, args){
+const HL_MS = { "1m":60e3, "5m":300e3, "15m":900e3, "1h":3600e3, "4h":14400e3, "1d":86400e3 };
+const r2 = (n, d = 2) => (n == null || !isFinite(n) ? null : Number(Number(n).toFixed(d)));
+const upper = (c) => String(c || "").toUpperCase();
+const walletOf = (a) => a.wallet || window.LZ?.snapshot?.()?.wallet || null;
+
+async function runTool(name, args){
   const LZ = window.LZ || {};
   try {
+    /* app control */
     if (name === "navigate"){ LZ.navigate?.(args.tab); return { ok: true, opened: args.tab }; }
     if (name === "get_app_state"){ return LZ.snapshot ? LZ.snapshot() : { error: "state unavailable" }; }
-    if (name === "set_trading_market"){ LZ.navigate?.("trade"); LZ.hl?.setCoin?.(String(args.coin).toUpperCase()); return { ok: true, market: String(args.coin).toUpperCase() }; }
+    if (name === "set_trading_market"){ LZ.navigate?.("trade"); LZ.hl?.setCoin?.(upper(args.coin)); return { ok: true, market: upper(args.coin) }; }
     if (name === "prefill_order"){ LZ.navigate?.("trade"); LZ.hl?.prefillOrder?.(args); return { ok: true, note: "ticket pre-filled — the user must review and sign" }; }
+
+    /* Hyperliquid market data */
+    if (name === "get_ticker"){
+      const C = upper(args.coin); const [m, ctxs] = await HL.metaAndCtxs();
+      const i = m.universe.findIndex(u => u.name === C);
+      if (i < 0) return { error: `${C} is not a Hyperliquid perp` };
+      const c = ctxs[i] || {}; const mark = +c.markPx, prev = +c.prevDayPx;
+      return { coin: C, network: HL.getNetwork(), mark_px: mark, oracle_px: +c.oraclePx,
+        change_24h_pct: prev ? r2((mark - prev) / prev * 100) : null, day_volume_usd: r2(+c.dayNtlVlm, 0),
+        open_interest_usd: r2(+c.openInterest * mark, 0), funding_rate_pct: r2(+c.funding * 100, 5), max_leverage: m.universe[i].maxLeverage };
+    }
+    if (name === "get_all_markets"){
+      const [m, ctxs] = await HL.metaAndCtxs();
+      const rows = m.universe.map((u, i) => { const c = ctxs[i] || {}; const mark = +c.markPx, prev = +c.prevDayPx;
+        return { coin: u.name, mark_px: mark, change_24h_pct: prev ? r2((mark - prev) / prev * 100) : null,
+          day_volume_usd: r2(+c.dayNtlVlm, 0), open_interest_usd: r2(+c.openInterest * mark, 0),
+          funding_rate_pct: r2(+c.funding * 100, 5), max_leverage: u.maxLeverage }; })
+        .filter(r => isFinite(r.mark_px)).sort((a, b) => (b.day_volume_usd || 0) - (a.day_volume_usd || 0));
+      return { network: HL.getNetwork(), count: rows.length, markets: rows.slice(0, 60) };
+    }
+    if (name === "get_orderbook"){
+      const C = upper(args.coin); const d = Math.min(Math.max(1, args.depth || 10), 25);
+      const b = await HL.l2Book(C); const lv = b?.levels || [];
+      const side = (s) => (lv[s] || []).slice(0, d).map(l => ({ px: +l.px, sz: +l.sz }));
+      return { coin: C, bids: side(0), asks: side(1) };
+    }
+    if (name === "get_trades"){
+      const C = upper(args.coin); const n = Math.min(Math.max(1, args.limit || 20), 50);
+      const t = await HL.info({ type: "recentTrades", coin: C });
+      return { coin: C, trades: (t || []).slice(0, n).map(x => ({ px: +x.px, sz: +x.sz, side: x.side === "B" ? "buy" : "sell", time: x.time })) };
+    }
+    if (name === "get_candles"){
+      const C = upper(args.coin); const iv = args.interval; const n = Math.min(Math.max(1, args.limit || 50), 200);
+      const ms = HL_MS[iv] || 9e5; const end = Date.now(); const start = end - n * ms;
+      const data = await HL.candleSnapshot(C, iv, start, end);
+      return { coin: C, interval: iv, candles: (data || []).slice(-n).map(c => ({ t: c.t, o: +c.o, h: +c.h, l: +c.l, c: +c.c, v: +c.v })) };
+    }
+    if (name === "get_funding_history"){
+      const C = upper(args.coin); const n = Math.min(Math.max(1, args.limit || 24), 100);
+      const h = await HL.info({ type: "fundingHistory", coin: C, startTime: Date.now() - 7 * 864e5 });
+      return { coin: C, funding: (h || []).slice(-n).map(x => ({ time: x.time, funding_rate_pct: r2(+x.fundingRate * 100, 5), premium: r2(+x.premium, 5) })) };
+    }
+    if (name === "get_positions"){
+      const w = walletOf(args); if (!w) return { error: "no wallet connected — connect one or pass a wallet address" };
+      const ch = await HL.clearinghouse(w);
+      const pos = (ch?.assetPositions || []).filter(p => +p.position.szi !== 0).map(p => { const s = +p.position.szi;
+        return { coin: p.position.coin, side: s > 0 ? "long" : "short", size: Math.abs(s), entry_px: +p.position.entryPx,
+          position_value_usd: r2(+p.position.positionValue, 0), unrealized_pnl_usd: r2(+p.position.unrealizedPnl, 2),
+          liquidation_px: p.position.liquidationPx ? +p.position.liquidationPx : null, leverage: p.position.leverage?.value ?? null }; });
+      const ms = ch?.marginSummary || {};
+      return { wallet: w, network: HL.getNetwork(), account_value_usd: r2(+ms.accountValue, 2) || 0, withdrawable_usd: r2(+ch?.withdrawable, 2), positions: pos };
+    }
+    if (name === "get_open_orders"){
+      const w = walletOf(args); if (!w) return { error: "no wallet connected — connect one or pass a wallet address" };
+      const oo = await HL.openOrders(w);
+      return { wallet: w, network: HL.getNetwork(), orders: (oo || []).map(o => ({ coin: o.coin, side: o.side === "B" ? "buy" : "sell", size: +o.sz, limit_px: +o.limitPx, oid: o.oid, timestamp: o.timestamp })) };
+    }
+    if (name === "get_trade_history"){
+      const w = walletOf(args); if (!w) return { error: "no wallet connected — connect one or pass a wallet address" };
+      const n = Math.min(Math.max(1, args.limit || 20), 50);
+      const f = await HL.userFills(w);
+      return { wallet: w, network: HL.getNetwork(), fills: (f || []).slice(0, n).map(x => ({ coin: x.coin, side: x.side === "B" ? "buy" : "sell", px: +x.px, sz: +x.sz, closed_pnl_usd: r2(+x.closedPnl, 2), fee: r2(+x.fee, 4), time: x.time, liquidation: !!x.liquidation })) };
+    }
+
+    /* CoinGecko */
+    if (name === "cg_market_data") return await MD.cgMarketData(args.coin_id);
+    if (name === "cg_chart")       return await MD.cgChart(args.coin_id, args.days || 7);
+    if (name === "cg_top_coins")   return await MD.cgTopCoins(args.limit || 10);
+    if (name === "cg_trending")    return await MD.cgTrending();
+    if (name === "cg_global")      return await MD.cgGlobal();
+    if (name === "fear_greed")     return await MD.fearGreed();
+
+    /* DefiLlama */
+    if (name === "defi_protocols")   return await MD.dlProtocols(args.limit || 15);
+    if (name === "defi_protocol")    return await MD.dlProtocol(args.slug);
+    if (name === "defi_chains")      return await MD.dlChains(args.limit || 15);
+    if (name === "defi_stablecoins") return await MD.dlStablecoins(args.limit || 12);
+    if (name === "defi_yields")      return await MD.dlYields(args.limit || 12);
   } catch (e){ return { error: String(e?.message || e) }; }
   return { error: "unknown tool" };
 }
@@ -95,6 +229,12 @@ How you help:
 - Answer questions about what the app does and how to use any feature.
 - When the user wants to go somewhere or do something, use your tools: navigate to a tab, read live state with get_app_state, switch the trading market, or pre-fill an order for them to review.
 - For anything that moves funds or signs a transaction, set it up and explain it, but make clear the user signs it themselves.
+
+Live data — you can fetch real numbers, so never guess or make them up:
+- Hyperliquid perps (reflects the app's current testnet/mainnet toggle): get_ticker, get_orderbook, get_trades, get_candles, get_all_markets, get_funding_history, and the connected wallet's get_positions / get_open_orders / get_trade_history.
+- CoinGecko spot data: cg_market_data (by coin id like 'bitcoin'/'ethereum'/'solana'), cg_chart, cg_top_coins, cg_trending, cg_global, and fear_greed for sentiment.
+- DefiLlama: defi_protocols, defi_protocol (by slug), defi_chains, defi_stablecoins, defi_yields.
+When asked about a price, market, position, TVL, or "the market", call the right tool and answer from the result. Pick CoinGecko for spot/marketcap questions and Hyperliquid for perp/funding/order-book questions. If a tool returns an error (e.g. no wallet, rate limit), say so plainly. Format numbers readably (e.g. $1.2B, 3.4%). You have no CoinMarketCap tool — CoinGecko covers the same data.
 
 Style: warm, concise, plain language. No jargon dumps. A sentence or two is usually enough. Use the user's language.`;
 
@@ -123,6 +263,13 @@ function addBubble(role, text=""){
 const TRACE_LABELS = {
   navigate: "Opening", get_app_state: "Reading app state",
   set_trading_market: "Switching market", prefill_order: "Pre-filling order",
+  get_ticker: "Hyperliquid ticker", get_orderbook: "Reading order book", get_trades: "Recent trades",
+  get_candles: "Loading candles", get_all_markets: "Scanning HL markets", get_funding_history: "Funding history",
+  get_positions: "Reading positions", get_open_orders: "Reading open orders", get_trade_history: "Trade history",
+  cg_market_data: "CoinGecko", cg_chart: "CoinGecko chart", cg_top_coins: "Top coins",
+  cg_trending: "Trending", cg_global: "Global market", fear_greed: "Fear & Greed",
+  defi_protocols: "DefiLlama protocols", defi_protocol: "DefiLlama", defi_chains: "Chain TVL",
+  defi_stablecoins: "Stablecoins", defi_yields: "Yield pools",
 };
 function addTrace(name, args){
   const detail = args && Object.keys(args).length ? Object.values(args).join(" · ") : "";
@@ -257,7 +404,7 @@ async function askClaude(userText){
       const results = [];
       for (const b of blocks.filter(x => x.type === "tool_use")){
         const trace = addTrace(b.name, b.input || {});
-        const out = runTool(b.name, b.input || {});
+        const out = await runTool(b.name, b.input || {});
         if (out && out.error) trace.fail(); else trace.done();
         results.push({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(out) });
       }
@@ -334,7 +481,7 @@ const ICONS = {
 
 const GREET_CHIPS = [
   { icon: "trade", label: "Open Trading", run: () => { window.LZ?.navigate?.("trade"); flagSuggestionSeen(); } },
-  { icon: "wallet", label: "Read balances", run: () => send("show my balances") },
+  { icon: "markets", label: "Market snapshot", run: () => send("give me a quick crypto market snapshot: BTC and ETH price with 24h change, total market cap, and the fear & greed index") },
   { icon: "recovery", label: "Explain Recovery", run: () => send("explain recovery") },
   { icon: "spark", label: "Prefill a BTC trade", run: () => {
       window.LZ?.navigate?.("trade");
