@@ -117,8 +117,8 @@ function renderBanner(){
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/><circle cx="17" cy="15" r="1.2"/></svg>
       </div>
       <div class="col">
-        <h4>Connect to use the wallet</h4>
-        <p>You're viewing demo balances. Connect MetaMask to see your real address everywhere — sends still sign locally in demo mode.</p>
+        <h4>Connect to see your balances</h4>
+        <p>Connect MetaMask or Rabby to read your real on-chain balances across Ethereum, Arbitrum, Optimism and Base.</p>
       </div>
       <button class="btn accent sm" id="bannerConnect">Connect Wallet</button>
     </div>
@@ -145,6 +145,8 @@ async function connectFlow(){
 connectBtn.addEventListener("click", connectFlow);
 
 onChange(reflectWalletButton);
+let lastWalletAddr = null;
+onChange(() => { if (state.account !== lastWalletAddr){ lastWalletAddr = state.account; loadWallet(); } });
 
 /* =================================================================== *
  *  CHAT VIEW
@@ -283,59 +285,93 @@ document.getElementById("chatSearch")?.addEventListener("input", (e) => renderCh
 /* =================================================================== *
  *  WALLET VIEW
  * =================================================================== */
-let walletPrices = { eth: 3698, arb: 0.83, op: 1.23 };
-const TOKENS = [
-  { sym:"ETH", nm:"Ethereum", chain:"mainnet",  amount:2.418, key:"eth", cls:"eth", icon:"Ξ" },
-  { sym:"ARB", nm:"Arbitrum", chain:"arbitrum", amount:1842,  key:"arb", cls:"arb", icon:"AR" },
-  { sym:"OP",  nm:"Optimism", chain:"optimism", amount:930,   key:"op",  cls:"op",  icon:"OP" },
+/* Real on-chain balances: native ETH + native USDC across L1 + major L2s,
+   read straight from public RPCs in the browser. No backend, no demo data. */
+const WALLET_CHAINS = [
+  { key:"eth",  name:"Ethereum", rpc:"https://ethereum-rpc.publicnode.com",     usdc:"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
+  { key:"arb",  name:"Arbitrum", rpc:"https://arbitrum-one-rpc.publicnode.com", usdc:"0xaf88d065e77c8cC2239327C5EDb3A432268e5831" },
+  { key:"op",   name:"Optimism", rpc:"https://optimism-rpc.publicnode.com",     usdc:"0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" },
+  { key:"base", name:"Base",     rpc:"https://base-rpc.publicnode.com",          usdc:"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
 ];
-const TXS = [
-  { kind:"in",   t:"Received ETH",     s:"from 0x4ec2…b021 · LayerZero",   amt:"+ 0.42 ETH",   dir:"up" },
-  { kind:"out",  t:"Sent ARB",         s:"to 0xF1A4…0237 · Arbitrum",       amt:"− 120 ARB",    dir:"dn" },
-  { kind:"swap", t:"Swap OP → ETH",    s:"0.3 OP via 1inch · OP",          amt:"+ 0.014 ETH",  dir:"up" },
-  { kind:"in",   t:"Bridge in",        s:"from Optimism · OFTv2",          amt:"+ 12.5 OP",    dir:"up" },
-  { kind:"out",  t:"Fee · gas",        s:"Arbitrum gas refill",            amt:"− $0.18",      dir:"dn" },
-];
-
+const WALLET_ICN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/><circle cx="17" cy="15" r="1.2"/></svg>`;
+let walletTokens = [];        // [{sym,nm,chain,amount,price,usd}]
+let walletLoading = false;
+let ethPrice = 3700;
 let walletRendered = false;
-function totalUSD(){
-  return TOKENS.reduce((s,t) => s + (walletPrices[t.key] || 0) * t.amount, 0);
-}
-function renderWallet(){
-  document.getElementById("walletTotal").innerHTML = `${fmt.usd(totalUSD())} <small id="walletDelta">+ 3.1%</small>`;
-  const list = document.getElementById("tokenList");
-  list.innerHTML = TOKENS.map((t, i) => {
-    const usd = walletPrices[t.key] * t.amount;
-    const fresh = walletRendered ? "" : "stagger-in";
-    return `<div class="token-row ${fresh}" style="--i:${i}">
-      <div class="ic ${t.cls}">${t.icon}</div>
-      <div class="col"><span class="sym">${t.sym}</span><span class="nm">${t.nm} · ${t.amount.toLocaleString("en-US")} ${t.sym}</span></div>
-      <div class="amount"><span class="v">${fmt.usd(usd)}</span><span class="usd">@ ${fmt.usd(walletPrices[t.key])}</span></div>
-    </div>`;
-  }).join("");
 
-  const txl = document.getElementById("txList");
-  txl.innerHTML = TXS.map((tx, i) => `
-    <div class="tx-row ${walletRendered ? "" : "stagger-in"}" style="--i:${i}">
-      <div class="ic ${tx.kind}">${tx.kind === "in" ? "↓" : tx.kind === "out" ? "↑" : "⇄"}</div>
-      <div class="col"><div class="t">${tx.t}</div><div class="s">${tx.s}</div></div>
-      <div class="amt ${tx.dir}">${tx.amt}</div>
-    </div>`).join("");
-  walletRendered = true;
+async function rpcCall(url, method, params){
+  const r = await fetch(url, { method:"POST", headers:{ "content-type":"application/json" },
+    body: JSON.stringify({ jsonrpc:"2.0", id:1, method, params }) });
+  if (!r.ok) throw new Error("rpc " + r.status);
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "rpc error");
+  return j.result;
 }
+const hexToNum = (hex, dec) => { try { return Number(BigInt(hex || "0x0")) / 10 ** dec; } catch { return 0; } };
 
-async function fetchWalletPrices(){
+function totalUSD(){ return walletTokens.reduce((s,t) => s + t.usd, 0); }
+
+async function loadWallet(){
+  if (!state.account){ walletTokens = []; walletLoading = false; renderWallet(); return; }
+  walletLoading = true; renderWallet();
   try {
-    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ethereum,arbitrum,optimism&vs_currencies=usd");
-    if (!r.ok) throw new Error("rate-limited");
-    const j = await r.json();
-    walletPrices = {
-      eth: j.ethereum?.usd ?? walletPrices.eth,
-      arb: j.arbitrum?.usd ?? walletPrices.arb,
-      op:  j.optimism?.usd ?? walletPrices.op,
-    };
-    renderWallet();
-  } catch { /* keep demo prices */ }
+    const pr = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd");
+    if (pr.ok){ const pj = await pr.json(); ethPrice = pj.ethereum?.usd ?? ethPrice; }
+  } catch { /* keep last */ }
+  const addr = state.account;
+  const balData = "0x70a08231" + addr.slice(2).toLowerCase().padStart(64, "0");
+  const found = [];
+  await Promise.all(WALLET_CHAINS.map(async (c) => {
+    const [nativeHex, usdcHex] = await Promise.all([
+      rpcCall(c.rpc, "eth_getBalance", [addr, "latest"]).catch(() => "0x0"),
+      rpcCall(c.rpc, "eth_call", [{ to: c.usdc, data: balData }, "latest"]).catch(() => "0x0"),
+    ]);
+    const eth = hexToNum(nativeHex, 18), usdc = hexToNum(usdcHex, 6);
+    if (eth  > 1e-6) found.push({ sym:"ETH",  nm:c.name, chain:c.key, amount:eth,  price:ethPrice, usd:eth * ethPrice });
+    if (usdc > 0.01) found.push({ sym:"USDC", nm:c.name, chain:c.key, amount:usdc, price:1,        usd:usdc });
+  }));
+  found.sort((a, b) => b.usd - a.usd);
+  walletTokens = found; walletLoading = false;
+  renderWallet();
+}
+
+function renderWallet(){
+  const totalEl = document.getElementById("walletTotal");
+  const list = document.getElementById("tokenList");
+  const txl = document.getElementById("txList");
+  if (!totalEl || !list || !txl) return;
+
+  if (!state.account){
+    totalEl.innerHTML = `${fmt.usd(0)} <small id="walletDelta">— not connected</small>`;
+    list.replaceChildren(emptyState({ icon: WALLET_ICN, title: "Connect a wallet",
+      body: "Connect to see your real on-chain balances across Ethereum, Arbitrum, Optimism and Base.",
+      actionLabel: "Connect Wallet", onAction: connectFlow }));
+    txl.replaceChildren(emptyState({ title: "No activity yet", body: "Connect a wallet to see your balances here." }));
+    return;
+  }
+
+  if (walletLoading && !walletTokens.length){
+    totalEl.innerHTML = `${fmt.usd(0)} <small id="walletDelta">reading chain…</small>`;
+    list.innerHTML = skeleton({ rows: 3, height: 62 });
+  } else {
+    totalEl.innerHTML = `${fmt.usd(totalUSD())} <small id="walletDelta" class="wallet-live">● live · on-chain</small>`;
+    if (!walletTokens.length){
+      list.replaceChildren(emptyState({ icon: WALLET_ICN, title: "No balances found",
+        body: `No ETH or USDC on Ethereum, Arbitrum, Optimism or Base for ${shortAddr(state.account)}. Switch the wallet or top it up to see it here.` }));
+    } else {
+      list.innerHTML = walletTokens.map((t, i) => `
+        <div class="token-row ${walletRendered ? "" : "stagger-in"}" style="--i:${i}">
+          ${coinAvatarHTML(t.sym, 44)}
+          <div class="col"><span class="sym">${t.sym}</span><span class="nm">${t.nm} · ${t.amount.toLocaleString("en-US", { maximumFractionDigits: t.sym === "ETH" ? 5 : 2 })} ${t.sym}</span></div>
+          <div class="amount"><span class="v">${fmt.usd(t.usd)}</span><span class="usd">@ ${fmt.usd(t.price)}</span></div>
+        </div>`).join("");
+    }
+  }
+  // Real per-tx history needs an indexer (Etherscan/Alchemy key + CORS), which a
+  // keyless static app can't do — so we show an honest note instead of fake txs.
+  txl.replaceChildren(emptyState({ title: "Transaction history",
+    body: "Live on-chain history needs an indexer API and isn't wired in this build. The balances above are real." }));
+  walletRendered = true;
 }
 
 /* Replace the native <select>s with the shared CustomSelect. The hidden
@@ -355,7 +391,7 @@ if (sendViaSel){
   new CustomSelect({ select: sendViaSel, title: "Select route" });
 }
 
-document.getElementById("walletRefresh")?.addEventListener("click", () => { fetchWalletPrices(); toast("prices refreshed", "ok"); });
+document.getElementById("walletRefresh")?.addEventListener("click", () => { loadWallet(); toast(state.account ? "reading balances…" : "connect a wallet first", state.account ? "ok" : "err"); });
 document.getElementById("sendBtn")?.addEventListener("click", () => {
   const to = document.getElementById("sendTo").value.trim();
   const amt = document.getElementById("sendAmt").value.trim();
@@ -751,7 +787,7 @@ makeValueCopyable(idNpub, "npub");
  * =================================================================== */
 const ONROUTE = {
   chat: () => { renderChatList(""); renderThread(); },
-  wallet: () => { renderWallet(); fetchWalletPrices(); },
+  wallet: () => { loadWallet(); },
   markets: () => { if (!marketsLoaded) fetchMarkets(); else renderMarkets(); },
   network: () => {},
   identity: () => { reflectIdentity(); reflectIdentityDetails(); },
@@ -799,7 +835,7 @@ window.LZ = Object.assign(window.LZ || {}, {
       npub: state.derived?.npub || null,
       identityDerived: !!state.derived,
       walletTotalUsd: Math.round(totalUSD()),
-      tokens: TOKENS.map(t => ({ sym: t.sym, amount: t.amount, chain: t.chain })),
+      tokens: walletTokens.map(t => ({ sym: t.sym, amount: t.amount, chain: t.nm, usd: Math.round(t.usd) })),
       topMarkets: marketsRows.slice(0, 6).map(c => ({ sym: (c.symbol||"").toUpperCase(), price: c.current_price, ch24h: c.price_change_percentage_24h })),
     };
   },

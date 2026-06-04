@@ -140,6 +140,8 @@
 .token-row .amount{text-align:right;display:flex;flex-direction:column;gap:2px}
 .token-row .amount .v{font-family:var(--mono);font-size:14px;font-weight:600}
 .token-row .amount .usd{font-family:var(--mono);font-size:11px;color:var(--text-dim)}
+.wallet-live{color:var(--accent-2);font-size:11px;font-weight:500;letter-spacing:.02em}
+.wallet-live::first-letter{color:var(--success)}
 
 .tx-list{display:flex;flex-direction:column;gap:6px}
 .tx-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.02);font-size:13px}
