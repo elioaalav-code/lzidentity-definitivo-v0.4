@@ -25,8 +25,6 @@
 /* symbol + stats strip */
 .trade-top{display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding:16px 20px;border:1px solid var(--border);border-radius:var(--r-lg);background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,0))}
 .trade-symbol{display:flex;align-items:center;gap:16px}
-.trade-symbol select{font-family:var(--mono);font-size:16px;font-weight:600;padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.03);cursor:pointer}
-.trade-symbol select:focus{border-color:var(--accent)}
 .sym-price{display:flex;align-items:baseline;gap:10px}
 .sym-price .last{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.01em}
 .sym-price .last.flash-up{animation:hlFlashUp .7s ease}
@@ -64,22 +62,34 @@
 .book-head{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mute)}
 .book-head .spread{color:var(--text-dim);text-transform:none;letter-spacing:0}
 .book{display:flex;flex-direction:column}
-.book .lvl{position:relative;display:flex;justify-content:space-between;align-items:center;padding:4px 14px;font-size:11.5px;cursor:pointer;overflow:hidden}
-.book .lvl i{position:absolute;top:0;bottom:0;right:0;opacity:.16;z-index:0}
+.book .lvl{position:relative;display:flex;justify-content:space-between;align-items:center;padding:4px 14px;font-size:11.5px;cursor:pointer;overflow:hidden;transition:background var(--t-fast) var(--ease)}
+.book .lvl i{position:absolute;top:0;bottom:0;right:0;width:var(--depth,0%);opacity:.16;z-index:0;transition:width .28s var(--ease-out)}
+.book .lvl::before{content:"";position:absolute;top:0;bottom:0;right:0;width:var(--cum,0%);opacity:.05;z-index:0;background:currentColor;transition:width .28s var(--ease-out)}
 .book .lvl .p,.book .lvl .s{position:relative;z-index:1}
 .book .lvl .s{color:var(--text-dim)}
-.book.asks .lvl .p{color:var(--short)} .book.asks .lvl i{background:var(--short)}
-.book.bids .lvl .p{color:var(--long)}  .book.bids .lvl i{background:var(--long)}
-.book .lvl:hover{background:rgba(255,255,255,.04)}
-.book-mid{padding:8px 14px;font-size:14px;font-weight:600;text-align:center;border-block:1px solid var(--border);color:var(--text)}
+.book.asks .lvl{color:var(--short)} .book.asks .lvl .p{color:var(--short)} .book.asks .lvl i{background:var(--short)}
+.book.bids .lvl{color:var(--long)}  .book.bids .lvl .p{color:var(--long)}  .book.bids .lvl i{background:var(--long)}
+.book .lvl:hover{background:rgba(255,255,255,.05)}
+.book .lvl:hover .s::after{content:"→ limit";margin-left:8px;font-size:9px;letter-spacing:.06em;color:var(--accent);text-transform:uppercase;opacity:.85}
+.book .lvl.picked{animation:hlPick .5s var(--ease-out)}
+@keyframes hlPick{0%{background:rgba(179,154,255,.22)}100%{background:transparent}}
+.book-mid{padding:8px 14px;font-size:14px;font-weight:600;text-align:center;border-block:1px solid var(--border);color:var(--text);transition:color .15s ease}
+.book-mid.up{animation:hlMidUp .6s ease} .book-mid.dn{animation:hlMidDn .6s ease}
+@keyframes hlMidUp{from{color:var(--long)}} @keyframes hlMidDn{from{color:var(--short)}}
 
 /* order ticket */
 .ticket-card{border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:12px}
-.ticket-side,.ticket-type{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:3px;background:rgba(255,255,255,.04);border-radius:10px}
-.ticket-side button,.ticket-type button{padding:9px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--text-mute);transition:background .15s,color .15s}
-.ticket-type button.on{background:rgba(255,255,255,.1);color:var(--text)}
-.ticket-side button.buy.on{background:var(--long-soft);color:var(--long)}
-.ticket-side button.sell.on{background:var(--short-soft);color:var(--short)}
+.ticket-side,.ticket-type{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:3px;background:rgba(255,255,255,.04);border-radius:10px;isolation:isolate}
+/* sliding indicator — positioned by the container's data-on attribute */
+.ticket-side::before,.ticket-type::before{content:"";position:absolute;z-index:0;top:3px;bottom:3px;left:3px;width:calc(50% - 4.5px);border-radius:8px;transition:transform var(--t) var(--spring),background var(--t-fast) var(--ease)}
+.ticket-type::before{background:rgba(255,255,255,.1)}
+.ticket-side::before{background:var(--long-soft);box-shadow:inset 0 0 0 1px rgba(63,185,138,.3)}
+.ticket-side[data-on="sell"]::before,.ticket-type[data-on="limit"]::before{transform:translateX(calc(100% + 6px))}
+.ticket-side[data-on="sell"]::before{background:var(--short-soft);box-shadow:inset 0 0 0 1px rgba(224,85,107,.3)}
+.ticket-side button,.ticket-type button{position:relative;z-index:1;padding:9px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--text-mute);transition:color var(--t-fast) var(--ease)}
+.ticket-type button.on{color:var(--text)}
+.ticket-side button.buy.on{color:var(--long)}
+.ticket-side button.sell.on{color:var(--short)}
 .ticket-field{display:flex;flex-direction:column;gap:5px}
 .ticket-field span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mute)}
 .ticket-field span em{color:var(--accent-2);font-style:normal}
@@ -88,18 +98,83 @@
 .ticket-lev{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.015)}
 .ticket-lev .lev-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)}
 .ticket-lev .lev-row span:last-child{color:var(--accent);font-weight:700}
-.ticket-lev input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
 .btn.xs{padding:6px 10px;font-size:11px}
-.ticket-reduce{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);cursor:pointer}
-.ticket-reduce input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
+
+/* leverage slider — gradient-filled track + value bubble */
+.lev-slider{position:relative;padding-top:4px}
+.lev-slider input[type=range]{
+  --lev-fill:30%;
+  width:100%;height:22px;cursor:pointer;background:transparent;-webkit-appearance:none;appearance:none;display:block;
+}
+.lev-slider input[type=range]::-webkit-slider-runnable-track{
+  height:6px;border-radius:999px;
+  background:linear-gradient(90deg,var(--accent) 0%,var(--accent) var(--lev-fill),rgba(255,255,255,.08) var(--lev-fill),rgba(255,255,255,.08) 100%);
+}
+.lev-slider input[type=range]::-moz-range-track{height:6px;border-radius:999px;background:rgba(255,255,255,.08)}
+.lev-slider input[type=range]::-moz-range-progress{height:6px;border-radius:999px;background:var(--accent)}
+.lev-slider input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:16px;height:16px;margin-top:-5px;border-radius:50%;
+  background:#fff;box-shadow:0 0 0 3px rgba(179,154,255,.32),0 2px 6px rgba(0,0,0,.5);cursor:grab;
+  transition:transform var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease);
+}
+.lev-slider input[type=range]::-moz-range-thumb{
+  width:16px;height:16px;border:0;border-radius:50%;background:#fff;
+  box-shadow:0 0 0 3px rgba(179,154,255,.32),0 2px 6px rgba(0,0,0,.5);cursor:grab;
+}
+.lev-slider input[type=range]:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1.12);box-shadow:0 0 0 5px rgba(179,154,255,.26),0 2px 8px rgba(0,0,0,.5)}
+.lev-slider input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:var(--ring-accent),0 0 0 5px rgba(179,154,255,.3)}
+.lev-bubble{
+  position:absolute;top:-20px;transform:translateX(-50%);padding:2px 7px;border-radius:6px;
+  font-family:var(--mono);font-size:10.5px;font-weight:700;color:#0a0a0c;background:var(--accent);
+  pointer-events:none;opacity:0;transition:opacity var(--t-fast) var(--ease);white-space:nowrap;
+}
+.lev-bubble::after{content:"";position:absolute;left:50%;bottom:-3px;width:6px;height:6px;background:var(--accent);transform:translateX(-50%) rotate(45deg)}
+.lev-slider:hover .lev-bubble,.lev-slider:focus-within .lev-bubble{opacity:1}
+
+/* size quick-chips */
+.size-chips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:-4px}
+.size-chips button{
+  padding:7px 4px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.02);
+  font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-mute);
+  transition:border-color var(--t-fast) var(--ease),color var(--t-fast) var(--ease),background var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);
+}
+.size-chips button:hover:not(:disabled){border-color:var(--border-strong);color:var(--text);transform:translateY(-1px)}
+.size-chips button.on{border-color:var(--accent);color:var(--accent);background:rgba(179,154,255,.1)}
+.size-chips button:disabled{opacity:.4;cursor:not-allowed}
+.size-chips.disabled{opacity:.65}
+.ticket-reduce{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--text-dim);cursor:pointer;user-select:none}
+/* custom reduce-only checkbox */
+.ticket-reduce input{
+  appearance:none;-webkit-appearance:none;position:relative;flex:0 0 auto;
+  width:17px;height:17px;border:1px solid var(--border-strong);border-radius:5px;
+  background:rgba(255,255,255,.03);cursor:pointer;
+  transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease);
+}
+.ticket-reduce input:hover{border-color:var(--accent)}
+.ticket-reduce input:checked{background:var(--accent);border-color:var(--accent)}
+.ticket-reduce input:checked::after{
+  content:"";position:absolute;left:5px;top:2px;width:4px;height:8px;
+  border:solid #0a0a0c;border-width:0 2px 2px 0;transform:rotate(42deg);
+}
+.ticket-reduce input:focus-visible{outline:none;box-shadow:var(--ring-accent),0 0 0 4px rgba(179,154,255,.22)}
 .ticket-notional{display:flex;justify-content:space-between;align-items:center;padding-top:4px;font-family:var(--mono);font-size:12px;color:var(--text-mute);letter-spacing:.04em}
 .ticket-notional span:last-child{color:var(--text);font-weight:600;font-size:14px}
-.ticket-submit{width:100%;padding:13px;font-size:14px;font-weight:600}
+.ticket-submit{width:100%;padding:13px;font-size:14px;font-weight:600;transition:background var(--t-fast) var(--ease),transform var(--t-fast) var(--ease),opacity var(--t-fast) var(--ease)}
 .ticket-submit.long{background:var(--long);color:#04130d}
 .ticket-submit.long:hover{background:#4fce9c}
 .ticket-submit.short{background:var(--short);color:#1a0508}
 .ticket-submit.short:hover{background:#ec6b80}
+.ticket-submit:active{transform:translateY(1px)}
+/* signing / placed micro-states */
+.ticket-submit.is-signing{opacity:.85;cursor:progress}
+.ticket-submit.is-placed{background:var(--long);color:#04130d}
 .ticket-hint{font-size:11px;color:var(--text-mute);line-height:1.5;text-align:center}
+
+/* confirm-button spinner + check (review modal) */
+.bt-spin{display:inline-block;width:13px;height:13px;margin-right:7px;vertical-align:-2px;border:1.6px solid rgba(255,255,255,.35);border-top-color:currentColor;border-radius:50%;animation:hlSpin .7s linear infinite}
+@keyframes hlSpin{to{transform:rotate(360deg)}}
+.bt-check{display:inline-block;margin-right:6px;font-weight:700}
+#hlConfirm[data-state="placed"]{background:var(--long);color:#04130d}
 
 /* positions / orders / balance */
 .trade-positions{border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface);overflow:hidden}
@@ -112,8 +187,12 @@
 .pt-head,.pt-row{display:grid;grid-template-columns:1fr 1fr 1fr 1.2fr 1.2fr 1.2fr;gap:10px;padding:10px 18px;align-items:center}
 .pos-table.orders .pt-head,.pos-table.orders .pt-row{grid-template-columns:1fr 1fr 1.2fr 1.2fr auto}
 .pt-head{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute);border-bottom:1px solid var(--border)}
-.pt-row{border-bottom:1px solid rgba(255,255,255,.03)}
-.pt-row:hover{background:rgba(255,255,255,.02)}
+.pt-row{border-bottom:1px solid rgba(255,255,255,.03);transition:background var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease)}
+.pt-row:hover{background:rgba(255,255,255,.035);box-shadow:inset 2px 0 0 var(--accent)}
+.pt-row.is-pickable{cursor:pointer}
+.pt-row.is-pickable .c::after{content:"↗";margin-left:7px;font-size:11px;color:var(--text-mute);opacity:0;transform:translateX(-3px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+.pt-row.is-pickable:hover .c::after,.pt-row.is-pickable:focus-visible .c::after{opacity:1;transform:none}
+.pt-row.is-pickable:focus-visible{outline:none;box-shadow:inset 2px 0 0 var(--accent),0 0 0 1px var(--border-strong)}
 .pt-row .c{font-weight:600}
 .pt-row .long{color:var(--long)} .pt-row .short{color:var(--short)}
 .acct-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;padding:18px}
@@ -140,3 +219,58 @@
 .hl-modal-net b{color:#fff}
 .hl-modal-actions{display:flex;gap:10px}
 .hl-modal-actions .btn{flex:1}
+
+/* ============================================================ *
+ *  Market switcher (CustomSelect over #hlCoin)
+ *  — trigger lives in the symbol strip; rows in the popover.
+ * ============================================================ */
+.market-switcher{min-width:200px}
+.market-switcher .lz-select,.market-switcher .lz-select-trigger{width:100%}
+.market-switcher .lz-select-trigger{padding:8px 12px;border-radius:12px}
+.market-switcher .lz-select-pop{width:max(340px,100%)}
+
+/* trigger body */
+.mk-trig-av{display:inline-flex;flex:0 0 auto}
+.mk-trig-sym{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:-.01em}
+.mk-trig-px{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--text-dim);margin-left:2px}
+
+/* a 24h-change chip, reused in trigger + rows */
+.mk-chip{display:inline-flex;align-items:center;font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 6px;border-radius:6px;color:var(--text-mute);background:rgba(255,255,255,.05);transition:color var(--t-fast) var(--ease),background var(--t-fast) var(--ease)}
+.mk-chip.up{color:var(--long);background:var(--long-soft)}
+.mk-chip.dn{color:var(--short);background:var(--short-soft)}
+
+/* a market row inside the popover list */
+.market-switcher .lz-select-row{gap:11px;padding:9px 10px}
+.mk-av{display:inline-flex;flex:0 0 auto}
+.mk-id{display:flex;flex-direction:column;gap:2px;min-width:0;flex:0 0 auto;width:74px}
+.mk-sym{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:-.01em;color:var(--text)}
+.mk-tag{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mk-meta{display:flex;align-items:center;gap:7px;margin-left:auto;flex:0 0 auto}
+.mk-px{font-family:var(--mono);font-size:12.5px;font-weight:500;color:var(--text-dim);min-width:62px;text-align:right}
+.mk-lev{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text-mute);padding:1px 5px;border:1px solid var(--border);border-radius:5px;flex:0 0 auto}
+.mk-vol{font-family:var(--mono);font-size:11px;color:var(--text-mute);min-width:48px;text-align:right;flex:0 0 auto}
+/* the CustomSelect check mark would collide with the star — hide it for markets */
+.market-switcher .lz-select-check{display:none}
+
+/* star toggle */
+.mk-star{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:7px;flex:0 0 auto;color:var(--text-mute);transition:color var(--t-fast) var(--ease),background var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+.mk-star:hover{background:rgba(255,255,255,.06);color:var(--text)}
+.mk-star.on{color:#f3dd96}
+.mk-star:active{transform:scale(.88)}
+.mk-star:focus-visible{outline:none;box-shadow:var(--ring-accent)}
+
+@media (max-width:600px){
+  .mk-vol{display:none}
+  .mk-id{width:auto;flex:1}
+  .market-switcher .lz-select-pop{width:100%}
+}
+
+/* ── reduced motion: cut new transitions/animations ─────────── */
+@media (prefers-reduced-motion: reduce){
+  .ticket-side::before,.ticket-type::before{transition:none}
+  .book .lvl i,.book .lvl::before{transition:none}
+  .book .lvl.picked,.book-mid.up,.book-mid.dn{animation:none}
+  .bt-spin{animation:none}
+  .sym-price .last.flash-up,.sym-price .last.flash-dn{animation:none}
+  .size-chips button:hover,.pt-row{transition:none}
+}

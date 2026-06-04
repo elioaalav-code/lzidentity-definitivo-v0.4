@@ -1,4 +1,5 @@
 import { mountShader } from "./shader.js";
+import { magnetic } from "./ui.js";
 import {
   awaitCrypto, bootstrapWallet, connectWallet, disconnectWallet, deriveNostr,
   onChange, state, shortAddr, toast, clockTickerUTC,
@@ -11,16 +12,33 @@ window.addEventListener("load", () => setTimeout(() => document.getElementById("
 const gmtEl = document.getElementById("gmt");
 if (gmtEl) clockTickerUTC(gmtEl);
 
-/* nav solid on scroll */
+/* nav: scroll-aware — solid past 24px, condensed once past the hero fold */
 const nav = document.getElementById("nav");
-const onScrollNav = () => nav?.classList.toggle("solid", window.scrollY > 24);
+let lastNavY = -1;
+const onScrollNav = () => {
+  const y = window.scrollY;
+  if (y === lastNavY) return;
+  lastNavY = y;
+  nav?.classList.toggle("solid", y > 24);
+  nav?.classList.toggle("condensed", y > 120);
+};
 window.addEventListener("scroll", onScrollNav, { passive:true });
 onScrollNav();
 
-/* reveal on scroll */
+/* reveal on scroll — fire ~70% threshold (P7) and stagger siblings at
+   log-ish spacing so groups breathe in rather than snap (P2/P3). */
 const io = new IntersectionObserver((entries) => {
-  entries.forEach(e => { if (e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); }});
-}, { threshold:0.18 });
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    const el = e.target;
+    // stagger by position among data-reveal siblings in the same parent
+    const sibs = [...(el.parentElement?.querySelectorAll(":scope > [data-reveal]") || [])];
+    const idx = Math.max(0, sibs.indexOf(el));
+    el.style.setProperty("--reveal-delay", `${Math.min(idx, 6) * 90}ms`);
+    el.classList.add("in");
+    io.unobserve(el);
+  });
+}, { threshold:0.18, rootMargin:"0px 0px -12% 0px" });
 document.querySelectorAll("[data-reveal]").forEach(el => io.observe(el));
 
 /* marquee */
@@ -45,6 +63,11 @@ if (mq){
 /* hero shader */
 const canvas = document.getElementById("glCanvas");
 if (canvas) mountShader(canvas);
+
+/* magnetic hover on the marquee headline CTAs (hero + finale).
+   magnetic() self-disables under reduced motion. */
+document.querySelectorAll(".hero .btn.accent, .finale .btn.accent, .wt-intro .btn.accent")
+  .forEach(btn => magnetic(btn));
 
 /* respect reduced-motion across landing micro-interactions */
 const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;

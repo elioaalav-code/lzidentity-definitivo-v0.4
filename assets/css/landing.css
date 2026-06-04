@@ -83,7 +83,9 @@ h2.h2 .ital{font-family:var(--serif);font-style:italic;font-weight:400;backgroun
 .mb-explain .row p code{font-family:var(--mono);font-size:13px;color:var(--accent);background:rgba(179,154,255,.08);padding:1px 6px;border-radius:4px}
 
 /* Walkthrough — scroll-driven sticky */
-.walkthrough{padding:120px 0 0;border-top:1px solid var(--border);background:#070708;overflow:hidden}
+/* overflow-x:clip contains horizontal bleed WITHOUT creating a scroll container,
+   which would otherwise kill the position:sticky pin below (the empty-scroll bug). */
+.walkthrough{padding:120px 0 0;border-top:1px solid var(--border);background:#070708;overflow-x:clip}
 .wt-intro{text-align:center;max-width:780px;margin:0 auto 80px;padding:0 var(--pad)}
 .wt-intro h2{margin-bottom:18px}
 .wt-intro .section-label{margin-bottom:24px}
@@ -258,3 +260,125 @@ footer{padding:80px var(--pad) 40px;border-top:1px solid var(--border);backgroun
 .fbot{max-width:var(--maxw);margin:0 auto;padding-top:32px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--text-mute);letter-spacing:.05em}
 .fbot .sys{display:flex;gap:14px;align-items:center}
 .fbot .sys .d{width:6px;height:6px;border-radius:50%;background:var(--success);box-shadow:0 0 8px var(--success);animation:pulse 1.8s ease-in-out infinite}
+
+/* ============================================================ *
+ *  CRAFT LAYER — Agent C overhaul (landing-only)
+ *  Honors the staggered-reveal cadence + hemodynamic anticipation
+ *  from docs/DESIGN_PRINCIPLES.md. Tokens only.
+ * ============================================================ */
+
+/* staggered reveal delay (set per-element from landing.js) */
+[data-reveal]{transition-delay:var(--reveal-delay,0ms)}
+
+/* ── Nav: scroll-aware condense + elevate ─────────────────── */
+.nav{transition:background .4s var(--ease),border-color .4s var(--ease),padding .4s var(--ease),box-shadow .4s var(--ease)}
+.nav.condensed{padding-top:9px;padding-bottom:9px}
+.nav.condensed.solid{box-shadow:var(--sh-2)}
+.brand{display:inline-flex;align-items:center;gap:9px;position:relative}
+.brand .b-mark{transition:transform .5s var(--spring)}
+.brand:hover .b-mark{transform:rotate(-8deg) scale(1.06)}
+/* animated brand dot — a quiet 4s heartbeat that idles, brightens on hover */
+.brand .b-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 rgba(179,154,255,.5);animation:brandDot 4s var(--ease-in-out) infinite}
+.brand:hover .b-dot{animation-duration:1.6s}
+@keyframes brandDot{
+  0%,100%{box-shadow:0 0 0 0 rgba(179,154,255,.45);opacity:.7}
+  50%{box-shadow:0 0 0 5px rgba(179,154,255,0);opacity:1}
+}
+
+/* ── Nav links: hover lift + animated underline ──────────── */
+.nav-links a{position:relative;padding:2px 0;transition:color .2s var(--ease),transform .25s var(--ease)}
+.nav-links a::after{content:"";position:absolute;left:0;right:100%;bottom:-3px;height:1px;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:right .32s var(--ease-out)}
+.nav-links a:hover{transform:translateY(-1px)}
+.nav-links a:hover::after,.nav-links a:focus-visible::after{right:0}
+
+/* ── Hero: eyebrow bar draw, coord drift, CTA breathing ──── */
+.eyebrow .bar{transition:width .6s var(--ease-out)}
+.hero-inner:hover .eyebrow .bar{width:34px}
+.hero-coord{transition:opacity .6s var(--ease)}
+.hero .cta-row .btn{will-change:transform}
+.hero-meta .cell{transition:transform .3s var(--ease)}
+.hero-meta .cell:hover{transform:translateY(-2px)}
+.hero-meta .cell:hover .val{color:var(--accent)}
+.hero-meta .val{transition:color .3s var(--ease)}
+
+/* magnetic helper smoothing for hero/finale CTAs */
+.lz-magnetic{transition:transform .35s var(--spring),box-shadow .35s var(--ease)}
+
+/* ── Marquee rows: gentle hover highlight ────────────────── */
+.marquee-track .row{transition:color .25s var(--ease),transform .25s var(--ease)}
+.marquee-track .row:hover{color:var(--text);transform:translateY(-1px)}
+
+/* ── Magic-box nodes: subtle entrance settle (decorative) ── */
+.mb-node{transition:border-color .3s var(--ease),box-shadow .3s var(--ease),transform .3s var(--ease)}
+.mb-node.live{transform:translateY(-1px)}
+
+/* ── Pillars: additive hover depth (base lives in anima.css) ──
+   anima.css owns .pillar layout + its ::before ambient breath, so
+   here we ONLY add: a deeper colored drop-shadow on hover, a slightly
+   stronger lift, an animated hairline under spec rows, and a focus
+   ring. We never re-declare ::before (would kill the breath). */
+.pillar{transition:border-color .35s var(--ease),transform .35s var(--ease),box-shadow .4s var(--ease)}
+.pillar.recovery{--p-color:var(--accent-3)}
+.pillar.trade{--p-color:var(--accent-2)}
+.pillar.assist{--p-color:var(--accent)}
+.pillar:hover{transform:translateY(-5px)}
+.pillar.recovery:hover{box-shadow:0 0 0 1px rgba(255,122,89,.2),0 22px 52px -22px rgba(255,122,89,.4)}
+.pillar.trade:hover{box-shadow:var(--glow-teal),0 22px 52px -22px rgba(94,234,212,.35)}
+.pillar.assist:hover{box-shadow:var(--glow-accent),0 22px 52px -22px rgba(179,154,255,.4)}
+.pillar .pillar-viz{transition:border-color .35s var(--ease)}
+.pillar:hover .pillar-viz{border-color:color-mix(in srgb,var(--p-color,var(--accent)) 35%,var(--border))}
+/* animated specs — a hairline that draws in under each spec row on hover */
+.pillar .specs .sp{position:relative}
+.pillar .specs .sp::after{content:"";position:absolute;left:0;right:100%;bottom:-4px;height:1px;background:color-mix(in srgb,var(--p-color,var(--accent)) 50%,transparent);transition:right .4s var(--ease-out)}
+.pillar:hover .specs .sp::after{right:0}
+.pillar:hover .specs .sp:nth-child(2)::after{transition-delay:.05s}
+.pillar:hover .specs .sp:nth-child(3)::after{transition-delay:.1s}
+.pillar .specs .sp .v{transition:color .3s var(--ease)}
+.pillar:hover .specs .sp .v{color:var(--text)}
+/* pillar CTA: animated underline (gap nudge handled in anima.css) */
+.pillar .pillar-cta{position:relative;width:fit-content}
+.pillar .pillar-cta::after{content:"";position:absolute;left:0;right:100%;bottom:-3px;height:1px;background:currentColor;opacity:.55;transition:right .32s var(--ease-out)}
+.pillar:hover .pillar-cta::after,.pillar .pillar-cta:focus-visible::after{right:0}
+
+/* ── Manifest: gentle parallax handled in anima.js; quote lift ─ */
+.am-quote{transition:transform .5s var(--ease)}
+
+/* ── Transport cards: per-color hover glow (echo pillars) ── */
+.tp-card.mesh:hover{box-shadow:var(--glow-teal)}
+.tp-card.nostr:hover{box-shadow:0 0 0 1px rgba(255,122,89,.2),0 16px 40px -16px rgba(255,122,89,.35)}
+.tp-card.lz:hover{box-shadow:var(--glow-accent)}
+.tp-card .viz svg{width:100%;height:100%;display:block}
+.tp-card .specs .sp{position:relative}
+.tp-card .specs .sp .v{transition:color .25s var(--ease)}
+.tp-card:hover .specs .sp .v{color:var(--text)}
+
+/* ── Stat cells: hover lift + accent ─────────────────────── */
+.stat-cell{transition:background .3s var(--ease)}
+.stat-cell:hover{background:rgba(255,255,255,.015)}
+.stat-cell:hover .val{color:var(--accent)}
+.stat-cell .val{transition:color .35s var(--ease)}
+.stat-cell:hover .lab{color:var(--text-dim)}
+.stat-cell .lab{transition:color .3s var(--ease)}
+
+/* ── Finale: ambient halo breath (4s) + CTA ─────────────── */
+.finale::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 100%,rgba(179,154,255,.10),transparent 60%);animation:finaleBreath 4s var(--ease-in-out) infinite;opacity:.7}
+@keyframes finaleBreath{0%,100%{opacity:.45}50%{opacity:.9}}
+.finale .wrap{position:relative;z-index:1}
+
+/* ── Footer links: arrow/underline nudge ─────────────────── */
+.fcol a{position:relative;width:fit-content;transition:color .2s var(--ease),transform .22s var(--ease)}
+.fcol a:hover{transform:translateX(3px)}
+.fcol a::after{content:"";position:absolute;left:0;right:100%;bottom:1px;height:1px;background:var(--accent);opacity:.5;transition:right .3s var(--ease-out)}
+.fcol a:hover::after,.fcol a:focus-visible::after{right:0}
+
+/* ── Focus-visible rings everywhere interactive ──────────── */
+.nav-links a:focus-visible,.fcol a:focus-visible,.pillar-cta:focus-visible,
+.hero-meta .cell:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+
+/* ── Reduced motion: silence the looping ambients ────────── */
+@media (prefers-reduced-motion: reduce){
+  .brand .b-dot{animation:none;box-shadow:0 0 0 1px rgba(179,154,255,.4)}
+  .finale::after{animation:none;opacity:.6}
+  .pillar:hover,.tp-card:hover,.hero-meta .cell:hover,.stat-cell:hover{transform:none}
+  .fcol a:hover{transform:none}
+}

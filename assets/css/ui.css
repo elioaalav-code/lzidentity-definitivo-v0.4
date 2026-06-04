@@ -1,0 +1,137 @@
+/* ============================================================ *
+ *  ui.css — shared UI primitives (v2.2 overhaul)
+ *  CustomSelect · coinAvatar · button FX · skeleton · empty state
+ *  Tokens only. Reduced-motion safe (see end).
+ * ============================================================ */
+
+/* ── coin avatar ─────────────────────────────────────────────── */
+.lz-avatar{
+  width:var(--av-size,30px);height:var(--av-size,30px);flex:0 0 auto;
+  display:inline-grid;place-items:center;border-radius:30%;
+  font-family:var(--mono);font-weight:600;letter-spacing:-.02em;line-height:1;
+  color:var(--av-fg,#cbb8ff);
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0)),
+    var(--av-bg,rgba(179,154,255,.16));
+  box-shadow:inset 0 0 0 1px var(--av-ring,rgba(179,154,255,.34));
+  user-select:none;
+}
+
+/* ── CustomSelect ────────────────────────────────────────────── */
+.lz-select{position:relative;display:inline-block}
+.lz-select-native{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;clip:rect(0 0 0 0)}
+
+.lz-select-trigger{
+  display:inline-flex;align-items:center;gap:10px;width:100%;
+  padding:9px 12px;border:1px solid var(--border);border-radius:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,0));
+  color:var(--text);font-family:var(--mono);font-size:13px;font-weight:600;
+  transition:border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease),transform var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease);
+}
+.lz-select-trigger:hover{border-color:var(--border-strong);background:rgba(255,255,255,.05);transform:translateY(-1px)}
+.lz-select.open .lz-select-trigger{border-color:var(--accent);box-shadow:var(--glow-accent)}
+.lz-select-trig-body{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.lz-select-chev{margin-left:auto;color:var(--text-mute);transition:transform var(--t) var(--ease),color var(--t-fast)}
+.lz-select.open .lz-select-chev{transform:rotate(180deg);color:var(--accent)}
+.lz-select-ph{color:var(--text-mute)}
+.lz-select-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* popover */
+.lz-select-pop{
+  position:absolute;z-index:120;top:calc(100% + 8px);left:0;min-width:100%;
+  width:max(280px,100%);max-height:min(60vh,440px);display:flex;flex-direction:column;
+  border:1px solid var(--border-strong);border-radius:var(--r-lg);
+  background:var(--glass);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);
+  box-shadow:var(--sh-3);overflow:hidden;
+  transform-origin:top left;
+  animation:lzSelIn .18s var(--ease-out);
+}
+.lz-select.closing .lz-select-pop{animation:lzSelOut .14s var(--ease) forwards}
+@keyframes lzSelIn{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes lzSelOut{to{opacity:0;transform:translateY(-4px) scale(.99)}}
+
+.lz-select-search{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--hairline);color:var(--text-mute);flex:0 0 auto}
+.lz-select-search svg{flex:0 0 auto}
+.lz-select-input{flex:1;font-family:var(--sans);font-size:14px;color:var(--text)}
+.lz-select-input::placeholder{color:var(--text-mute)}
+
+.lz-select-list{overflow-y:auto;padding:6px;scrollbar-width:thin}
+.lz-select-group{
+  position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:8px;
+  padding:9px 10px 5px;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--text-mute);
+  background:linear-gradient(180deg,var(--glass),rgba(18,18,22,.55));
+}
+.lz-select-group-n{padding:1px 6px;border:1px solid var(--border);border-radius:999px;color:var(--text-dim);letter-spacing:.04em}
+
+.lz-select-row{
+  position:relative;display:flex;align-items:center;gap:10px;
+  padding:8px 10px;border-radius:10px;cursor:pointer;color:var(--text);
+  transition:background var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);
+}
+.lz-select-row:hover,.lz-select-row.active{background:rgba(255,255,255,.05)}
+.lz-select-row.active{box-shadow:inset 0 0 0 1px var(--border-strong)}
+.lz-select-row.sel{background:rgba(179,154,255,.08)}
+.lz-select-check{margin-left:auto;color:var(--accent);opacity:0;transform:scale(.6);transition:opacity var(--t-fast),transform var(--t-fast) var(--spring);flex:0 0 auto}
+.lz-select-row.sel .lz-select-check{opacity:1;transform:none}
+.lz-select-empty{padding:28px 16px;text-align:center;font-size:13px;color:var(--text-mute)}
+
+/* bottom-sheet on phones */
+.lz-select.as-sheet .lz-select-pop{
+  position:fixed;inset:auto 0 0 0;top:auto;width:100%;max-height:78vh;
+  border-radius:var(--r-xl) var(--r-xl) 0 0;border-bottom:0;z-index:402;
+  animation:lzSheetIn .26s var(--ease-out);
+}
+@keyframes lzSheetIn{from{transform:translateY(100%)}to{transform:none}}
+.lz-select.as-sheet.closing .lz-select-pop{animation:lzSheetOut .18s var(--ease) forwards}
+@keyframes lzSheetOut{to{transform:translateY(100%)}}
+.lz-select-backdrop{position:fixed;inset:0;z-index:401;background:rgba(3,3,4,.6);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);animation:lzFade .2s ease}
+@keyframes lzFade{from{opacity:0}to{opacity:1}}
+
+/* staggered row reveal (subtle) */
+.lz-select.open .lz-select-row{animation:lzRowIn .26s var(--ease-out) backwards}
+.lz-select.open .lz-select-row:nth-child(1){animation-delay:.01s}
+.lz-select.open .lz-select-row:nth-child(2){animation-delay:.03s}
+.lz-select.open .lz-select-row:nth-child(3){animation-delay:.05s}
+.lz-select.open .lz-select-row:nth-child(4){animation-delay:.07s}
+.lz-select.open .lz-select-row:nth-child(n+5){animation-delay:.09s}
+@keyframes lzRowIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ── button FX: sheen sweep + press ripple ───────────────────── */
+.btn{position:relative;overflow:hidden;isolation:isolate}
+.btn::after{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.18) 50%,transparent 70%);
+  background-size:220% 100%;background-position:140% 0;opacity:0;
+  transition:opacity var(--t-fast) var(--ease);
+}
+.btn:hover::after{opacity:1;animation:lzSheen .9s var(--ease-out)}
+@keyframes lzSheen{from{background-position:140% 0}to{background-position:-60% 0}}
+.btn.accent::after,.btn.ticket-submit::after{background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.32) 50%,transparent 70%);background-size:220% 100%}
+
+.lz-ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.28);transform:scale(0);animation:lzRipple .6s var(--ease-out);pointer-events:none;z-index:0;mix-blend-mode:overlay}
+@keyframes lzRipple{to{transform:scale(2.4);opacity:0}}
+.lz-magnetic{transition:transform .25s var(--ease-out)}
+
+/* ── skeleton ─────────────────────────────────────────────────── */
+.lz-skel-stack{display:flex;flex-direction:column}
+.lz-skel{
+  background:linear-gradient(90deg,rgba(255,255,255,.03) 25%,rgba(255,255,255,.07) 37%,rgba(255,255,255,.03) 63%);
+  background-size:400px 100%;animation:shimmer 1.4s linear infinite;
+}
+
+/* ── empty state ──────────────────────────────────────────────── */
+.lz-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:40px 24px;text-align:center}
+.lz-empty-icn{width:44px;height:44px;display:grid;place-items:center;border-radius:13px;border:1px solid var(--border);background:rgba(255,255,255,.02);color:var(--text-dim)}
+.lz-empty-icn svg{width:22px;height:22px}
+.lz-empty-title{font-size:14px;font-weight:500;color:var(--text)}
+.lz-empty-body{font-size:12.5px;color:var(--text-mute);max-width:34ch;line-height:1.5}
+.lz-empty-action{margin-top:4px}
+
+/* ── reduced motion ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce){
+  .lz-select-pop,.lz-select.as-sheet .lz-select-pop,.lz-select-row,.lz-skel{animation:none !important}
+  .btn::after{display:none}
+  .lz-ripple{display:none}
+  .lz-magnetic{transition:none}
+}

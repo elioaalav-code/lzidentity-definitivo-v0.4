@@ -13,10 +13,13 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@1&display=swap" />
 
 <link rel="stylesheet" href="/assets/css/base.css" />
+<link rel="stylesheet" href="/assets/css/ui.css" />
 <link rel="stylesheet" href="/assets/css/app.css" />
 <link rel="stylesheet" href="/assets/css/anima.css" />
 <link rel="stylesheet" href="/assets/css/trade.css" />
 <link rel="stylesheet" href="/assets/css/assistant.css" />
+<link rel="stylesheet" href="/assets/css/recovery.css" />
+<script type="module" src="/assets/js/ui.js"></script>
 </head>
 <body>
 
@@ -48,37 +51,37 @@
     </a>
     <nav class="side-nav" id="sideNav">
       <a href="#/chat" data-route="chat">
-        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-3.85 7.1L17 22l-3.4-2.4a8.4 8.4 0 1 1 7.4-8.1Z"/></svg>
+        <svg class="icn" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-3.85 7.1L17 22l-3.4-2.4a8.4 8.4 0 1 1 7.4-8.1Z"/></svg>
         <span class="lab">Chat</span>
         <span class="badge" id="chatBadge">3</span>
       </a>
       <a href="#/wallet" data-route="wallet">
-        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/><circle cx="17" cy="15" r="1.2"/></svg>
+        <svg class="icn" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/><circle cx="17" cy="15" r="1.2"/></svg>
         <span class="lab">Wallet</span>
       </a>
       <a href="#/markets" data-route="markets">
-        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17 9 11l4 4 8-8"/><path d="M14 7h7v7"/></svg>
+        <svg class="icn" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17 9 11l4 4 8-8"/><path d="M14 7h7v7"/></svg>
         <span class="lab">Markets</span>
       </a>
       <a href="#/trade" data-route="trade">
-        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7" rx="1"/><rect x="13" y="6" width="3" height="11" rx="1"/></svg>
+        <svg class="icn" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7" rx="1"/><rect x="13" y="6" width="3" height="11" rx="1"/></svg>
         <span class="lab">Trading</span>
         <span class="badge" id="tradeBadge" style="background:rgba(94,234,212,.14);color:var(--accent-2)">HL</span>
       </a>
       <a href="#/network" data-route="network">
-        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        <svg class="icn" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
         <span class="lab">Network</span>
         <span class="badge" id="netBadge" style="background:rgba(94,234,212,.14);color:var(--accent-2)">live</span>
       </a>
       <a href="#/identity" data-route="identity">
-        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+        <svg class="icn" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
         <span class="lab">Identity</span>
       </a>
 
       <div class="side-divider"><span>YOUR IDENTITY</span></div>
 
       <a href="#/recovery" data-route="recovery">
-        <svg class="icn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="11" r="3"/><path d="M12 14v5"/><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M7.5 7.5L10 10M16.5 7.5L14 10"/></svg>
+        <svg class="icn" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="11" r="3"/><path d="M12 14v5"/><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M7.5 7.5L10 10M16.5 7.5L14 10"/></svg>
         <span class="lab">Recovery</span>
         <span class="badge" style="background:rgba(255,107,53,.14);color:#ff6b35">2 / 3</span>
       </a>
@@ -100,7 +103,7 @@
     <div class="actions">
       <span class="clock" id="clock">— UTC —</span>
       <a href="/index.html" class="btn ghost sm">About ↗</a>
-      <button id="connectBtn" class="btn ghost"><span class="dot" style="display:none" id="connDot"></span><span id="connLabel">Connect Wallet</span></button>
+      <button id="connectBtn" class="btn ghost" aria-label="Connect wallet"><span class="dot" aria-hidden="true" style="display:none" id="connDot"></span><span class="conn-spin" aria-hidden="true"></span><span id="connLabel">Connect Wallet</span></button>
     </div>
   </header>
 
@@ -210,7 +213,7 @@
 
       <div class="markets-table">
         <div class="head">
-          <span>#</span><span>Coin</span><span style="text-align:right">Price</span><span style="text-align:right">24h</span><span>7d</span><span style="text-align:right">Mkt cap</span>
+          <span>#</span><span class="coin-h">Coin <span class="demo-chip" aria-live="polite">sample data</span></span><span style="text-align:right">Price</span><span style="text-align:right">24h</span><span>7d</span><span style="text-align:right">Mkt cap</span>
         </div>
         <div id="marketsRows" class="market-skel">loading coins from coingecko…</div>
       </div>
@@ -301,7 +304,7 @@
     <!-- ============================================================ -->
     <!-- ===== RECOVERY VIEW · guardians ============================ -->
     <!-- ============================================================ -->
-    <section class="view anima-view" data-view="recovery">
+    <section class="view anima-view rec" data-view="recovery">
       <div class="view-header">
         <div>
           <h1>Recovery <small>a way back, without the seed phrase</small></h1>
@@ -319,15 +322,75 @@
         <div class="lcard"><div class="lab">chains covered</div><div class="v" id="recoveryChains">5</div></div>
       </div>
 
-      <div class="section-label" style="margin-bottom:14px"><span class="num">[ your guardians ]</span> two of them together can restore your identity on every chain at once</div>
+      <!-- per-chain deployment status -->
+      <div class="section-label" style="margin-bottom:14px"><span class="num">[ where it lives ]</span> your recovery rule, deployed on every chain at once</div>
+      <div class="rec-chains" id="recoveryChainStatus" role="list" aria-label="Per-chain deployment status"></div>
 
-      <div class="recovery-budgets" id="recoveryGuardiansList">
-        <div class="recovery-budget"><div class="chain eth"><span class="d"></span>Maya · friend</div><div class="bar"><i style="width:100%"></i></div><div class="amt"><strong>ready</strong></div></div>
-        <div class="recovery-budget"><div class="chain arb"><span class="d"></span>Ledger Nano · drawer</div><div class="bar"><i style="width:100%"></i></div><div class="amt"><strong>ready</strong></div></div>
-        <div class="recovery-budget"><div class="chain op"><span class="d"></span>Backup phone</div><div class="bar"><i style="width:100%"></i></div><div class="amt"><strong>ready</strong></div></div>
+      <!-- guardians -->
+      <div class="section-label" style="margin:32px 0 14px"><span class="num">[ your guardians ]</span> two of them together can restore your identity on every chain at once</div>
+
+      <div class="rec-guardians" id="recoveryGuardiansList" role="list" aria-label="Guardians"></div>
+
+      <div class="rec-actions">
+        <button class="btn ghost sm" id="recoveryAddBtn" aria-haspopup="dialog" aria-expanded="false">+ Add guardian</button>
+
+        <!-- threshold M-of-N stepper -->
+        <div class="rec-threshold" role="group" aria-label="Recovery threshold">
+          <span class="rt-label">Signatures needed</span>
+          <div class="rt-stepper">
+            <button type="button" class="rt-step" id="recoveryThreshDown" aria-label="Lower threshold">−</button>
+            <span class="rt-val" id="recoveryThreshVal" aria-live="polite">2<span class="rt-of">of</span>3</span>
+            <button type="button" class="rt-step" id="recoveryThreshUp" aria-label="Raise threshold">+</button>
+          </div>
+        </div>
       </div>
-      <button class="btn ghost sm" style="margin-top:14px">+ Add guardian</button>
 
+      <!-- add-guardian inline panel (modal-ish) -->
+      <div class="rec-addpanel" id="recoveryAddPanel" role="dialog" aria-modal="false" aria-labelledby="recAddTitle" hidden>
+        <div class="rec-addpanel-in">
+          <div class="rap-head">
+            <h3 id="recAddTitle">Invite a guardian</h3>
+            <button type="button" class="rap-close" id="recoveryAddClose" aria-label="Close">✕</button>
+          </div>
+          <p class="rap-sub">Send this link to someone you trust, or have them scan the code. They accept on their own device — you never share a seed phrase.</p>
+          <div class="rap-grid">
+            <div class="rap-fields">
+              <label class="rap-field">
+                <span>Their name or label</span>
+                <input type="text" id="recoveryInviteName" placeholder="e.g. Sister · Sam" autocomplete="off" />
+              </label>
+              <label class="rap-field">
+                <span>Guardian type</span>
+                <select id="recoveryInviteType" aria-label="Guardian type">
+                  <option value="friend">Friend</option>
+                  <option value="device">Device</option>
+                  <option value="backup wallet">Backup wallet</option>
+                </select>
+              </label>
+              <label class="rap-field">
+                <span>Invite link</span>
+                <div class="rap-copy">
+                  <input type="text" id="recoveryInviteLink" readonly value="https://lz.id/g/inv-7f3a-91c2" aria-label="Invite link" />
+                  <button type="button" class="btn ghost xs" id="recoveryInviteCopy">Copy</button>
+                </div>
+              </label>
+            </div>
+            <div class="rap-qr" aria-hidden="true">
+              <div class="rap-qr-grid" id="recoveryQR"></div>
+              <span class="rap-qr-cap">scan to accept</span>
+            </div>
+          </div>
+          <div class="rap-foot">
+            <button type="button" class="btn ghost sm" id="recoveryAddCancel">Cancel</button>
+            <button type="button" class="btn accent sm" id="recoveryAddConfirm">Send invite</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- recovery drill sequence -->
+      <div class="rec-drill" id="recoveryDrill" hidden aria-live="polite"></div>
+
+      <!-- activity feed -->
       <div class="section-label" style="margin:32px 0 14px"><span class="num">[ recovery history ]</span> drills, additions, removals</div>
       <div class="recovery-feed" id="recoveryFeed">
         <div class="recovery-event"><span class="t">7 d</span><span class="what">Recovery drill · <em>2 of 3 signed in 14 s</em></span><span class="delta pos">ok</span></div>
@@ -362,7 +425,7 @@
 
       <div class="trade-top">
         <div class="trade-symbol">
-          <select id="hlCoin" aria-label="Market"><option>BTC</option></select>
+          <div class="market-switcher"><select id="hlCoin" aria-label="Market"><option>BTC</option></select></div>
           <div class="sym-price"><span class="last" id="hlLast">—</span><span class="ch" id="hlChange">—</span></div>
         </div>
         <div class="trade-stats">
@@ -406,10 +469,19 @@
             <button data-type="limit">Limit</button>
           </div>
           <label class="ticket-field"><span>Size <em id="hlSzUnit">BTC</em></span><input id="hlSize" inputmode="decimal" autocomplete="off" placeholder="0.0" /></label>
+          <div class="size-chips" id="hlSizeChips" role="group" aria-label="Quick size">
+            <button type="button" data-pct="25">25%</button>
+            <button type="button" data-pct="50">50%</button>
+            <button type="button" data-pct="75">75%</button>
+            <button type="button" data-pct="max">Max</button>
+          </div>
           <label class="ticket-field" id="hlPriceField" hidden><span>Limit price · USD</span><input id="hlPrice" inputmode="decimal" autocomplete="off" placeholder="0.0" /></label>
           <div class="ticket-lev">
             <div class="lev-row"><span>Leverage</span><span id="hlLevVal">5×</span></div>
-            <input type="range" id="hlLev" min="1" max="20" value="5" />
+            <div class="lev-slider">
+              <input type="range" id="hlLev" min="1" max="20" value="5" aria-label="Leverage" />
+              <output class="lev-bubble" id="hlLevBubble" aria-hidden="true">5×</output>
+            </div>
             <button class="btn ghost xs" id="hlLevApply">Set leverage on-chain</button>
           </div>
           <label class="ticket-reduce"><input type="checkbox" id="hlReduce" /> <span>Reduce only</span></label>
@@ -449,14 +521,15 @@
 </div>
 
 <!-- ===== AI copilot ===== -->
-<button class="copilot-fab" id="copilotFab" aria-label="Open the assistant" title="Assistant">
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a4 4 0 0 1 4 4c0 1.3-.6 2.4-1.5 3.1.9.4 1.5 1 1.5 1.9v0c2.2.5 4 2 4 4.5V21H4v-4.5c0-2.5 1.8-4 4-4.5v0c0-.9.6-1.5 1.5-1.9A3.98 3.98 0 0 1 8 7a4 4 0 0 1 4-4Z"/><circle cx="9.5" cy="16" r="1"/><circle cx="14.5" cy="16" r="1"/></svg>
-  <span class="copilot-fab-dot"></span>
+<button class="copilot-fab" id="copilotFab" aria-label="Open the assistant" aria-haspopup="dialog" aria-expanded="false" aria-controls="copilot" title="Assistant">
+  <span class="copilot-fab-ring" aria-hidden="true"></span>
+  <svg class="copilot-fab-ico" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a4 4 0 0 1 4 4c0 1.3-.6 2.4-1.5 3.1.9.4 1.5 1 1.5 1.9v0c2.2.5 4 2 4 4.5V21H4v-4.5c0-2.5 1.8-4 4-4.5v0c0-.9.6-1.5 1.5-1.9A3.98 3.98 0 0 1 8 7a4 4 0 0 1 4-4Z"/><circle cx="9.5" cy="16" r="1"/><circle cx="14.5" cy="16" r="1"/></svg>
+  <span class="copilot-fab-dot" aria-hidden="true"></span>
 </button>
 
-<aside class="copilot" id="copilot" hidden aria-label="LZ assistant">
+<aside class="copilot" id="copilot" hidden role="dialog" aria-modal="false" aria-label="LZ assistant">
   <header class="copilot-head">
-    <div class="ct"><span class="dot"></span><span>LZ Assistant</span><span class="ct-mode" id="copilotMode">offline</span></div>
+    <div class="ct"><span class="dot"></span><span>LZ Assistant</span><span class="ct-mode" id="copilotMode" aria-live="polite">offline</span></div>
     <div class="copilot-head-actions">
       <button id="copilotSettings" class="ico" aria-label="Settings" title="Settings">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
@@ -484,14 +557,18 @@
     </div>
   </div>
 
-  <div class="copilot-body" id="copilotBody"></div>
+  <div class="copilot-body" id="copilotBody" aria-live="polite"></div>
 
-  <form class="copilot-input" id="copilotForm" autocomplete="off">
-    <input id="copilotInput" placeholder="Ask anything · “open trading”, “explain recovery”…" />
-    <button class="btn accent sm" type="submit" aria-label="Send">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-    </button>
-  </form>
+  <div class="copilot-input-wrap">
+    <div class="copilot-cmd" id="copilotCmd" role="listbox" aria-label="Commands" hidden></div>
+    <form class="copilot-input" id="copilotForm" autocomplete="off">
+      <button type="button" class="copilot-slash" id="copilotSlash" aria-label="Commands" title="Commands (/)">/</button>
+      <input id="copilotInput" role="combobox" aria-expanded="false" aria-controls="copilotCmd" aria-autocomplete="list" placeholder="Ask anything · type / for commands…" />
+      <button class="btn accent sm" type="submit" aria-label="Send">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </form>
+  </div>
 </aside>
 
 <script type="module" src="/assets/js/app.js"></script>

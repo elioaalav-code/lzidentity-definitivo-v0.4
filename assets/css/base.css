@@ -49,6 +49,11 @@
   --hairline:rgba(255,255,255,.06);
   /* spacing scale */
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:72px;
+  /* shared hover-lift + focus rings (v2.2 overhaul — used by ui.css and every lane) */
+  --lift-sh:0 10px 30px -12px rgba(0,0,0,.55);
+  --lift-sh-sm:0 6px 18px -10px rgba(0,0,0,.5);
+  --ring-accent:0 0 0 1px rgba(179,154,255,.4);
+  --ring-teal:0 0 0 1px rgba(94,234,212,.4);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none !important}
