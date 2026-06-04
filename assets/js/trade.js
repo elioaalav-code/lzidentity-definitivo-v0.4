@@ -812,6 +812,17 @@ const ICON_ORDERS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 // emptyState(...) returns an element; swap it into the body cleanly.
 function paintEmpty(body, opts){ body.replaceChildren(emptyState(opts)); }
 
+/* jump the terminal to a coin's market (used by clickable position rows) */
+function goToMarket(c){
+  const sel = $("hlCoin");
+  if (!sel) return;
+  if (![...sel.options].some(o => o.value === c)){ toast(`${c} isn’t listed on Hyperliquid`, "err"); return; }
+  if (sel.value !== c){ sel.value = c; sel.dispatchEvent(new Event("change")); }
+  if (marketSelect) marketSelect.setValue(c);
+  document.querySelector(".trade-top")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  toast(`market · ${c}`, "ok");
+}
+
 function renderPositions(){
   const body = $("hlPosBody");
   if (!state.account){
@@ -837,7 +848,7 @@ function renderPositions(){
       ${pos.map(p => {
         const s = Number(p.position.szi);
         const pnl = Number(p.position.unrealizedPnl);
-        return `<div class="pt-row">
+        return `<div class="pt-row is-pickable" data-go-coin="${p.position.coin}" role="button" tabindex="0" aria-label="Open ${p.position.coin} market">
           <span class="c">${p.position.coin}</span>
           <span class="${s>0?'long':'short'}">${s>0?'Long':'Short'}</span>
           <span>${Math.abs(s)}</span>
@@ -847,6 +858,11 @@ function renderPositions(){
         </div>`;
       }).join("")}
     </div>`;
+    body.querySelectorAll(".pt-row[data-go-coin]").forEach(r => {
+      const go = () => goToMarket(r.dataset.goCoin);
+      r.addEventListener("click", go);
+      r.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } });
+    });
   } else if (posTab === "orders"){
     if (!userOrders.length){
       paintEmpty(body, { icon: ICON_ORDERS, title: "No open orders",

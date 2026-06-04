@@ -189,6 +189,10 @@
 .pt-head{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute);border-bottom:1px solid var(--border)}
 .pt-row{border-bottom:1px solid rgba(255,255,255,.03);transition:background var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease)}
 .pt-row:hover{background:rgba(255,255,255,.035);box-shadow:inset 2px 0 0 var(--accent)}
+.pt-row.is-pickable{cursor:pointer}
+.pt-row.is-pickable .c::after{content:"↗";margin-left:7px;font-size:11px;color:var(--text-mute);opacity:0;transform:translateX(-3px);transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+.pt-row.is-pickable:hover .c::after,.pt-row.is-pickable:focus-visible .c::after{opacity:1;transform:none}
+.pt-row.is-pickable:focus-visible{outline:none;box-shadow:inset 2px 0 0 var(--accent),0 0 0 1px var(--border-strong)}
 .pt-row .c{font-weight:600}
 .pt-row .long{color:var(--long)} .pt-row .short{color:var(--short)}
 .acct-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;padding:18px}

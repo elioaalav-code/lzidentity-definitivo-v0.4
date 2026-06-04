@@ -460,7 +460,7 @@ function renderMarkets(){
   root.innerHTML = marketsRows.map((c, i) => {
     const up = (c.price_change_percentage_24h || 0) >= 0;
     const sparkUp = (c.sparkline_in_7d?.price?.[0] || 0) <= (c.sparkline_in_7d?.price?.at(-1) || 0);
-    return `<div class="row stagger-in" data-id="${c.id}" style="--i:${i}">
+    return `<div class="row stagger-in" data-id="${c.id ?? ""}" data-sym="${c.symbol}" data-name="${c.name}" role="button" tabindex="0" aria-haspopup="menu" style="--i:${i}">
       <span class="rk">#${c.market_cap_rank}</span>
       <div class="coin">${c.image ? `<img src="${c.image}" alt="" loading="lazy"/>` : `<span class="coin-badge">${c.symbol.slice(0,1).toUpperCase()}</span>`}<div class="nm"><span class="s">${c.symbol.toUpperCase()}</span><span class="n">${c.name}</span></div></div>
       <span class="pr">${fmt.usd(c.current_price)}</span>
@@ -472,6 +472,67 @@ function renderMarkets(){
 }
 
 document.getElementById("marketsRefresh")?.addEventListener("click", () => { fetchMarkets(); toast("refreshing markets…"); });
+
+/* ----- market row → quick-actions menu (trade · external info) ----- */
+let coinMenuEl = null, coinMenuKey = null;
+function closeCoinMenu(){
+  if (!coinMenuEl) return;
+  document.removeEventListener("keydown", coinMenuKey);
+  window.removeEventListener("scroll", closeCoinMenu, true);
+  window.removeEventListener("resize", closeCoinMenu);
+  coinMenuEl.remove(); coinMenuEl = null;
+}
+function openCoinMenu(row){
+  closeCoinMenu();
+  const sym  = (row.dataset.sym || "").toUpperCase();
+  const name = row.dataset.name || sym;
+  const id   = row.dataset.id && row.dataset.id !== "undefined" ? row.dataset.id : "";
+  const slug = (id || name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const cg   = id ? `https://www.coingecko.com/en/coins/${id}` : `https://www.coingecko.com/en/search?query=${encodeURIComponent(sym)}`;
+  const cmc  = `https://coinmarketcap.com/currencies/${slug}/`;
+  const dl   = `https://defillama.com/`;
+  const ext  = (href, label) => `<a class="cmenu-item" href="${href}" target="_blank" rel="noopener" role="menuitem"><span>${label}</span><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6 3h7v7M12.5 3.5 7 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`;
+  const m = document.createElement("div");
+  m.className = "cmenu";
+  m.setAttribute("role", "menu");
+  m.setAttribute("aria-label", `${sym} actions`);
+  m.innerHTML = `
+    <div class="cmenu-head">${coinAvatarHTML(sym, 28)}<div class="cmenu-id"><span class="s">${sym}</span><span class="n">${name}</span></div></div>
+    <button class="cmenu-item primary" data-act="trade" role="menuitem"><span>Trade ${sym} on Hyperliquid</span><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 13 13 3M6 3h7v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="cmenu-sep">Open full data</div>
+    ${ext(cg, "CoinGecko")}${ext(cmc, "CoinMarketCap")}${ext(dl, "DefiLlama")}`;
+  document.body.appendChild(m);
+  // anchor under the row, clamped to the viewport
+  const r = row.getBoundingClientRect();
+  const mw = m.offsetWidth, mh = m.offsetHeight;
+  let left = Math.min(r.left, window.innerWidth - mw - 12);
+  let top  = r.bottom + 6;
+  if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6);
+  m.style.left = Math.max(8, left) + "px";
+  m.style.top  = top + "px";
+  coinMenuEl = m;
+  m.querySelector('[data-act="trade"]').addEventListener("click", () => {
+    closeCoinMenu();
+    window.LZ.navigate("trade");
+    setTimeout(() => window.LZ.hl?.setCoin(sym), 80);
+  });
+  m.addEventListener("click", (e) => { if (e.target.closest("a")) closeCoinMenu(); });
+  coinMenuKey = (e) => { if (e.key === "Escape"){ closeCoinMenu(); row.focus(); } };
+  document.addEventListener("keydown", coinMenuKey);
+  window.addEventListener("scroll", closeCoinMenu, true);
+  window.addEventListener("resize", closeCoinMenu);
+  requestAnimationFrame(() => { m.classList.add("in"); m.querySelector(".cmenu-item")?.focus(); });
+}
+document.getElementById("marketsRows")?.addEventListener("click", (e) => {
+  const row = e.target.closest(".row[data-sym]");
+  if (row){ e.stopPropagation(); openCoinMenu(row); }
+});
+document.getElementById("marketsRows")?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " "){ const row = e.target.closest(".row[data-sym]"); if (row){ e.preventDefault(); openCoinMenu(row); } }
+});
+document.addEventListener("click", (e) => {
+  if (coinMenuEl && !coinMenuEl.contains(e.target) && !e.target.closest(".row[data-sym]")) closeCoinMenu();
+});
 
 /* =================================================================== *
  *  NETWORK VIEW — simulated live stream

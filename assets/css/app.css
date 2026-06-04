@@ -378,3 +378,30 @@
   .mb-flow.deriving .mb-node,.mb-flow.deriving #deriveBtn,#deriveBtn.is-deriving::after,.mb-flow.deriving .arrow::after{animation:none}
   .markets-table .row:hover .sk svg{transform:none}
 }
+
+/* ----- market row quick-actions menu ----- */
+.cmenu{
+  position:fixed;z-index:300;min-width:230px;max-width:280px;padding:6px;
+  border:1px solid var(--border-strong);border-radius:var(--r-lg);
+  background:var(--glass);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);
+  box-shadow:var(--sh-3);
+  opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top left;
+  transition:opacity var(--t-fast) var(--ease-out),transform var(--t-fast) var(--ease-out);
+}
+.cmenu.in{opacity:1;transform:none}
+.cmenu-head{display:flex;align-items:center;gap:10px;padding:8px 10px 10px}
+.cmenu-id{display:flex;flex-direction:column;min-width:0}
+.cmenu-id .s{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--text)}
+.cmenu-id .n{font-size:11px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmenu-sep{padding:8px 10px 4px;font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-mute)}
+.cmenu-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;
+  padding:9px 11px;border-radius:10px;font-size:13px;color:var(--text);text-align:left;
+  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease)}
+.cmenu-item svg{color:var(--text-mute);flex:none;transition:color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+.cmenu-item:hover,.cmenu-item:focus-visible{background:rgba(255,255,255,.05);outline:none}
+.cmenu-item:hover svg{color:var(--text)}
+.cmenu-item.primary{background:rgba(94,234,212,.1);color:var(--accent-2);font-weight:500;margin-bottom:2px}
+.cmenu-item.primary svg{color:var(--accent-2)}
+.cmenu-item.primary:hover{background:rgba(94,234,212,.16)}
+.cmenu-item.primary:hover svg{transform:translate(1px,-1px)}
+@media (prefers-reduced-motion: reduce){ .cmenu{transition:none;opacity:1;transform:none} .cmenu-item.primary:hover svg{transform:none} }
