@@ -1,0 +1,461 @@
+/* =================================================================== *
+ *  coin-page.css — owned by its feature agent.
+ *  Mirrors the app's dark aesthetic: vars from base.css, conventions
+ *  from app.css (.kpi, .balance-card) and trade.css (chart, toolbar).
+ * =================================================================== */
+
+/* ── Wrapper ─────────────────────────────────────────────────────── */
+.coin-page {
+  /* full-height flex container; the #coinPage div itself */
+  display: flex;
+  flex-direction: column;
+}
+
+.cp-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0;          /* .main already provides 32px outer padding */
+  animation: fadeUp .35s var(--ease, cubic-bezier(.22,.8,.36,1));
+}
+
+/* ── Loading state ───────────────────────────────────────────────── */
+.cp-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 320px;
+  color: var(--text-mute);
+}
+
+.cp-loading-ring {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, .1);
+  border-top-color: var(--accent);
+  animation: spin 1s linear infinite;
+}
+
+.cp-loading-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+/* ── Error state ─────────────────────────────────────────────────── */
+.cp-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 320px;
+  text-align: center;
+  padding: 40px 24px;
+}
+
+.cp-error-icon {
+  font-size: 32px;
+  color: var(--warn);
+}
+
+.cp-error-msg {
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  max-width: 400px;
+}
+
+.cp-error-msg strong {
+  color: var(--text);
+}
+
+.cp-error-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ── Back button ─────────────────────────────────────────────────── */
+.cp-back {
+  display: flex;
+  align-items: center;
+}
+
+.cp-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  padding: 6px 12px;
+  border-radius: var(--r-sm, 8px);
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--border);
+  transition: color .15s ease, background .15s ease, border-color .15s ease;
+}
+
+.cp-back-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, .07);
+  border-color: var(--border-strong);
+}
+
+.cp-back-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* ── Page header ─────────────────────────────────────────────────── */
+.cp-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.cp-title-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Coin icon: letter-avatar fallback */
+.cp-icon {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 20px;
+  color: #0a0a0c;
+}
+
+/* Real image loaded async */
+.cp-icon-img {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--elevated);
+  display: block;
+  object-fit: cover;
+}
+
+.cp-title-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cp-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cp-name {
+  font-size: clamp(22px, 2.8vw, 32px);
+  font-weight: 300;
+  letter-spacing: -.02em;
+  line-height: 1;
+  color: var(--text);
+}
+
+.cp-sym {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-mute);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.cp-rank {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  background: rgba(179, 154, 255, .12);
+  padding: 2px 8px;
+  border-radius: var(--r-full, 999px);
+  letter-spacing: .04em;
+  border: 1px solid rgba(179, 154, 255, .2);
+}
+
+.cp-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cp-price {
+  font-family: var(--mono);
+  font-size: clamp(20px, 2.4vw, 28px);
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+
+.cp-ch {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cp-up { color: var(--long, #3fb98a); }
+.cp-dn { color: var(--short, #e0556b); }
+
+.cp-period-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-mute);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* ── Trade button ────────────────────────────────────────────────── */
+.cp-trade-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--r, 14px);
+  background: var(--accent);
+  color: #0a0a0c;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .18s ease, transform .18s var(--spring, cubic-bezier(.34,1.56,.64,1)),
+              box-shadow .18s ease;
+}
+
+.cp-trade-btn:hover {
+  background: #cbbdff;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -8px rgba(179, 154, 255, .5);
+}
+
+.cp-trade-btn:active {
+  transform: translateY(0);
+}
+
+/* ── Chart card ──────────────────────────────────────────────────── */
+.cp-chart-card {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg, 20px);
+  background: var(--surface);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.cp-chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+/* Range picker — mirrors .iv-picker from trade.css */
+.cp-range-picker {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: rgba(255, 255, 255, .04);
+  border-radius: 8px;
+}
+
+.cp-range-btn {
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: var(--text-mute);
+  transition: background .15s ease, color .15s ease;
+  cursor: pointer;
+}
+
+.cp-range-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, .06);
+}
+
+.cp-range-btn.on {
+  background: var(--accent);
+  color: #0a0a0c;
+}
+
+/* OHLC readout line */
+.cp-readout {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  min-height: 14px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Canvas container — mirrors .chart-wrap from trade.css */
+.cp-chart-wrap {
+  position: relative;
+  height: 340px;
+  width: 100%;
+}
+
+.cp-canvas {
+  display: block;
+  cursor: crosshair;
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 760px) {
+  .cp-chart-wrap { height: 240px; }
+}
+
+/* ── Stat cards grid — mirrors .kpi from app.css ─────────────────── */
+.cp-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 1000px) {
+  .cp-stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .cp-stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+}
+
+.cp-stat {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--r, 14px);
+  background: rgba(255, 255, 255, .02);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color .18s ease, background .18s ease,
+              transform .2s cubic-bezier(.22, .8, .36, 1),
+              box-shadow .18s ease;
+}
+
+.cp-stat:hover {
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, .035);
+  transform: translateY(-2px);
+  box-shadow: var(--lift-sh-sm, 0 6px 18px -10px rgba(0,0,0,.5));
+}
+
+.cp-stat-lab {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-mute);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.cp-stat-val {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -.02em;
+  line-height: 1;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-stat-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-mute);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── DefiLlama TVL section ───────────────────────────────────────── */
+.cp-dl-section { display: block; }
+.cp-dl-card { padding: 20px 24px; border: 1px solid var(--border); border-radius: var(--r-lg, 20px); background: rgba(255,255,255,.02); display: flex; flex-direction: column; gap: 14px; }
+.cp-dl-header { display: flex; align-items: center; gap: 10px; }
+.cp-dl-title { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--text-mute); }
+.cp-dl-badge { font-family: var(--mono); font-size: 10px; padding: 2px 8px; border-radius: var(--r-full, 999px); background: rgba(94,234,212,.12); color: var(--accent-2); border: 1px solid rgba(94,234,212,.22); letter-spacing: .05em; }
+.cp-dl-total { font-size: 26px; font-weight: 300; letter-spacing: -.02em; color: var(--text); }
+.cp-dl-chains { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+@media (max-width: 640px) { .cp-dl-chains { grid-template-columns: repeat(2, 1fr); } }
+.cp-dl-chain { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-sm, 8px); background: rgba(255,255,255,.015); }
+.cp-dl-chain-name { font-family: var(--mono); font-size: 10px; color: var(--text-mute); letter-spacing: .06em; text-transform: uppercase; }
+.cp-dl-chain-tvl { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text); }
+
+/* ── Utility classes ─────────────────────────────────────────────── */
+.cp-link { color: var(--accent); font-weight: 500; cursor: pointer; background: none; border: none; font-family: inherit; font-size: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.cp-link:hover { color: #cbbdff; }
+.cp-btn-secondary { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: var(--r-sm, 8px); background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.cp-btn-secondary:hover { background: rgba(255,255,255,.1); border-color: var(--border-strong); }
+
+/* ── Responsive tweaks ───────────────────────────────────────────── */
+@media (max-width: 680px) {
+  .cp-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cp-trade-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cp-icon,
+  .cp-icon-img {
+    width: 42px;
+    height: 42px;
+    font-size: 16px;
+  }
+
+  .cp-chart-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* ── Reduced-motion ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .cp-wrap { animation: none; }
+  .cp-loading-ring { animation: none; border-top-color: var(--accent); }
+  .cp-stat,
+  .cp-back-btn,
+  .cp-trade-btn { transition: none; }
+}

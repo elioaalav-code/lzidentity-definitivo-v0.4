@@ -912,6 +912,7 @@ function switchNetwork(net){
   if (net === "mainnet" && !confirm("Switch to Hyperliquid MAINNET? Orders you sign will use real funds.")) return;
   HL.setNetwork(net);
   reflectNetwork();
+  emitNet();
   // reset + reload all data on the new host
   ctxByCoin = {}; mids = {}; lastPx = null; candles = []; book = { bids:[], asks:[] };
   booted = false;
@@ -933,6 +934,7 @@ function wire(){
     if (active){ subscribeCoin(); }
     await Promise.all([loadCandles(), loadBook()]);
     updateSubmitLabel();
+    emitCoin();
   });
   $("hlIv").querySelectorAll("button").forEach(b => on(b, "click", async () => {
     interval = b.dataset.iv;
@@ -984,7 +986,18 @@ wire();
 // route event fired before this module's listener was attached).
 if ((location.hash || "").replace(/^#\/?/, "").split("/")[0] === "trade") activate();
 
-/* expose a couple of helpers for the AI copilot */
+/* ─── integration events for add-on modules (markets/depth/portfolio/pro) ──
+ * These let independently-loaded modules react to coin/network changes
+ * without reaching into this file's internals. Detail carries the bits a
+ * consumer needs; consumers can also read the getters on window.LZ.hl. */
+function emitCoin(){
+  try { window.dispatchEvent(new CustomEvent("lz:hl:coin", { detail: { coin, szDecimals, universe } })); } catch {}
+}
+function emitNet(){
+  try { window.dispatchEvent(new CustomEvent("lz:hl:net", { detail: { network: HL.getNetwork() } })); } catch {}
+}
+
+/* expose helpers for the AI copilot and the add-on modules */
 window.LZ = Object.assign(window.LZ || {}, {
   hl: {
     setCoin(c){
@@ -1002,5 +1015,12 @@ window.LZ = Object.assign(window.LZ || {}, {
       renderNotional();
     },
     network: HL.getNetwork,
+    // live getters for add-on modules (read-only views of trade state)
+    coin: () => coin,
+    account: () => state.account || null,
+    szDecimals: () => szDecimals,
+    universe: () => universe.map(u => ({ ...u })),
+    // let a module force a refresh of the user panel after it acts (e.g. close)
+    refreshUser: () => { try { if (active) pollUser(); } catch {} },
   },
 });

@@ -5,3 +5,14 @@ node_modules/
 .vscode/
 .idea/
 *.log
+
+# Local tooling / agent state — not part of the app (Ruflo / Claude Code)
+.claude/
+.claude-flow/
+.swarm/
+CLAUDE.md
+
+# Ruflo / vector DBs (binary, local state)
+*.rvf
+*.rvf.lock
+*.db

@@ -234,7 +234,9 @@ Live data — you can fetch real numbers, so never guess or make them up:
 - Hyperliquid perps (reflects the app's current testnet/mainnet toggle): get_ticker, get_orderbook, get_trades, get_candles, get_all_markets, get_funding_history, and the connected wallet's get_positions / get_open_orders / get_trade_history.
 - CoinGecko spot data: cg_market_data (by coin id like 'bitcoin'/'ethereum'/'solana'), cg_chart, cg_top_coins, cg_trending, cg_global, and fear_greed for sentiment.
 - DefiLlama: defi_protocols, defi_protocol (by slug), defi_chains, defi_stablecoins, defi_yields.
-When asked about a price, market, position, TVL, or "the market", call the right tool and answer from the result. Pick CoinGecko for spot/marketcap questions and Hyperliquid for perp/funding/order-book questions. If a tool returns an error (e.g. no wallet, rate limit), say so plainly. Format numbers readably (e.g. $1.2B, 3.4%). You have no CoinMarketCap tool — CoinGecko covers the same data.
+When asked about a price, market, position, TVL, or "the market", call the right tool and answer from the result. Pick CoinGecko for spot/marketcap questions and Hyperliquid for perp/funding/order-book questions. If a tool returns an error (e.g. no wallet, rate limit), say so plainly. You have no CoinMarketCap tool — CoinGecko covers the same data.
+
+Visuals are rendered for you: every time you call a data tool, the app automatically draws the result as a chart, comparison bars, KPI cards, or a gauge right in the chat, just above your reply. So DON'T repeat the raw numbers as a markdown table, grid, or long bullet list — the user already sees them. Instead give a SHORT, spoken-style takeaway: 1–2 sentences highlighting what matters (the trend, the standout, what it means, what to do next). You may mention one or two key figures inline (e.g. "BTC's up 3.4% to ~$68K"), but never dump the whole dataset as text. Stay factual — only state numbers a tool actually returned; never invent them.
 
 Style: warm, concise, plain language. No jargon dumps. A sentence or two is usually enough. Use the user's language.`;
 
@@ -247,6 +249,269 @@ function mdLite(s){
   h = h.replace(/^- (.+)$/gm, "• $1");
   return h.replace(/\n/g, "<br>");
 }
+/* ─── rich chat visuals (charts / bars / KPI cards) ─────────── *
+ *  renderToolVisual(name, args, result) → a DOM node (or null).
+ *  Pure SVG + DOM, no external lib. All untrusted text goes through
+ *  escapeHtml; numbers are formatted, never injected raw. Respects
+ *  the file's reduce() reduced-motion check.
+ * ───────────────────────────────────────────────────────────── */
+const UP = "#3fb98a", DN = "#e0556b";
+const isNum = (n) => n != null && isFinite(n);
+
+/* compact USD / number / pct formatters */
+function fmtUsd(n){
+  if (!isNum(n)) return "—";
+  const a = Math.abs(n);
+  if (a >= 1e12) return "$" + (n / 1e12).toFixed(2) + "T";
+  if (a >= 1e9)  return "$" + (n / 1e9).toFixed(2) + "B";
+  if (a >= 1e6)  return "$" + (n / 1e6).toFixed(2) + "M";
+  if (a >= 1e3)  return "$" + (n / 1e3).toFixed(2) + "K";
+  if (a >= 1)    return "$" + n.toFixed(2);
+  return "$" + n.toPrecision(3).replace(/\.?0+$/, "");
+}
+function fmtPx(n){
+  if (!isNum(n)) return "—";
+  const a = Math.abs(n);
+  if (a >= 1000) return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (a >= 1)    return "$" + n.toFixed(2);
+  return "$" + n.toPrecision(4).replace(/0+$/, "").replace(/\.$/, "");
+}
+function fmtBig(n){
+  if (!isNum(n)) return "—";
+  const a = Math.abs(n);
+  if (a >= 1e12) return (n / 1e12).toFixed(2) + "T";
+  if (a >= 1e9)  return (n / 1e9).toFixed(2) + "B";
+  if (a >= 1e6)  return (n / 1e6).toFixed(2) + "M";
+  if (a >= 1e3)  return (n / 1e3).toFixed(1) + "K";
+  return String(n);
+}
+function fmtPct(n){ return isNum(n) ? (n >= 0 ? "+" : "") + n.toFixed(2) + "%" : "—"; }
+const pctCls = (n) => (isNum(n) && n < 0 ? "dn" : "up");
+
+/* a tiny sparkline polyline (closed-area + line) from an array of nums */
+function sparkline(values, up, w = 96, h = 26){
+  const vals = (values || []).filter(isNum);
+  if (vals.length < 2) return "";
+  const min = Math.min(...vals), max = Math.max(...vals), range = max - min || 1;
+  const x = (i) => (i / (vals.length - 1) * w).toFixed(2);
+  const y = (v) => (h - (v - min) / range * h).toFixed(2);
+  const pts = vals.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+  const col = up ? UP : DN;
+  const area = `0,${h} ${pts} ${w},${h}`;
+  const gid = "sg" + Math.random().toString(36).slice(2, 8);
+  return `<svg class="cv-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${col}" stop-opacity=".22"/><stop offset="1" stop-color="${col}" stop-opacity="0"/>
+    </linearGradient></defs>
+    <polygon points="${area}" fill="url(#${gid})"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+/* a node wrapper that fades in (unless reduced motion) */
+function visualNode(html){
+  const el = document.createElement("div");
+  el.className = "cv" + (reduce() ? "" : " cv-in");
+  el.innerHTML = html;
+  return el;
+}
+
+/* line/candle chart from [{t,o,h,l,c}] (cg_chart / get_candles) */
+function chartVisual(title, candles){
+  const rows = (candles || []).filter(c => isNum(c.c));
+  if (rows.length < 2) return null;
+  const W = 300, H = 132, padT = 8, padB = 16, padR = 4, padL = 4;
+  const pw = W - padL - padR, ph = H - padT - padB;
+  let lo = Infinity, hi = -Infinity;
+  for (const c of rows){ const l = isNum(c.l) ? c.l : c.c, h = isNum(c.h) ? c.h : c.c; lo = Math.min(lo, l); hi = Math.max(hi, h); }
+  const pad = (hi - lo) * 0.06 || hi * 0.01 || 1; lo -= pad; hi += pad;
+  const span = hi - lo || 1;
+  const xOf = (i) => padL + (rows.length === 1 ? pw / 2 : i / (rows.length - 1) * pw);
+  const yOf = (p) => padT + (hi - p) / span * ph;
+  const first = rows[0].c, last = rows[rows.length - 1].c;
+  const up = last >= first;
+  const col = up ? UP : DN;
+  const hasOHLC = rows.every(c => isNum(c.o) && isNum(c.h) && isNum(c.l));
+  let inner = "";
+  if (hasOHLC && rows.length <= 80){
+    const cw = pw / rows.length, bw = Math.max(1.2, Math.min(8, cw * 0.6));
+    inner = rows.map((c, i) => {
+      const x = xOf(i), gUp = c.c >= c.o, cc = gUp ? UP : DN;
+      const yH = yOf(c.h), yL = yOf(c.l);
+      const top = Math.min(yOf(c.o), yOf(c.c)), bh = Math.max(1, Math.abs(yOf(c.c) - yOf(c.o)));
+      return `<line x1="${x.toFixed(1)}" y1="${yH.toFixed(1)}" x2="${x.toFixed(1)}" y2="${yL.toFixed(1)}" stroke="${cc}" stroke-width="1"/>
+        <rect x="${(x - bw / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${cc}"/>`;
+    }).join("");
+  } else {
+    const pts = rows.map((c, i) => `${xOf(i).toFixed(1)},${yOf(c.c).toFixed(1)}`).join(" ");
+    const area = `${xOf(0).toFixed(1)},${(padT + ph).toFixed(1)} ${pts} ${xOf(rows.length - 1).toFixed(1)},${(padT + ph).toFixed(1)}`;
+    const gid = "cg" + Math.random().toString(36).slice(2, 8);
+    inner = `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${col}" stop-opacity=".18"/><stop offset="1" stop-color="${col}" stop-opacity="0"/>
+      </linearGradient></defs>
+      <polygon points="${area}" fill="url(#${gid})"/>
+      <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }
+  const chgPct = first ? (last - first) / first * 100 : null;
+  return visualNode(
+    `<div class="cv-head"><span class="cv-title">${escapeHtml(title)}</span>
+      <span class="cv-chg ${pctCls(chgPct)}">${fmtPx(last)} · ${fmtPct(chgPct)}</span></div>
+     <svg class="cv-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(title)} price chart, ${fmtPct(chgPct)} over range">${inner}</svg>`
+  );
+}
+
+/* horizontal comparison bars (value-scaled) with optional per-row pct + sparkline */
+function barsVisual(title, rows){
+  const items = (rows || []).filter(r => isNum(r.value) && r.value > 0);
+  if (!items.length) return null;
+  const max = Math.max(...items.map(r => r.value));
+  const body = items.map(r => {
+    const pctW = Math.max(2, r.value / max * 100);
+    const sp = r.spark ? sparkline(r.spark, (r.sparkUp ?? true), 60, 18) : "";
+    const chg = isNum(r.change) ? `<span class="cv-bar-chg ${pctCls(r.change)}">${fmtPct(r.change)}</span>` : "";
+    const sub = r.sub ? `<span class="cv-bar-sub">${escapeHtml(r.sub)}</span>` : "";
+    return `<div class="cv-bar" role="listitem">
+      <div class="cv-bar-lbl"><span class="cv-bar-name">${escapeHtml(String(r.label))}</span>${sub}</div>
+      <div class="cv-bar-track"><span class="cv-bar-fill" style="width:${pctW.toFixed(1)}%"></span></div>
+      <div class="cv-bar-val">${escapeHtml(r.valueText || fmtUsd(r.value))}${chg}</div>
+      ${sp ? `<div class="cv-bar-spark">${sp}</div>` : ""}
+    </div>`;
+  }).join("");
+  return visualNode(
+    `<div class="cv-head"><span class="cv-title">${escapeHtml(title)}</span></div>
+     <div class="cv-bars" role="list" aria-label="${escapeHtml(title)}">${body}</div>`
+  );
+}
+
+/* KPI / stat cards */
+function cardsVisual(title, cards){
+  const items = (cards || []).filter(Boolean);
+  if (!items.length) return null;
+  const body = items.map(c => {
+    const tone = c.tone ? ` cv-card-${c.tone}` : "";
+    const sub = c.sub ? `<span class="cv-card-sub ${c.subTone || ""}">${escapeHtml(c.sub)}</span>` : "";
+    return `<div class="cv-card${tone}">
+      <span class="cv-card-k">${escapeHtml(c.k)}</span>
+      <span class="cv-card-v">${escapeHtml(c.v)}</span>${sub}</div>`;
+  }).join("");
+  return visualNode(
+    `${title ? `<div class="cv-head"><span class="cv-title">${escapeHtml(title)}</span></div>` : ""}
+     <div class="cv-cards">${body}</div>`
+  );
+}
+
+/* a Fear & Greed semicircular gauge (0-100) */
+function gaugeVisual(value, classification){
+  if (!isNum(value)) return null;
+  const v = Math.max(0, Math.min(100, value));
+  const W = 160, H = 92, cx = W / 2, cy = H - 8, r = 64;
+  const ang = Math.PI * (1 - v / 100);             // 180°→0°
+  const px = cx + r * Math.cos(ang), py = cy - r * Math.sin(ang);
+  const col = v < 25 ? DN : v < 45 ? "#e0a23f" : v < 55 ? "#d6d64a" : v < 75 ? "#7fd14a" : UP;
+  const arc = (a0, a1) => {
+    const x0 = cx + r * Math.cos(a0), y0 = cy - r * Math.sin(a0);
+    const x1 = cx + r * Math.cos(a1), y1 = cy - r * Math.sin(a1);
+    return `M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${r} ${r} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+  };
+  return visualNode(
+    `<div class="cv-head"><span class="cv-title">Fear &amp; Greed</span>
+      <span class="cv-chg" style="color:${col}">${escapeHtml(classification || "")}</span></div>
+     <div class="cv-gauge"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Fear and Greed index ${v} of 100, ${escapeHtml(classification || "")}">
+      <path d="${arc(Math.PI, 0)}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="9" stroke-linecap="round"/>
+      <path d="${arc(Math.PI, ang)}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round"/>
+      <circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="${col}"/>
+      <text x="${cx}" y="${cy - 14}" text-anchor="middle" class="cv-gauge-num" fill="${col}">${v}</text>
+     </svg></div>`
+  );
+}
+
+function renderToolVisual(name, args, result){
+  try {
+    if (!result || result.error) return null;
+
+    /* ── line / candle charts ── */
+    if (name === "cg_chart")
+      return chartVisual(`${upper(args.coin_id)} · ${result.days ?? args.days ?? 7}d`, result.candles);
+    if (name === "get_candles")
+      return chartVisual(`${upper(args.coin)} · ${String(result.interval || args.interval || "")}`, result.candles);
+
+    /* ── comparison bars ── */
+    if (name === "cg_top_coins")
+      return barsVisual("Top coins · market cap", (result.coins || []).map(c => ({
+        label: c.symbol, sub: c.name, value: c.market_cap_usd, valueText: fmtUsd(c.market_cap_usd),
+        change: c.change_24h_pct })));
+    if (name === "get_all_markets")
+      return barsVisual(`Hyperliquid markets · 24h volume${result.network ? " (" + result.network + ")" : ""}`,
+        (result.markets || []).slice(0, 15).map(m => ({
+          label: m.coin, value: m.day_volume_usd, valueText: fmtUsd(m.day_volume_usd),
+          change: m.change_24h_pct })));
+    if (name === "defi_protocols")
+      return barsVisual("DeFi protocols · TVL", (result.protocols || []).map(p => ({
+        label: p.symbol || p.name, sub: p.category, value: p.tvl_usd, valueText: fmtUsd(p.tvl_usd),
+        change: p.change_1d_pct })));
+    if (name === "defi_chains")
+      return barsVisual("Chains · TVL", (result.chains || []).map(c => ({
+        label: c.name, value: c.tvl_usd, valueText: fmtUsd(c.tvl_usd) })));
+    if (name === "defi_stablecoins")
+      return barsVisual("Stablecoins · circulating", (result.stablecoins || []).map(s => ({
+        label: s.symbol, sub: s.name, value: s.circulating_usd, valueText: fmtUsd(s.circulating_usd) })));
+    if (name === "defi_yields")
+      return barsVisual("Yield pools · APY", (result.pools || []).map(p => ({
+        label: p.symbol, sub: `${p.project} · ${p.chain}`, value: p.apy_pct,
+        valueText: fmtPct(p.apy_pct).replace("+", "") })));
+
+    /* ── KPI / stat cards ── */
+    if (name === "cg_market_data"){
+      const r = result;
+      return cardsVisual(`${r.name || upper(r.symbol)}${r.symbol ? " · " + r.symbol : ""}`, [
+        { k: "Price", v: fmtPx(r.price_usd) },
+        { k: "24h", v: fmtPct(r.change_24h_pct), tone: pctCls(r.change_24h_pct) },
+        { k: "7d", v: fmtPct(r.change_7d_pct), tone: pctCls(r.change_7d_pct) },
+        { k: "Market cap", v: fmtUsd(r.market_cap_usd), sub: isNum(r.market_cap_rank) ? "#" + r.market_cap_rank : "" },
+        { k: "24h volume", v: fmtUsd(r.volume_24h_usd) },
+        { k: "ATH", v: fmtPx(r.ath_usd), sub: fmtPct(r.ath_change_pct), subTone: pctCls(r.ath_change_pct) },
+      ]);
+    }
+    if (name === "get_ticker"){
+      const r = result;
+      return cardsVisual(`${upper(r.coin)} · Hyperliquid${r.network ? " (" + r.network + ")" : ""}`, [
+        { k: "Mark", v: fmtPx(r.mark_px) },
+        { k: "24h", v: fmtPct(r.change_24h_pct), tone: pctCls(r.change_24h_pct) },
+        { k: "24h volume", v: fmtUsd(r.day_volume_usd) },
+        { k: "Open interest", v: fmtUsd(r.open_interest_usd) },
+        { k: "Funding", v: fmtPct(r.funding_rate_pct), tone: pctCls(r.funding_rate_pct) },
+        { k: "Max lev", v: isNum(r.max_leverage) ? r.max_leverage + "×" : "—" },
+      ]);
+    }
+    if (name === "cg_global"){
+      const r = result;
+      return cardsVisual("Global crypto market", [
+        { k: "Total cap", v: fmtUsd(r.total_market_cap_usd), sub: fmtPct(r.market_cap_change_24h_pct), subTone: pctCls(r.market_cap_change_24h_pct) },
+        { k: "24h volume", v: fmtUsd(r.total_volume_24h_usd) },
+        { k: "BTC dom", v: isNum(r.btc_dominance_pct) ? r.btc_dominance_pct + "%" : "—" },
+        { k: "ETH dom", v: isNum(r.eth_dominance_pct) ? r.eth_dominance_pct + "%" : "—" },
+        { k: "Coins", v: isNum(r.active_cryptocurrencies) ? fmtBig(r.active_cryptocurrencies) : "—" },
+      ]);
+    }
+    if (name === "fear_greed")
+      return gaugeVisual(result.value, result.classification);
+
+    /* ── trending: compact cards ── */
+    if (name === "cg_trending")
+      return cardsVisual("Trending · 24h", (result.coins || []).slice(0, 8).map(c => ({
+        k: c.symbol, v: c.name, sub: isNum(c.market_cap_rank) ? "#" + c.market_cap_rank : "" })));
+
+    /* ── positions: cards ── */
+    if (name === "get_positions" && (result.positions || []).length)
+      return cardsVisual(`Positions · ${fmtUsd(result.account_value_usd)} account`,
+        result.positions.map(p => ({
+          k: `${p.coin} ${p.side}`, v: fmtUsd(p.unrealized_pnl_usd),
+          tone: pctCls(p.unrealized_pnl_usd),
+          sub: `${fmtBig(p.size)} @ ${fmtPx(p.entry_px)}` })));
+  } catch { return null; }
+  return null;
+}
+
 function nearBottom(){ return body.scrollHeight - body.scrollTop - body.clientHeight < 80; }
 function autoscroll(force){ if (force || nearBottom()) body.scrollTop = body.scrollHeight; }
 function nowTime(){ return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
@@ -406,6 +671,9 @@ async function askClaude(userText){
         const trace = addTrace(b.name, b.input || {});
         const out = await runTool(b.name, b.input || {});
         if (out && out.error) trace.fail(); else trace.done();
+        // render a rich inline visual (chart / bars / cards) for data tools
+        const visual = renderToolVisual(b.name, b.input || {}, out);
+        if (visual){ body.appendChild(visual); autoscroll(); }
         results.push({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(out) });
       }
       history.push({ role: "user", content: results });

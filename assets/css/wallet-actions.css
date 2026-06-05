@@ -1,0 +1,171 @@
+/* =================================================================== *
+ *  wallet-actions.css — Receive / Swap / Bridge modals
+ *  Mirrors the app's .hl-modal visual language (see trade.css) with a
+ *  .wa- prefix so it never collides with other agents' styles.
+ * =================================================================== */
+
+.wa-modal{
+  position:fixed; inset:0; z-index:420;
+  display:grid; place-items:center; padding:20px;
+  background:rgba(3,3,4,.72);
+  -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+  opacity:0; transition:opacity var(--t,.2s) var(--ease,ease);
+}
+.wa-modal.show{ opacity:1; }
+
+.wa-card{
+  width:min(440px,100%);
+  border:1px solid var(--border-strong);
+  border-radius:var(--r-xl,28px);
+  background:var(--surface);
+  box-shadow:0 30px 80px -20px rgba(0,0,0,.7);
+  transform:translateY(8px) scale(.98);
+  opacity:0;
+  transition:transform var(--t,.25s) var(--spring,ease), opacity var(--t,.25s) var(--ease,ease);
+  max-height:calc(100vh - 40px);
+  overflow:auto;
+}
+.wa-modal.show .wa-card{ transform:translateY(0) scale(1); opacity:1; }
+
+.wa-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:20px 24px 0;
+}
+.wa-head h3{ font-size:18px; font-weight:500; }
+.wa-x{
+  width:30px; height:30px; border-radius:8px;
+  display:grid; place-items:center;
+  color:var(--text-mute); font-size:13px;
+  background:transparent; border:1px solid transparent;
+  transition:background var(--t-fast,.15s) var(--ease,ease), color var(--t-fast,.15s) var(--ease,ease);
+}
+.wa-x:hover{ background:rgba(255,255,255,.06); color:var(--text); }
+
+.wa-body{ padding:18px 24px 24px; }
+
+/* ---- loading / error states ---- */
+.wa-loading,.wa-error{
+  font-family:var(--mono); font-size:13px; color:var(--text-dim);
+  padding:24px 4px; display:flex; align-items:center; gap:10px;
+}
+.wa-error{ color:var(--error); }
+.wa-spin{
+  width:13px; height:13px; flex-shrink:0;
+  border:2px solid rgba(255,255,255,.18);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  display:inline-block;
+  animation:waSpin .7s linear infinite;
+}
+@keyframes waSpin{ to{ transform:rotate(360deg); } }
+
+/* =================== RECEIVE =================== */
+.wa-receive{ display:flex; flex-direction:column; align-items:center; gap:18px; }
+.wa-qr{
+  width:220px; height:220px; padding:0;
+  border-radius:12px; overflow:hidden;
+  background:#fff; line-height:0;
+  box-shadow:0 8px 30px -12px rgba(0,0,0,.6);
+}
+.wa-qr svg{ display:block; width:100%; height:100%; }
+.wa-qr-fail{
+  width:100%; height:100%; display:grid; place-items:center;
+  color:#0a0a0c; font-family:var(--mono); font-size:12px;
+}
+.wa-addr-box{
+  width:100%; text-align:center;
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+  padding:14px 16px;
+  border:1px solid var(--border);
+  border-radius:var(--r-lg,20px);
+  background:rgba(255,255,255,.02);
+}
+.wa-addr-lab{
+  font-family:var(--mono); font-size:10px; letter-spacing:.15em;
+  text-transform:uppercase; color:var(--text-mute);
+}
+.wa-addr-val{
+  font-family:var(--mono); font-size:13px; color:var(--text);
+  word-break:break-all; line-height:1.5;
+}
+.wa-hint{
+  font-size:12px; color:var(--text-dim); text-align:center; line-height:1.5;
+}
+.wa-hint b{ color:var(--text-dim); }
+
+/* =================== SWAP / BRIDGE =================== */
+.wa-ex{ display:flex; flex-direction:column; gap:10px; }
+.wa-leg{
+  border:1px solid var(--border);
+  border-radius:var(--r-lg,20px);
+  background:rgba(255,255,255,.02);
+  padding:14px 16px;
+  display:flex; flex-direction:column; gap:10px;
+}
+.wa-leg-head{
+  display:flex; justify-content:space-between;
+  font-family:var(--mono); font-size:10px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--text-mute);
+}
+.wa-leg-row{ display:flex; gap:10px; }
+.wa-sel{
+  flex:1; min-width:0;
+  padding:10px 12px; border-radius:10px;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--border);
+  color:var(--text); font-size:13px;
+  transition:border-color var(--t-fast,.15s) var(--ease,ease);
+}
+.wa-sel:focus{ border-color:var(--accent); outline:none; }
+.wa-fixedchain{ color:var(--text-dim); cursor:default; }
+.wa-amount{
+  width:100%; padding:10px 12px; border-radius:10px;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--border);
+  color:var(--text); font-size:20px; font-family:var(--mono);
+  transition:border-color var(--t-fast,.15s) var(--ease,ease);
+}
+.wa-amount:focus{ border-color:var(--accent); outline:none; }
+.wa-amount::placeholder{ color:var(--text-mute); }
+
+.wa-arrow{
+  align-self:center;
+  width:32px; height:32px; margin:-4px 0;
+  display:grid; place-items:center;
+  border-radius:50%; background:var(--surface-2);
+  border:1px solid var(--border);
+  color:var(--accent); font-size:15px;
+}
+.wa-receive-est{
+  font-family:var(--mono); font-size:18px; color:var(--text);
+  padding:4px 2px;
+}
+
+.wa-quote-meta{
+  margin-top:4px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:rgba(179,154,255,.04);
+  padding:12px 14px;
+  display:flex; flex-direction:column; gap:7px;
+}
+.wa-q-row{
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:12px; color:var(--text-dim);
+}
+.wa-q-row b{ color:var(--text); font-weight:500; font-family:var(--mono); font-size:12px; }
+.wa-status{
+  display:flex; align-items:center; gap:9px;
+  font-size:12px; color:var(--accent);
+  padding-top:8px; margin-top:2px;
+  border-top:1px solid var(--border);
+}
+
+.wa-cta{ width:100%; margin-top:6px; }
+.wa-cta.wa-ready{ background:var(--success); color:#0a1a0e; }
+.wa-cta.wa-ready:hover{ background:#a4f3bf; }
+
+@media (max-width:480px){
+  .wa-leg-row{ flex-direction:column; }
+  .wa-qr{ width:180px; height:180px; }
+}

@@ -82,25 +82,11 @@ function nonceToBytes(nonce){
  *  decimals (MAX_DECIMALS = 6 perps, 8 spot). Output is the minimal
  *  decimal string — the exact same string is hashed and sent.       */
 
-function trimNum(s){
-  if (s.indexOf(".") === -1) return s;
-  s = s.replace(/0+$/, "").replace(/\.$/, "");
-  return s === "" || s === "-" ? "0" : s;
-}
-export function formatSize(sz, szDecimals){
-  return trimNum(Number(sz).toFixed(Math.max(0, szDecimals)));
-}
-export function formatPrice(px, szDecimals, isPerp = true){
-  px = Number(px);
-  if (!isFinite(px) || px <= 0) return "0";
-  if (Number.isInteger(px)) return String(px);
-  const maxDecimals = isPerp ? 6 : 8;
-  const decimals = Math.max(0, maxDecimals - szDecimals);
-  let v = Number(px.toPrecision(5));      // 5 significant figures
-  v = Number(v.toFixed(decimals));        // decimal-place cap
-  if (Number.isInteger(v)) return String(v);
-  return trimNum(v.toFixed(decimals));
-}
+// Pure wire-formatting rules live in hl-format.js so they can be unit
+// tested in Node (this module pulls in browser/remote-ESM deps). Re-export
+// for any consumer importing them off the HL namespace.
+export { formatSize, formatPrice } from "./hl-format.js";
+import { formatSize, formatPrice } from "./hl-format.js";
 
 /* ─── INFO endpoint ────────────────────────────────────────── */
 
@@ -310,6 +296,136 @@ export async function updateLeverage({ account, coin, leverage, isCross = true }
   if (!account) throw new Error("connect a wallet first");
   const { index } = await assetInfo(coin);
   const action = { type: "updateLeverage", asset: index, isCross: !!isCross, leverage: Math.round(leverage) };
+  const nonce = Date.now();
+  const signature = await signL1Action(account, action, nonce);
+  return postExchange(action, signature, nonce);
+}
+
+/* ─── ADVANCED ORDERS (additive — pro-orders module) ───────────── *
+ *  Everything below is purely additive. It REUSES the exact signing
+ *  path above (assetInfo, formatPrice/formatSize, signL1Action,
+ *  postExchange) and replicates placeOrder()'s LOAD-BEARING wire key
+ *  order a,b,p,s,r,t byte-identically. placeOrder/cancelOrder/
+ *  updateLeverage above are NOT modified.                            */
+
+/**
+ * Build one order-wire object the same way placeOrder() does.
+ * `type` is "limit" or "market". For "market" we cross by ±slippage
+ * (IOC), matching placeOrder(). For "trigger" pass a precomputed
+ * `t` object via `triggerT`.
+ * Returns { wire } where wire = { a, b, p, s, r, t } in that order.
+ */
+async function buildOrderWire({ coin, isBuy, sz, px, type = "limit", tif = "Gtc", reduceOnly = false, triggerT = null }){
+  const { index, szDecimals } = await assetInfo(coin);
+
+  let priceNum = Number(px);
+  let limitTif = tif;
+  let t;
+
+  if (triggerT){
+    // caller supplied a fully-formed trigger order-type object
+    t = triggerT;
+    if (!isFinite(priceNum) || priceNum <= 0) priceNum = 0;
+  } else if (type === "market"){
+    const mids = await allMids();
+    const mid = Number(mids[coin]);
+    if (!isFinite(mid) || mid <= 0) throw new Error("no mid price for " + coin);
+    priceNum = isBuy ? mid * (1 + DEFAULT_SLIPPAGE) : mid * (1 - DEFAULT_SLIPPAGE);
+    limitTif = "Ioc";
+    t = { limit: { tif: limitTif } };
+  } else {
+    if (!isFinite(priceNum) || priceNum <= 0) throw new Error("limit price must be greater than zero");
+    t = { limit: { tif: limitTif } };
+  }
+
+  const pStr = formatPrice(priceNum, szDecimals, true);
+  const sStr = formatSize(sz, szDecimals);
+  if (Number(sStr) <= 0) throw new Error("size must be greater than zero");
+
+  // wire key order is load-bearing for the signature hash: a,b,p,s,r,t
+  const wire = { a: index, b: !!isBuy, p: pStr, s: sStr, r: !!reduceOnly, t };
+  return { wire };
+}
+
+/**
+ * Place a single Take-Profit / Stop-Loss / trigger order.
+ *  tpsl  : "tp" | "sl"
+ *  isMarket: true -> fires a market order when triggerPx is hit;
+ *            false -> rests a limit order at `px` (defaults to triggerPx).
+ * Standalone trigger orders use grouping "na".
+ *   t = { trigger: { isMarket, triggerPx, tpsl } }
+ *   wire = { a, b:isBuy, p, s, r:reduceOnly, t }
+ */
+export async function placeTrigger({ account, coin, isBuy, sz, triggerPx, px = null, isMarket = true, tpsl, reduceOnly = true }){
+  if (!account) throw new Error("connect a wallet first");
+  if (tpsl !== "tp" && tpsl !== "sl") throw new Error("tpsl must be 'tp' or 'sl'");
+  const trig = Number(triggerPx);
+  if (!isFinite(trig) || trig <= 0) throw new Error("trigger price must be greater than zero");
+  const { szDecimals } = await assetInfo(coin);
+
+  const triggerPxStr = formatPrice(trig, szDecimals, true);
+  // limit price for a trigger order: when market, HL convention is to use the
+  // trigger price as the order price; when limit, use the supplied limit px.
+  const limitPxNum = isMarket ? trig : Number(px ?? trig);
+  const t = { trigger: { isMarket: !!isMarket, triggerPx: triggerPxStr, tpsl } };
+
+  const { wire } = await buildOrderWire({ coin, isBuy, sz, px: limitPxNum, reduceOnly, triggerT: t });
+  const action = { type: "order", orders: [wire], grouping: "na" };
+  const nonce = Date.now();
+  const signature = await signL1Action(account, action, nonce);
+  return postExchange(action, signature, nonce);
+}
+
+/**
+ * Batch place many orders in ONE signed action — for scale ladders and
+ * for an entry+TP+SL bracket.
+ *  orders: [{ coin, isBuy, sz, px, type:"limit"|"market", tif, reduceOnly,
+ *             trigger?:{ isMarket, triggerPx, tpsl } }]
+ *  grouping: "na" (independent) | "normalTpsl" (entry + tp + sl bracket).
+ * Each child resolves its own asset index + formatting per coin.
+ */
+export async function placeOrders({ account, orders, grouping = "na" }){
+  if (!account) throw new Error("connect a wallet first");
+  if (!Array.isArray(orders) || orders.length === 0) throw new Error("no orders to place");
+
+  const wires = [];
+  for (const o of orders){
+    let triggerT = null;
+    if (o.trigger){
+      const { szDecimals } = await assetInfo(o.coin);
+      const trig = Number(o.trigger.triggerPx);
+      if (!isFinite(trig) || trig <= 0) throw new Error("trigger price must be greater than zero");
+      triggerT = { trigger: { isMarket: !!o.trigger.isMarket, triggerPx: formatPrice(trig, szDecimals, true), tpsl: o.trigger.tpsl } };
+    }
+    const { wire } = await buildOrderWire({
+      coin: o.coin, isBuy: o.isBuy, sz: o.sz, px: o.px,
+      type: o.type || "limit", tif: o.tif || "Gtc", reduceOnly: o.reduceOnly,
+      triggerT,
+    });
+    wires.push(wire);
+  }
+
+  const action = { type: "order", orders: wires, grouping };
+  const nonce = Date.now();
+  const signature = await signL1Action(account, action, nonce);
+  return postExchange(action, signature, nonce);
+}
+
+/**
+ * Native TWAP order. Action wire (matches HL SDK):
+ *   { type:"twapOrder", twap:{ a:index, b:isBuy, s:size, r:reduceOnly,
+ *                              m:minutes, t:randomize } }
+ *  size string is formatted to szDecimals like a normal order size.
+ */
+export async function placeTwap({ account, coin, isBuy, sz, minutes, reduceOnly = false, randomize = true }){
+  if (!account) throw new Error("connect a wallet first");
+  const { index, szDecimals } = await assetInfo(coin);
+  const sStr = formatSize(sz, szDecimals);
+  if (Number(sStr) <= 0) throw new Error("size must be greater than zero");
+  const m = Math.round(Number(minutes));
+  if (!isFinite(m) || m <= 0) throw new Error("duration must be greater than zero");
+
+  const action = { type: "twapOrder", twap: { a: index, b: !!isBuy, s: sStr, r: !!reduceOnly, m, t: !!randomize } };
   const nonce = Date.now();
   const signature = await signL1Action(account, action, nonce);
   return postExchange(action, signature, nonce);

@@ -1,0 +1,98 @@
+/* ============================================================ *
+ *  chat-charts.css — rich inline visuals for the AI copilot.
+ *
+ *  Owned by the assistant feature. The matching JS is
+ *  assistant.js → renderToolVisual() / *Visual() helpers, which
+ *  emit a `.cv` container holding charts (.cv-chart), comparison
+ *  bars (.cv-bars), KPI cards (.cv-cards) or a F&G gauge
+ *  (.cv-gauge). Styled to feel native to the .cm / .cm-b chat
+ *  bubbles (see assistant.css). Tokens come from base.css.
+ * ============================================================ */
+
+/* ─── container ───────────────────────────────────────────── */
+.cv{
+  align-self:flex-start;
+  max-width:88%;
+  width:300px;
+  margin:2px 0 1px;
+  padding:11px 12px 12px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  border-bottom-left-radius:4px;
+  background:rgba(255,255,255,.035);
+}
+.cv-in{ animation:cvIn .34s var(--ease-out); }
+@keyframes cvIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+
+/* ─── shared header ───────────────────────────────────────── */
+.cv-head{
+  display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+  margin-bottom:9px;
+}
+.cv-title{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--text-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.cv-chg{
+  font-family:var(--mono);font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0;
+}
+.cv-chg.up,.cv-bar-chg.up,.cv-card-up .cv-card-v,.up.cv-card-sub{ color:#3fb98a; }
+.cv-chg.dn,.cv-bar-chg.dn,.cv-card-dn .cv-card-v,.dn.cv-card-sub{ color:#e0556b; }
+
+/* ─── line / candle chart ─────────────────────────────────── */
+.cv-chart{ display:block;width:100%;height:auto;overflow:visible; }
+
+/* ─── sparkline ───────────────────────────────────────────── */
+.cv-spark{ display:block;width:100%;height:100%; }
+
+/* ─── comparison bars ─────────────────────────────────────── */
+.cv-bars{ display:flex;flex-direction:column;gap:7px; }
+.cv-bar{
+  display:grid;
+  grid-template-columns:64px 1fr auto;
+  grid-template-areas:"lbl track val" "lbl spark val";
+  align-items:center;column-gap:8px;row-gap:2px;
+}
+.cv-bar-lbl{ grid-area:lbl;display:flex;flex-direction:column;min-width:0; }
+.cv-bar-name{ font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.cv-bar-sub{ font-size:9px;color:var(--text-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.cv-bar-track{
+  grid-area:track;position:relative;height:8px;border-radius:5px;
+  background:rgba(255,255,255,.05);overflow:hidden;
+}
+.cv-bar-fill{
+  position:absolute;left:0;top:0;bottom:0;border-radius:5px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  animation:cvBar .5s var(--ease-out) both;
+}
+@keyframes cvBar{ from{ transform:scaleX(0);transform-origin:left; } to{ transform:scaleX(1); } }
+.cv-bar-val{
+  grid-area:val;display:flex;flex-direction:column;align-items:flex-end;gap:1px;
+  font-family:var(--mono);font-size:10.5px;color:var(--text-dim);white-space:nowrap;
+}
+.cv-bar-chg{ font-size:9.5px;font-weight:600; }
+.cv-bar-spark{ grid-area:spark;height:16px;opacity:.85; }
+
+/* ─── KPI / stat cards ────────────────────────────────────── */
+.cv-cards{ display:grid;grid-template-columns:1fr 1fr;gap:7px; }
+.cv-card{
+  display:flex;flex-direction:column;gap:2px;
+  padding:8px 9px;border-radius:9px;
+  background:rgba(255,255,255,.04);border:1px solid var(--border);
+}
+.cv-card-k{ font-family:var(--mono);font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-mute); }
+.cv-card-v{ font-size:14px;font-weight:650;color:var(--text);line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.cv-card-sub{ font-family:var(--mono);font-size:9.5px;color:var(--text-mute); }
+.cv-card-up{ border-color:rgba(63,185,138,.28);background:rgba(63,185,138,.07); }
+.cv-card-dn{ border-color:rgba(224,85,107,.28);background:rgba(224,85,107,.07); }
+
+/* ─── Fear & Greed gauge ──────────────────────────────────── */
+.cv-gauge{ display:flex;justify-content:center; }
+.cv-gauge svg{ width:160px;height:auto;max-width:100%; }
+.cv-gauge-num{ font-family:var(--mono);font-size:26px;font-weight:700; }
+
+/* ─── reduced motion ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce){
+  .cv-in,.cv-bar-fill{ animation:none; }
+  .cv-bar-fill{ transform:none; }
+}

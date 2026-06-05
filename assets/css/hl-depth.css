@@ -1,0 +1,4 @@
+/* hl-depth.css — styles for the depth chart + trades tape.
+   Owned by the DEPTH+TAPE agent. See assets/js/hl-depth.js header for the
+   contract. The row layout container is #hlAddonRow.hl-addon-row (you own
+   its styling too). Mirror .book-card in trade.css; reuse base.css tokens. */

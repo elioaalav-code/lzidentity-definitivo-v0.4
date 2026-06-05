@@ -1,0 +1,108 @@
+/* hl-orders-pro.css — advanced order types panel (TP/SL, scale, TWAP, TIF).
+   Mirrors the .ticket-card controls in trade.css; reuses base.css tokens. */
+
+.hl-pro{ margin-top:12px; border-top:1px solid var(--border); padding-top:10px; }
+
+/* toggle header */
+.pro-toggle{
+  width:100%; display:flex; align-items:center; gap:10px;
+  background:none; border:0; cursor:pointer; padding:6px 2px;
+  font-family:var(--mono); font-size:11px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--text-mute);
+  transition:color var(--t-fast) var(--ease);
+}
+.pro-toggle:hover{ color:var(--text); }
+.pro-toggle > span:first-child{ flex:1; text-align:left; }
+.pro-coinlbl{ font-size:10px; letter-spacing:.04em; text-transform:none; color:var(--text-mute); }
+.pro-coinlbl em{ color:var(--text-dim); font-style:normal; }
+.pro-chev{ flex-shrink:0; transition:transform var(--t) var(--ease); }
+.pro-toggle[aria-expanded="true"] .pro-chev{ transform:rotate(180deg); }
+
+.pro-body{ display:flex; flex-direction:column; gap:10px; padding-top:8px; }
+
+/* tabs */
+.pro-tabs{ display:flex; gap:4px; background:rgba(255,255,255,.03); border-radius:8px; padding:3px; }
+.pro-tabs button{
+  flex:1; padding:6px 4px; border:0; background:none; cursor:pointer;
+  font-family:var(--mono); font-size:11px; color:var(--text-mute);
+  border-radius:6px; transition:all var(--t-fast) var(--ease);
+}
+.pro-tabs button:hover{ color:var(--text); }
+.pro-tabs button.on{ background:rgba(255,255,255,.07); color:var(--text); }
+
+.pro-panel{ display:flex; flex-direction:column; gap:9px; }
+.pro-hint{ margin:0; font-size:11px; line-height:1.4; color:var(--text-mute); }
+
+/* fields */
+.pro-field{ display:flex; flex-direction:column; gap:4px; }
+.pro-field > span{
+  font-family:var(--mono); font-size:10px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--text-mute);
+}
+.pro-field > span em{ color:var(--text-dim); font-style:normal; }
+.pro-field input{
+  width:100%; padding:8px 10px; border-radius:8px;
+  background:rgba(255,255,255,.04); border:1px solid var(--border);
+  font-family:var(--mono); font-size:13px; color:var(--text);
+  transition:border-color var(--t-fast) var(--ease);
+}
+.pro-field input:focus{ border-color:var(--accent); outline:none; }
+.pro-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+
+/* side toggle */
+.pro-side, .pro-tif{ display:flex; gap:4px; }
+.pro-side button{
+  flex:1; padding:7px 4px; border:1px solid var(--border); cursor:pointer;
+  background:rgba(255,255,255,.02); color:var(--text-mute);
+  font-family:var(--mono); font-size:11px; border-radius:7px;
+  transition:all var(--t-fast) var(--ease);
+}
+.pro-side button.on.buy{ background:color-mix(in srgb,var(--long) 18%,transparent); border-color:var(--long); color:var(--long); }
+.pro-side button.on.sell{ background:color-mix(in srgb,var(--short) 18%,transparent); border-color:var(--short); color:var(--short); }
+
+/* TIF selector */
+.pro-tif{ align-items:center; gap:8px; }
+.pro-tif > span{ font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-mute); }
+.pro-tif button{
+  padding:5px 10px; border:1px solid var(--border); cursor:pointer;
+  background:rgba(255,255,255,.02); color:var(--text-mute);
+  font-family:var(--mono); font-size:11px; border-radius:6px;
+  transition:all var(--t-fast) var(--ease);
+}
+.pro-tif button.on{ border-color:var(--accent); color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,transparent); }
+
+/* checkboxes */
+.pro-check{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-dim); cursor:pointer; }
+.pro-check input{ accent-color:var(--accent); }
+
+/* scale preview */
+.pro-preview{
+  border:1px solid var(--border); border-radius:8px; overflow:hidden;
+  max-height:160px; overflow-y:auto; background:rgba(0,0,0,.15);
+}
+.pro-pv-head, .pro-pv-row{
+  display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:5px 12px;
+  font-family:var(--mono); font-size:11px;
+}
+.pro-pv-head{ color:var(--text-mute); border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); }
+.pro-pv-row{ color:var(--text-dim); border-bottom:1px solid rgba(255,255,255,.03); }
+.pro-pv-row:last-child{ border-bottom:0; }
+.pro-pv-row span:last-child, .pro-pv-head span:last-child{ text-align:right; }
+.pro-pv-msg{ display:block; padding:10px 12px; font-size:11px; color:var(--text-mute); }
+
+.pro-submit{ width:100%; margin-top:2px; }
+
+/* confirm sheet */
+.pro-confirm{
+  border:1px solid var(--accent); border-radius:9px; padding:11px 12px;
+  background:color-mix(in srgb,var(--accent) 7%,var(--surface));
+  display:flex; flex-direction:column; gap:9px;
+}
+.pro-confirm-msg{ display:flex; flex-direction:column; gap:3px; }
+.pro-confirm-msg strong{ font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+.pro-confirm-msg span{ font-size:12px; line-height:1.4; color:var(--text); }
+.pro-confirm-actions{ display:flex; gap:8px; justify-content:flex-end; }
+
+@media (prefers-reduced-motion: reduce){
+  .pro-chev, .pro-toggle, .pro-tabs button, .pro-side button, .pro-tif button, .pro-field input{ transition:none; }
+}

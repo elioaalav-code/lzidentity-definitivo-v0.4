@@ -20,7 +20,7 @@ tickClock(); setInterval(tickClock, 1000);
 /* =================================================================== *
  *  ROUTER (hash-based)
  * =================================================================== */
-const ROUTES = ["chat","wallet","markets","trade","network","identity","recovery"];
+const ROUTES = ["chat","wallet","markets","trade","network","identity","recovery","coin"];
 const views = Object.fromEntries(ROUTES.map(r => [r, document.querySelector(`.view[data-view="${r}"]`)]));
 const sideNav  = document.getElementById("sideNav");
 const navLinks = [...document.querySelectorAll(".side-nav a")];
@@ -52,6 +52,11 @@ function getRoute(){
   const h = (location.hash || "#/chat").replace(/^#\/?/, "");
   const r = h.split("/")[0];
   return ROUTES.includes(r) ? r : "chat";
+}
+/** Second hash segment, e.g. "#/coin/bitcoin" → "bitcoin". */
+function getRouteParam(){
+  const h = (location.hash || "").replace(/^#\/?/, "");
+  return decodeURIComponent(h.split("/")[1] || "");
 }
 function setActive(route){
   for (const k of ROUTES){ views[k]?.classList.toggle("active", k === route); }
@@ -560,11 +565,7 @@ function openCoinMenu(row){
   const sym  = (row.dataset.sym || "").toUpperCase();
   const name = row.dataset.name || sym;
   const id   = row.dataset.id && row.dataset.id !== "undefined" ? row.dataset.id : "";
-  const slug = (id || name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const cg   = id ? `https://www.coingecko.com/en/coins/${id}` : `https://www.coingecko.com/en/search?query=${encodeURIComponent(sym)}`;
-  const cmc  = `https://coinmarketcap.com/currencies/${slug}/`;
-  const dl   = `https://defillama.com/`;
-  const ext  = (href, label) => `<a class="cmenu-item" href="${href}" target="_blank" rel="noopener" role="menuitem"><span>${label}</span><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6 3h7v7M12.5 3.5 7 9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`;
+  const coinRef = id || sym.toLowerCase();
   const m = document.createElement("div");
   m.className = "cmenu";
   m.setAttribute("role", "menu");
@@ -573,7 +574,7 @@ function openCoinMenu(row){
     <div class="cmenu-head">${coinAvatarHTML(sym, 28)}<div class="cmenu-id"><span class="s">${sym}</span><span class="n">${name}</span></div></div>
     <button class="cmenu-item primary" data-act="trade" role="menuitem"><span>Trade ${sym} on Hyperliquid</span><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 13 13 3M6 3h7v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <div class="cmenu-sep">Open full data</div>
-    ${ext(cg, "CoinGecko")}${ext(cmc, "CoinMarketCap")}${ext(dl, "DefiLlama")}`;
+    <button class="cmenu-item" data-act="open" role="menuitem"><span>${sym} overview · price, charts &amp; stats</span><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
   document.body.appendChild(m);
   // anchor under the row, clamped to the viewport
   const r = row.getBoundingClientRect();
@@ -588,6 +589,10 @@ function openCoinMenu(row){
     closeCoinMenu();
     window.LZ.navigate("trade");
     setTimeout(() => window.LZ.hl?.setCoin(sym), 80);
+  });
+  m.querySelector('[data-act="open"]').addEventListener("click", () => {
+    closeCoinMenu();
+    location.hash = `#/coin/${encodeURIComponent(coinRef)}`;
   });
   m.addEventListener("click", (e) => { if (e.target.closest("a")) closeCoinMenu(); });
   coinMenuKey = (e) => { if (e.key === "Escape"){ closeCoinMenu(); row.focus(); } };
@@ -828,6 +833,7 @@ const ONROUTE = {
   markets: () => { if (!marketsLoaded) fetchMarkets(); else renderMarkets(); },
   network: () => {},
   identity: () => { reflectIdentity(); reflectIdentityDetails(); },
+  coin: () => { window.LZ.coinPage?.render(getRouteParam()); },
 };
 
 /* =================================================================== *
@@ -876,6 +882,12 @@ window.LZ = Object.assign(window.LZ || {}, {
       topMarkets: marketsRows.slice(0, 6).map(c => ({ sym: (c.symbol||"").toUpperCase(), price: c.current_price, ch24h: c.price_change_percentage_24h })),
     };
   },
+  /** Connected EOA, or null. For wallet-actions.js (swap/bridge/receive). */
+  account: () => state.account || null,
+  /** The L2/L1s the wallet scans, with rpc + usdc address. */
+  walletChains: () => WALLET_CHAINS.map(c => ({ ...c })),
+  /** Re-read on-chain balances (call after a swap/bridge settles). */
+  reloadWallet: () => loadWallet(),
   toast,
 });
 
