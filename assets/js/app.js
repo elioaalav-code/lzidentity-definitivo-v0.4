@@ -22,7 +22,7 @@ tickClock(); setInterval(tickClock, 1000);
 /* =================================================================== *
  *  ROUTER (hash-based)
  * =================================================================== */
-const ROUTES = ["chat","wallet","markets","trade","network","identity","recovery","coin"];
+const ROUTES = ["chat","communities","wallet","markets","trade","network","identity","recovery","coin"];
 const views = Object.fromEntries(ROUTES.map(r => [r, document.querySelector(`.view[data-view="${r}"]`)]));
 const sideNav  = document.getElementById("sideNav");
 const navLinks = [...document.querySelectorAll(".side-nav a")];
@@ -961,7 +961,8 @@ makeValueCopyable(idNpub, "npub");
  *  ROUTE HOOKS — onEnter
  * =================================================================== */
 const ONROUTE = {
-  chat: () => bootCommunities(),
+  chat: () => { renderChatList(""); renderThread(); },
+  communities: () => bootCommunities(),
   wallet: () => { loadWallet(); },
   markets: () => { if (!marketsLoaded) fetchMarkets(); else renderMarkets(); },
   network: () => {},
@@ -972,15 +973,17 @@ const ONROUTE = {
 /* =================================================================== *
  *  BOOT
  * =================================================================== */
-/* Communities (chat) view: init once communities.js has self-mounted. app.js
-   evaluates before that module, so init on window 'load' (all modules ready)
-   and on every chat-route enter; idempotent — the flag is only set once init exists. */
+/* Communities view: init once communities.js has self-mounted. app.js evaluates
+   before that module, so init on window 'load' (all modules ready) and on every
+   communities-route enter; idempotent — the flag is only set once init exists. */
 let commBooted = false;
 function bootCommunities(){
   if (commBooted) return;
   if (window.LZ?.communities?.init){ commBooted = true; window.LZ.communities.init(); }
 }
-window.addEventListener("load", () => { if (getRoute() === "chat") bootCommunities(); });
+window.addEventListener("load", () => { if (getRoute() === "communities") bootCommunities(); });
+renderChatList("");
+renderThread();
 renderWallet();
 bootstrapWallet().then(() => { reflectWalletButton(); });
 
