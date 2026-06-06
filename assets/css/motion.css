@@ -1,0 +1,44 @@
+/* ============================================================ *
+ *  Motion — the connective tissue (CSS half of motion.js).
+ *  Everything is gated on .motion-ready (added by motion.js) so a
+ *  no-JS load never hides content, and on prefers-reduced-motion.
+ * ============================================================ */
+
+/* ---- view transitions: cross-fade + gentle rise between routes ---- */
+@keyframes lz-vt-in  { from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+@keyframes lz-vt-out { from{ opacity:1; } to{ opacity:0; } }
+
+::view-transition-old(root){ animation:lz-vt-out .22s var(--ease-out) both; }
+::view-transition-new(root){ animation:lz-vt-in  .36s var(--ease-out) both; }
+
+/* ---- micro-interactions (hover-capable, motion-on only) ---- */
+@media (hover:hover) and (prefers-reduced-motion:no-preference){
+  .motion-ready .id-row,
+  .motion-ready [data-motion="lift"]{
+    transition:transform .3s var(--spring), box-shadow .3s var(--ease-out);
+  }
+  .motion-ready .id-row:hover,
+  .motion-ready [data-motion="lift"]:hover{
+    transform:translateY(-3px);
+    box-shadow:var(--lift-sh);
+  }
+  /* tactile press on primary buttons (additive — doesn't clobber base transitions) */
+  .motion-ready .btn{ transition:transform .18s var(--spring); }
+  .motion-ready .btn:active{ transform:scale(.97); }
+}
+
+/* ---- reveal-on-enter (opt-in via [data-reveal]; API exposed by motion.js) ---- */
+@media (prefers-reduced-motion:no-preference){
+  .motion-ready [data-reveal]{
+    opacity:0;
+    transform:translateY(14px);
+    transition:opacity .55s var(--ease-out), transform .65s var(--ease-out);
+    transition-delay:var(--reveal-delay, 0ms);
+  }
+  .motion-ready [data-reveal].reveal-in{ opacity:1; transform:none; }
+}
+
+@media (prefers-reduced-motion:reduce){
+  ::view-transition-old(root),
+  ::view-transition-new(root){ animation:none; }
+}

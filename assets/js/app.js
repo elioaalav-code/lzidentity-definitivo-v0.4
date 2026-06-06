@@ -4,6 +4,7 @@ import {
 } from "./shared.js";
 import { CustomSelect, coinAvatarHTML, skeleton, emptyState } from "./ui.js";
 import { mountSigil } from "./sigil.js";
+import { withViewTransition } from "./motion.js";
 
 const prefersReduced = () =>
   window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -60,7 +61,11 @@ function getRouteParam(){
   return decodeURIComponent(h.split("/")[1] || "");
 }
 function setActive(route){
-  for (const k of ROUTES){ views[k]?.classList.toggle("active", k === route); }
+  // cross-fade the view swap + its content render (graceful no-op fallback)
+  withViewTransition(() => {
+    for (const k of ROUTES){ views[k]?.classList.toggle("active", k === route); }
+    ONROUTE[route]?.();
+  });
   let activeLink = null;
   navLinks.forEach(a => {
     const on = a.dataset.route === route;
@@ -77,8 +82,7 @@ function setActive(route){
     crumbHere.classList.add("swap");
   }
   document.title = `LZidentity · ${route}`;
-  // each view's onEnter hook (app.js-owned views)
-  ONROUTE[route]?.();
+  // (the per-view onEnter hook runs inside the view-transition callback above)
   // broadcast to feature modules (trade.js, assistant.js) that live outside this file
   window.dispatchEvent(new CustomEvent("lz:route", { detail: { route } }));
 }
