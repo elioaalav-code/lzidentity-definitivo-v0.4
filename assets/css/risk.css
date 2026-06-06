@@ -1,0 +1,32 @@
+/* risk.css — risk-read card + FAB heat ring. Scoped via .lz-risk / fab states. */
+.lz-risk{border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin:8px 0;
+  background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,.004)),#0b0b10;display:flex;flex-direction:column;gap:12px}
+.lz-risk-head{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-mute)}
+.lz-risk-heat{display:flex;align-items:center;gap:10px}
+.lz-risk-heat-bar{flex:1;height:8px;border-radius:6px;background:rgba(255,255,255,.06);overflow:hidden}
+.lz-risk-heat-bar i{display:block;height:100%;border-radius:6px;transition:width .5s ease}
+.lz-risk.calm .lz-risk-heat-bar i{background:linear-gradient(90deg,#3fb98a,#5ad0a0)}
+.lz-risk.elevated .lz-risk-heat-bar i{background:linear-gradient(90deg,#e0a13f,#f0c06a)}
+.lz-risk.hot .lz-risk-heat-bar i{background:linear-gradient(90deg,#e0556b,#f07a8c)}
+.lz-risk-heat-n{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text);min-width:54px;text-align:right}
+.lz-risk-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lz-risk-kv{display:flex;flex-direction:column;gap:2px;font-family:var(--mono)}
+.lz-risk-kv .k{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-mute)}
+.lz-risk-kv .v{font-size:13px;color:var(--text);font-weight:600}
+.lz-risk-kv .v.warn{color:#e0556b}
+.lz-risk-pos{display:flex;flex-direction:column;gap:6px}
+.lz-risk-row{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;padding:7px 9px;border-radius:9px;background:rgba(255,255,255,.02)}
+.lz-risk-row .c{font-weight:600;min-width:46px}
+.lz-risk-row .s.long{color:#3fb98a}.lz-risk-row .s.short{color:#e0556b}
+.lz-risk-row .liq{margin-left:auto;color:var(--text-dim)}
+.lz-risk-row .liq.warn{color:#e0556b;font-weight:600}
+.lz-risk-note{font-size:11px;color:var(--text-dim);line-height:1.5}
+/* FAB heat ring */
+.copilot-fab .copilot-fab-ring{transition:box-shadow .4s ease,opacity .4s ease}
+.copilot-fab.heat-calm .copilot-fab-ring{box-shadow:0 0 0 2px rgba(63,185,138,.6);opacity:1}
+.copilot-fab.heat-elevated .copilot-fab-ring{box-shadow:0 0 0 2px rgba(224,161,63,.7);opacity:1}
+.copilot-fab.heat-hot .copilot-fab-ring{box-shadow:0 0 0 2px rgba(224,85,107,.85),0 0 16px -2px rgba(224,85,107,.7);opacity:1;animation:lzHeatPulse 1.6s ease-in-out infinite}
+@keyframes lzHeatPulse{0%,100%{box-shadow:0 0 0 2px rgba(224,85,107,.85),0 0 12px -2px rgba(224,85,107,.5)}50%{box-shadow:0 0 0 3px rgba(224,85,107,.95),0 0 22px 0 rgba(224,85,107,.8)}}
+.copilot-fab .copilot-fab-dot{opacity:0;transition:opacity .3s ease}
+.copilot-fab .copilot-fab-dot.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.copilot-fab.heat-hot .copilot-fab-ring{animation:none}}

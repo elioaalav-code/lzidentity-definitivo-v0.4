@@ -1,0 +1,126 @@
+/* =================================================================== *
+ *  wallet-pro.css — v0.3 Wallet elevation
+ *  Scoped to [data-view="wallet"] so it never leaks into other views.
+ *  Loads AFTER app.css → these refinements win. Tokens only, no network.
+ * =================================================================== */
+
+/* ---- chain accents (single source of truth) ---- */
+[data-view="wallet"]{
+  --ch-eth:#7b8cff; --ch-arb:#33a4f4; --ch-op:#ff5d6c; --ch-base:#4f7cff;
+}
+
+/* ===================== HERO BALANCE CARD ===================== */
+[data-view="wallet"] .balance-card{
+  min-height:248px;
+  background:
+    radial-gradient(120% 140% at 0% 0%,rgba(179,154,255,.16),transparent 55%),
+    radial-gradient(120% 140% at 100% 100%,rgba(94,234,212,.10),transparent 55%),
+    linear-gradient(135deg,rgba(179,154,255,.07),rgba(94,234,212,.03)),#0b0b10;
+  border-color:rgba(179,154,255,.24);
+  box-shadow:0 24px 60px -28px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.06);
+}
+/* slow drifting aura — pure CSS, respects reduced-motion below */
+[data-view="wallet"] .balance-card::after{
+  content:"";position:absolute;inset:-40% -10% auto auto;width:60%;height:120%;
+  background:radial-gradient(circle at 70% 30%,rgba(94,234,212,.16),transparent 60%);
+  pointer-events:none;filter:blur(10px);
+  animation:walAura 14s ease-in-out infinite alternate;
+}
+@keyframes walAura{from{transform:translate(0,0) scale(1)}to{transform:translate(-14%,12%) scale(1.18)}}
+
+[data-view="wallet"] .balance-card .lab{color:var(--text-mute);opacity:.9}
+[data-view="wallet"] .balance-card .v{
+  font-size:clamp(38px,4.8vw,56px);font-weight:300;letter-spacing:-.035em;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+  display:flex;align-items:baseline;flex-wrap:wrap;gap:0 10px;
+}
+[data-view="wallet"] .balance-card .v small{
+  font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.02em;margin:0;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 9px;border-radius:999px;
+  background:rgba(94,234,212,.10);border:1px solid rgba(94,234,212,.22);color:var(--success);
+}
+[data-view="wallet"] .balance-card .v small.wallet-live::before{
+  content:"";width:6px;height:6px;border-radius:50%;background:currentColor;
+  box-shadow:0 0 0 0 currentColor;animation:walPulse 2s ease-out infinite;
+}
+@keyframes walPulse{0%{box-shadow:0 0 0 0 rgba(94,234,212,.5)}70%,100%{box-shadow:0 0 0 6px rgba(94,234,212,0)}}
+
+/* portfolio allocation strip under the number */
+.wal-alloc{display:flex;flex-direction:column;gap:8px;margin:2px 0 -2px}
+.wal-alloc-bar{
+  display:flex;gap:2px;height:9px;border-radius:6px;overflow:hidden;
+  background:rgba(255,255,255,.04);box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);
+}
+.wal-alloc-seg{height:100%;min-width:3px;border-radius:2px;transition:flex-grow .5s var(--ease,ease),opacity .2s}
+.wal-alloc-seg:hover{opacity:.82}
+.wal-alloc-legend{display:flex;flex-wrap:wrap;gap:6px 14px}
+.wal-alloc-key{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10.5px;color:var(--text-dim);letter-spacing:.02em;
+}
+.wal-alloc-key i{width:8px;height:8px;border-radius:2px;flex:0 0 auto}
+.wal-alloc-key b{color:var(--text);font-weight:600}
+
+/* action buttons → icon + label, lifted */
+[data-view="wallet"] .balance-card .row .btn{
+  display:inline-flex;align-items:center;gap:7px;
+}
+[data-view="wallet"] .balance-card .row .btn svg{width:14px;height:14px;flex:0 0 auto;opacity:.9}
+
+/* ===================== QUICK SEND CARD ===================== */
+[data-view="wallet"] .send-card{
+  background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.004)),#0b0b10;
+  border-color:rgba(255,255,255,.09);
+}
+[data-view="wallet"] .send-card h3{
+  display:flex;align-items:center;gap:9px;letter-spacing:-.01em;
+}
+[data-view="wallet"] .send-card h3::before{
+  content:"";width:18px;height:18px;border-radius:6px;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  box-shadow:0 0 14px -3px var(--accent);
+}
+
+/* ===================== SECTION LABELS ===================== */
+[data-view="wallet"] .section-label{display:flex;align-items:center;gap:10px}
+[data-view="wallet"] .section-label .num{color:var(--text-mute)}
+.wal-count{
+  font-family:var(--mono);font-size:10px;letter-spacing:.04em;
+  padding:2px 8px;border-radius:999px;color:var(--text-dim);
+  border:1px solid var(--border);background:rgba(255,255,255,.02);
+}
+.wal-count b{color:var(--text);font-weight:600}
+
+/* ===================== TOKEN ROWS ===================== */
+[data-view="wallet"] .token-row{
+  position:relative;gap:14px;padding:15px 16px;
+  background:linear-gradient(180deg,rgba(255,255,255,.024),rgba(255,255,255,.004)),#0a0a0e;
+}
+/* left chain hairline accent */
+[data-view="wallet"] .token-row::before{
+  content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:3px;
+  background:var(--tk-accent,var(--accent));opacity:.85;
+}
+[data-view="wallet"] .token-row .col{gap:5px}
+[data-view="wallet"] .token-row .sym{display:inline-flex;align-items:center;gap:8px}
+.tk-chain{
+  font-family:var(--mono);font-size:9.5px;font-weight:600;font-style:normal;letter-spacing:.05em;
+  text-transform:uppercase;padding:2px 7px;border-radius:999px;line-height:1;
+  color:var(--tk-accent,var(--accent));
+  background:color-mix(in srgb,var(--tk-accent,var(--accent)) 14%,transparent);
+  border:1px solid color-mix(in srgb,var(--tk-accent,var(--accent)) 34%,transparent);
+}
+/* allocation share bar under the token name */
+.tk-share{display:block;height:4px;border-radius:3px;background:rgba(255,255,255,.05);overflow:hidden;max-width:160px;margin-top:1px}
+.tk-share i{display:block;height:100%;border-radius:3px;background:var(--tk-accent,var(--accent));transition:width .5s var(--ease,ease)}
+[data-view="wallet"] .token-row .amount .usd{display:flex;align-items:center;justify-content:flex-end;gap:7px}
+.tk-pct{color:var(--text);font-weight:600}
+
+/* honest tx empty-state keeps app's look; just a touch more padding */
+[data-view="wallet"] #txList .lz-empty{padding:30px 24px}
+
+@media (prefers-reduced-motion:reduce){
+  [data-view="wallet"] .balance-card::after,
+  [data-view="wallet"] .balance-card .v small.wallet-live::before{animation:none}
+}

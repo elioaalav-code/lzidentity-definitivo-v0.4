@@ -18,6 +18,7 @@
 import { CustomSelect } from "./ui.js";
 import * as HL from "./hyperliquid.js";
 import * as MD from "./marketdata.js";
+import { heatBand } from "./risk.js";
 
 const LS = { KEY: "lz:ai:key", MODEL: "lz:ai:model" };
 const API = "https://api.anthropic.com/v1/messages";
@@ -116,6 +117,8 @@ const TOOLS = [
     input_schema: { type: "object", properties: { limit: { type: "number" } } } },
   { name: "defi_yields", description: "DefiLlama highest-APY yield pools (TVL > $1M) with project, chain and TVL.",
     input_schema: { type: "object", properties: { limit: { type: "number" } } } },
+  { name: "get_risk", description: "Unified risk read for the connected wallet: portfolio heat (0-100), total leverage, nearest liquidation, per-asset net exposure, cash, and per-position distance-to-liquidation. Use this for any 'how risky am I / my exposure / am I safe' question before suggesting risk-management actions.",
+    input_schema: { type: "object", properties: {} } },
 ];
 
 const HL_MS = { "1m":60e3, "5m":300e3, "15m":900e3, "1h":3600e3, "4h":14400e3, "1d":86400e3 };
@@ -210,6 +213,11 @@ async function runTool(name, args){
     if (name === "defi_stablecoins") return await MD.dlStablecoins(args.limit || 12);
     if (name === "defi_yields")      return await MD.dlYields(args.limit || 12);
   } catch (e){ return { error: String(e?.message || e) }; }
+    if (name === "get_risk"){
+      const read = await (window.LZ?.risk?.readNow?.());
+      if (!read) return { error: "no wallet connected" };
+      return read;
+    }
   return { error: "unknown tool" };
 }
 
@@ -238,7 +246,16 @@ When asked about a price, market, position, TVL, or "the market", call the right
 
 Visuals are rendered for you: every time you call a data tool, the app automatically draws the result as a chart, comparison bars, KPI cards, or a gauge right in the chat, just above your reply. So DON'T repeat the raw numbers as a markdown table, grid, or long bullet list — the user already sees them. Instead give a SHORT, spoken-style takeaway: 1–2 sentences highlighting what matters (the trend, the standout, what it means, what to do next). You may mention one or two key figures inline (e.g. "BTC's up 3.4% to ~$68K"), but never dump the whole dataset as text. Stay factual — only state numbers a tool actually returned; never invent them.
 
-Style: warm, concise, plain language. No jargon dumps. A sentence or two is usually enough. Use the user's language.`;
+Style: warm, concise, plain language. No jargon dumps. A sentence or two is usually enough. Use the user's language.
+
+## Risk & strategy (when asked for ideas/strategy)
+Call get_risk first, then ground every suggestion in those numbers. Think in risk management, not predictions:
+- Position sizing & leverage: smaller size and lower leverage widen the distance to liquidation. Flag total leverage > 5x and any position < 10% from liquidation.
+- Liquidation buffer: suggest reducing size or adding margin when a position is close to liq; never suggest adding leverage to a stressed position.
+- Funding/basis: adverse funding is a holding cost — mention it when funding works against an open position.
+- Diversification: flag concentration when one position dominates notional.
+- Stops & plans: encourage pre-defined invalidation levels and taking partial profit, not chasing.
+Framing rules (strict): this is general risk education, NOT financial advice. Never promise returns, never state a price prediction as fact, never say "buy/sell X because it will go up/down". Use hedged language ("you could consider…", "one way to reduce risk…"). If the user has no API key the app already handles basic commands; strategy requires the connected assistant.`;
 
 /* ─── rendering ────────────────────────────────────────────── */
 function escapeHtml(s){ return s.replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
@@ -315,6 +332,42 @@ function visualNode(html){
   el.innerHTML = html;
   return el;
 }
+
+/* ── risk read card (keyless) ─────────────────────────────── */
+function fmtUsd0(n){ return n==null||!isFinite(n) ? "—" : "$"+Math.round(n).toLocaleString("en-US"); }
+function renderRiskRead(read){
+  if (!read){ return visualNode(`<div class="lz-risk"><div class="lz-risk-note">Connect a wallet to read your risk.</div></div>`); }
+  const t = read.totals, band = heatBand(t.heat);
+  const liq = t.nearestLiq;
+  const liqWarn = liq && liq.distToLiqPct <= 8;
+  const posRows = read.positions.map(p => {
+    const w = p.distToLiqPct!=null && p.distToLiqPct<=8;
+    return `<div class="lz-risk-row"><span class="c">${p.coin}</span><span class="s ${p.side}">${p.side}</span>`
+      + `<span>${fmtUsd0(p.notionalUsd)} · ${p.leverage??"—"}x</span>`
+      + `<span class="liq ${w?"warn":""}">${p.distToLiqPct!=null?p.distToLiqPct.toFixed(1)+"% to liq":"—"}</span></div>`;
+  }).join("") || `<div class="lz-risk-note">No open perp positions.</div>`;
+  return visualNode(
+    `<div class="lz-risk ${band}">`
+    + `<div class="lz-risk-head"><span>risk read</span><span>${band}</span></div>`
+    + `<div class="lz-risk-heat"><span class="lz-risk-heat-bar"><i style="width:${t.heat}%"></i></span><span class="lz-risk-heat-n">${t.heat}/100</span></div>`
+    + `<div class="lz-risk-grid">`
+    +   `<div class="lz-risk-kv"><span class="k">Total leverage</span><span class="v">${t.totalLeverage.toFixed(2)}x</span></div>`
+    +   `<div class="lz-risk-kv"><span class="k">Nearest liq</span><span class="v ${liqWarn?"warn":""}">${liq?liq.coin+" "+liq.distToLiqPct.toFixed(1)+"%":"—"}</span></div>`
+    +   `<div class="lz-risk-kv"><span class="k">Cash (USDC)</span><span class="v">${fmtUsd0(t.cashUsd)}</span></div>`
+    +   `<div class="lz-risk-kv"><span class="k">ETH spot</span><span class="v">${fmtUsd0(t.ethSpot.usd)}</span></div>`
+    + `</div>`
+    + `<div class="lz-risk-pos">${posRows}</div>`
+    + `<div class="lz-risk-note">Risk overview for awareness — not financial advice.</div>`
+    + `</div>`);
+}
+/* render a fresh risk read into the copilot body */
+async function showRiskRead(){
+  try { const read = await (window.LZ?.risk?.readNow?.()); body.appendChild(renderRiskRead(read)); autoscroll(); }
+  catch { body.appendChild(renderRiskRead(null)); autoscroll(); }
+}
+/* expose so the watcher can open the risk read when the user taps the FAB */
+window.LZ = window.LZ || {};
+window.LZ.copilot = Object.assign(window.LZ.copilot || {}, { showRisk: showRiskRead });
 
 /* line/candle chart from [{t,o,h,l,c}] (cg_chart / get_candles) */
 function chartVisual(title, candles){
@@ -672,6 +725,7 @@ async function askClaude(userText){
         const out = await runTool(b.name, b.input || {});
         if (out && out.error) trace.fail(); else trace.done();
         // render a rich inline visual (chart / bars / cards) for data tools
+        if (b.name === "get_risk" && out && out.totals){ body.appendChild(renderRiskRead(out)); autoscroll(); }
         const visual = renderToolVisual(b.name, b.input || {}, out);
         if (visual){ body.appendChild(visual); autoscroll(); }
         results.push({ type: "tool_result", tool_use_id: b.id, content: JSON.stringify(out) });
@@ -693,8 +747,47 @@ const TAB_HELP = {
   identity: "Identity derives a Nostr key from one wallet signature — deterministic and real. Same wallet, same name, every time.",
   recovery: "Recovery lets you pick guardians who can restore your identity without a seed phrase (sketch).",
 };
+/* ── keyless command parser (pure) ────────────────────────── */
+const NAV_TABS = { wallet:"wallet", portafoglio:"wallet", trading:"trade", trade:"trade", mercati:"markets", markets:"markets", market:"markets", chat:"chat", network:"network", rete:"network", identity:"identity", "identità":"identity", recovery:"recovery" };
+const KNOWN_COINS = ["BTC","ETH","SOL","ARB","OP","AVAX","LINK","DOT","SUI","TON","BNB","XRP","ADA","DOGE","MATIC","APT","ATOM","LTC","NEAR","INJ"];
+function parseCommand(text){
+  const t = String(text||"").trim().toLowerCase();
+  // prefill: (long|short) <size> <coin> [lev x]   OR  (long|short) <coin> <size> [lev x]
+  let m = t.match(/\b(long|short)\b\s+(?:([0-9]*\.?[0-9]+)\s+([a-z]{2,5})|([a-z]{2,5})\s+([0-9]*\.?[0-9]+))(?:\s+([0-9]+)\s*x)?/);
+  if (m){
+    const side = m[1]==="long" ? "buy" : "sell";
+    const size = Number(m[2] ?? m[5]); const coin = String(m[3] ?? m[4]).toUpperCase();
+    const lev  = m[6] ? Number(m[6]) : null;
+    if (KNOWN_COINS.includes(coin) && size>0) return { intent:"prefill", side, size, coin, lev };
+  }
+  // set market: "mostra/show/passa a <coin>"
+  m = t.match(/\b(?:mostra|show|passa a|switch to|vai su|open)\s+([a-z]{2,5})\b/);
+  if (m){ const coin = m[1].toUpperCase(); if (KNOWN_COINS.includes(coin)) return { intent:"market", coin }; }
+  // navigation
+  for (const word of Object.keys(NAV_TABS)){
+    if (new RegExp(`\\b(vai|apri|open|go to|show|mostra|porta|take me).*\\b${word}\\b`).test(t)
+        || new RegExp(`^${word}$`).test(t)) return { intent:"navigate", tab:NAV_TABS[word] };
+  }
+  return null;
+}
+
 function scriptedReply(text){
   const t = text.toLowerCase();
+  if (/\b(risk|rischio|come sto|how am i|exposure|esposizione)\b/.test(t)){
+    showRiskRead();
+    return "Here's your current risk read 👇 (overview for awareness, not advice).";
+  }
+  const cmd = parseCommand(text);
+  if (cmd){
+    if (cmd.intent==="navigate"){ window.LZ?.navigate?.(cmd.tab); return `Opening **${cmd.tab}**.`; }
+    if (cmd.intent==="market"){ window.LZ?.navigate?.("trade"); window.LZ?.hl?.setCoin?.(cmd.coin); return `Switching the Trading market to **${cmd.coin}**.`; }
+    if (cmd.intent==="prefill"){
+      window.LZ?.navigate?.("trade");
+      window.LZ?.hl?.prefillOrder?.({ side:cmd.side, type:"market", size:cmd.size, price:undefined });
+      const lev = cmd.lev ? ` at ${cmd.lev}x` : "";
+      return `Pre-filled a **${cmd.side==="buy"?"long":"short"} ${cmd.size} ${cmd.coin}**${lev} on the ticket — review and sign it yourself.`;
+    }
+  }
   for (const tab of Object.keys(TAB_HELP)){
     if (t.includes(tab) || (tab === "trade" && /trad|hyperliquid|perp|long|short/.test(t))){
       if (/open|go to|show|take me|vai|apri|porta/.test(t)){

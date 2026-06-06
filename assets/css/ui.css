@@ -6,16 +6,47 @@
 
 /* ── coin avatar ─────────────────────────────────────────────── */
 .lz-avatar{
+  /* size + layout */
   width:var(--av-size,30px);height:var(--av-size,30px);flex:0 0 auto;
-  display:inline-grid;place-items:center;border-radius:30%;
-  font-family:var(--mono);font-weight:600;letter-spacing:-.02em;line-height:1;
+  display:inline-grid;place-items:center;border-radius:28%;
+  /* typography — font-size/letter-spacing set inline per symbol */
+  font-family:var(--mono);font-weight:700;line-height:1;
   color:var(--av-fg,#cbb8ff);
+  /* layered background: sheen → radial highlight → base tint */
   background:
-    linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0)),
+    linear-gradient(160deg,rgba(255,255,255,.13) 0%,rgba(255,255,255,0) 55%),
+    radial-gradient(ellipse at 35% 30%,rgba(255,255,255,.10) 0%,rgba(255,255,255,0) 65%),
     var(--av-bg,rgba(179,154,255,.16));
-  box-shadow:inset 0 0 0 1px var(--av-ring,rgba(179,154,255,.34));
+  /* crisp 1px inner ring */
+  box-shadow:inset 0 0 0 1px var(--av-ring,rgba(179,154,255,.34)),
+             inset 0 1px 0 rgba(255,255,255,.10);
   user-select:none;
+  /* prevent blurry rendering at small sizes */
+  -webkit-font-smoothing:antialiased;
+  text-rendering:geometricPrecision;
 }
+/* branded variants get a slightly stronger ring for the recognisable hue */
+.lz-avatar--branded{
+  box-shadow:inset 0 0 0 1px var(--av-ring,rgba(179,154,255,.40)),
+             inset 0 1px 0 rgba(255,255,255,.12);
+}
+/* real vector logos: svg mark in --av-fg, sized to ~64% of the disc */
+.lz-avatar--logo{overflow:hidden}
+.lz-avatar-glyph{
+  width:64%;height:64%;display:block;color:var(--av-fg);
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.22));
+}
+/* solid token-icon look: brand-coloured disc, white mark, soft brand glow */
+.lz-avatar--solid{
+  background:
+    linear-gradient(160deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,0) 55%),
+    radial-gradient(ellipse at 34% 26%,rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 62%),
+    var(--av-bg);
+  box-shadow:inset 0 0 0 1px var(--av-ring),
+             inset 0 1px 0 rgba(255,255,255,.28),
+             0 1px 5px -1px var(--av-ring);
+}
+.lz-avatar--solid .lz-avatar-glyph{filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.3))}
 
 /* ── CustomSelect ────────────────────────────────────────────── */
 .lz-select{position:relative;display:inline-block}

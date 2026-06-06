@@ -17,6 +17,11 @@ let active = false;          // is the Trading tab currently shown
 let booted = false;          // one-time async boot done
 let coin = "BTC";
 let interval = "15m";
+// restore the last market + interval the user looked at (best-dapp memory)
+try {
+  const lc = localStorage.getItem("lz.hl.lastCoin"); if (lc) coin = lc;
+  const li = localStorage.getItem("lz.hl.lastIv");   if (li && ["1m","5m","15m","1h","4h","1d"].includes(li)) interval = li;
+} catch {}
 let szDecimals = 5;
 let maxLeverage = 20;
 let universe = [];           // [{name, szDecimals, maxLeverage}]
@@ -28,14 +33,15 @@ let book = { bids: [], asks: [] };
 let side = "buy";            // buy | sell
 let otype = "market";        // market | limit
 let posTab = "positions";
+let midTab = "book";         // book | depth | trades (centre column tabbed card)
 let userData = null;         // clearinghouse state
 let userOrders = [];         // open orders
-let hoverIdx = -1;
+let hovering = false;        // crosshair currently over the chart
 let prevLast = null;         // for the price-flash micro-interaction
 
 let perCoinUnsubs = [];      // ws unsubscribe fns for coin-scoped subs
 let midsUnsub = null;
-let userPollTimer = null, ctxTimer = null;
+let userPollTimer = null, ctxTimer = null, chartTimer = null;
 
 let marketSelect = null;     // CustomSelect instance over #hlCoin
 let firstUserPoll = true;    // show a skeleton until the first poll lands
@@ -92,6 +98,7 @@ function pxStr(n){
 }
 const usd = (n) => fmt.usd(Number(n));
 const compact = (n) => fmt.compact(Number(n));
+const TAKER_FEE = 0.00035;          // ≈ HL taker fee, for the ticket fee estimate
 const pct = (n) => (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(2) + "%";
 
 /* ─── boot (first time the tab is shown) ───────────────────── */
@@ -271,17 +278,22 @@ function refreshMarketItems(){
 async function activate(){
   if (active) return;
   active = true;
+  initChart();
+  document.querySelector(".trade-view")?.classList.add("lz-revealed");   // one-time staggered entrance
   await boot();
   subscribeMarket();
   ctxTimer = setInterval(refreshCtxs, 10_000);
+  // 1s tick keeps the idle OHLC readout's candle-close countdown live
+  chartTimer = setInterval(() => { if (!active) return; tickFunding(); if (!hovering) renderIdleReadout(); }, 1000);
   startUserPolling();
-  requestAnimationFrame(drawChart);
+  if (chartReady && candles.length) setChartData();
 }
 function deactivate(){
   if (!active) return;
   active = false;
   unsubscribeMarket();
   clearInterval(ctxTimer); ctxTimer = null;
+  clearInterval(chartTimer); chartTimer = null;
   stopUserPolling();
 }
 
@@ -344,7 +356,7 @@ HL.on("ws:candle", (c) => {
   if (last && last.t === k.t) candles[candles.length - 1] = k;
   else candles.push(k);
   if (candles.length > 400) candles.shift();
-  if (active) drawChart();
+  chartUpdateLast(k);
 });
 
 /* ─── data loads (REST) ────────────────────────────────────── */
@@ -360,11 +372,12 @@ async function refreshCtxs(){
   } catch (e){ /* keep last */ }
 }
 async function loadCandles(){
+  const ld = $("hlChartLoading"); if (ld) ld.classList.remove("hidden");
   const end = Date.now();
   const start = end - 200 * (INTERVAL_MS[interval] || 9e5);
   const data = await HL.candleSnapshot(coin, interval, start, end);
   candles = (data || []).map(c => ({ t:c.t, o:+c.o, h:+c.h, l:+c.l, c:+c.c, v:+c.v }));
-  if (active) drawChart();
+  setChartData();
 }
 async function loadBook(){
   try {
@@ -390,7 +403,7 @@ function renderSymbol(){
   const chEl = $("hlChange");
   if (px != null && prev){
     const ch = (px - prev) / prev * 100;
-    chEl.textContent = pct(ch);
+    chEl.innerHTML = `<span class="arr">${ch >= 0 ? "▲" : "▼"}</span>${Math.abs(ch).toFixed(2)}% <em>24h</em>`;
     chEl.className = "ch " + (ch >= 0 ? "up" : "dn");
   } else { chEl.textContent = "—"; chEl.className = "ch"; }
   renderNotional();
@@ -406,6 +419,15 @@ function renderStats(){
   fe.className = "v " + (f >= 0 ? "up" : "dn");
   $("hlOI").textContent  = usd(Number(ctx.openInterest) * Number(ctx.markPx));
   $("hlVol").textContent = usd(Number(ctx.dayNtlVlm));
+}
+// countdown to the next hourly funding (paid on the hour, HL convention)
+function tickFunding(){
+  const el = $("hlFundCd");
+  if (!el) return;
+  const now = new Date();
+  const ms = (60 - now.getMinutes()) * 60000 - now.getSeconds() * 1000;
+  const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+  el.textContent = `· ${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
 }
 
 /* ─── render: order book ───────────────────────────────────── */
@@ -465,6 +487,13 @@ function renderBook(){
     prevBookMid = mid;
     $("hlSpread").textContent = `${pxStr(spread)} · ${(spread/mid*1e4).toFixed(1)} bps`;
   }
+  // bid/ask pressure (imbalance) bar
+  const tot = bidTot + askTot;
+  const bidPct = tot > 0 ? (bidTot / tot) * 100 : 50;
+  const fill = $("hlImbFill"), bEl = $("hlImbB"), aEl = $("hlImbA");
+  if (fill) fill.style.width = bidPct.toFixed(1) + "%";
+  if (bEl) bEl.textContent = bidPct.toFixed(0) + "%";
+  if (aEl) aEl.textContent = (100 - bidPct).toFixed(0) + "%";
 }
 // click a level → prefill limit price (delegated once; survives reconciles)
 function wireBookClicks(){
@@ -480,159 +509,220 @@ function wireBookClicks(){
   on($("hlBids"), "click", handler);
 }
 
-/* ─── render: candlestick chart (canvas) ───────────────────── */
-const cv = $("hlChart");
-const ctx2d = cv ? cv.getContext("2d") : null;
-let chartW = 0, chartH = 0;
-let hoverY = -1;             // cursor y within the canvas (for the crosshair price tag)
-
-// resolve brand tokens once so the canvas stays on-palette.
-const CHART_COL = (() => {
-  const cs = getComputedStyle(document.documentElement);
-  const g = (k, fb) => (cs.getPropertyValue(k).trim() || fb);
-  return {
-    long:  g("--long", "#3fb98a"),
-    short: g("--short", "#e0556b"),
-    accent:g("--accent", "#b39aff"),
-    ink:   "#0a0a0c",
-  };
-})();
-const TIME_FMT = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
-const DATE_FMT = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
-
-function sizeCanvas(){
-  if (!cv) return;
-  const wrap = cv.parentElement;
-  const r = wrap.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  chartW = Math.max(320, r.width);
-  chartH = Math.max(260, r.height);
-  cv.width = chartW * dpr; cv.height = chartH * dpr;
-  cv.style.width = chartW + "px"; cv.style.height = chartH + "px";
-  ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-function drawChart(){
-  if (!ctx2d) return;
-  sizeCanvas();
-  const g = ctx2d;
-  g.clearRect(0, 0, chartW, chartH);
-  if (!candles.length) return;
-
-  const padR = 64, padB = 22, padT = 10, padL = 8;
-  const plotW = chartW - padR - padL, plotH = chartH - padB - padT;
-  const view = candles.slice(-Math.min(candles.length, 120));
-  const n = view.length;
-  let lo = Infinity, hi = -Infinity;
-  for (const c of view){ lo = Math.min(lo, c.l); hi = Math.max(hi, c.h); }
-  const pad = (hi - lo) * 0.08 || hi * 0.01;
-  lo -= pad; hi += pad;
-  const yOf = (p) => padT + (hi - p) / (hi - lo) * plotH;
-  const cw = plotW / n;
-  const bodyW = Math.max(1, Math.min(14, cw * 0.62));
-
-  // grid + price axis
-  g.font = "10px 'Geist Mono', monospace";
-  g.textBaseline = "middle";
-  const lines = 5;
-  for (let i = 0; i <= lines; i++){
-    const p = hi - (hi - lo) * (i / lines);
-    const y = yOf(p);
-    g.strokeStyle = "rgba(255,255,255,.05)";
-    g.lineWidth = 1;
-    g.beginPath(); g.moveTo(padL, y); g.lineTo(padL + plotW, y); g.stroke();
-    g.fillStyle = "rgba(160,160,168,.8)";
-    g.textAlign = "left";
-    g.fillText(pxStr(p), padL + plotW + 6, y);
+/* ─── centre column tabs: Book / Depth / Trades ────────────────
+ * The book pane is owned here; the depth + trades panes are owned by
+ * hl-depth.js (it renders into #hlDepthMount / #hlTradesMount). Those
+ * canvases can't size while display:none, so when a pane is shown we
+ * emit `lz:hl:addontab` and hl-depth.js re-measures + redraws.        */
+function setMidTab(t){
+  midTab = t;
+  document.querySelectorAll("#hlMidTabs button").forEach(b => {
+    const on = b.dataset.mid === t;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  document.querySelectorAll(".trade-mid-card .mid-pane").forEach(p => { p.hidden = p.dataset.pane !== t; });
+  if (t === "depth" || t === "trades"){
+    try { window.dispatchEvent(new CustomEvent("lz:hl:addontab", { detail: { tab: t } })); } catch {}
   }
+}
 
-  // time axis (a few evenly-spaced labels along the bottom)
+/* ─── candlestick chart — TradingView lightweight-charts, our theme ───
+ * Real pan / zoom / crosshair from TradingView's official library (vendored
+ * locally in assets/vendor — no build step, offline at runtime). We feed it
+ * HL candles + a volume histogram and drive the #hlReadout OHLC strip off the
+ * crosshair. Falls back gracefully (no chart) if the lib didn't load.        */
+let chart = null, candleSeries = null, volSeries = null, chartReady = false;
+let maFastSeries = null, maSlowSeries = null;   // EMA overlays (TradingView-style)
+let maFastData = [], maSlowData = [];           // cached {time,value} for legend lookup
+let lastEmaFast = null, lastEmaSlow = null;
+const MA_FAST = 9, MA_SLOW = 21;
+let maOn = (() => { try { return (localStorage.getItem("lz.hl.ma") ?? "1") === "1"; } catch { return true; } })();
+let posPriceLines = [];      // entry / liq price lines for the current coin's position
+
+// mm:ss (or Hh MMm for long intervals) remaining until a candle closes
+function fmtCountdown(ms){
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2,"0")}m`;
+  return `${String(m).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
+}
+
+const toSec = (t) => Math.floor(t / 1000);
+const VOL_UP = "rgba(63,185,138,.45)", VOL_DN = "rgba(224,85,107,.45)";
+const candlePoint = (c) => ({ time: toSec(c.t), open: c.o, high: c.h, low: c.l, close: c.c });
+const volPoint    = (c) => ({ time: toSec(c.t), value: c.v || 0, color: c.c >= c.o ? VOL_UP : VOL_DN });
+
+function initChart(){
+  if (chart || !window.LightweightCharts) return;
+  const el = $("hlChart");
+  if (!el) return;
+  const LWC = window.LightweightCharts;
+  chart = LWC.createChart(el, {
+    autoSize: true,
+    layout: {
+      background: { type: "solid", color: "transparent" },
+      textColor: "#9a9aa3",
+      fontFamily: "'Geist Mono', ui-monospace, monospace",
+      fontSize: 11,
+    },
+    grid: {
+      vertLines: { color: "rgba(255,255,255,.04)" },
+      horzLines: { color: "rgba(255,255,255,.05)" },
+    },
+    crosshair: {
+      mode: LWC.CrosshairMode ? LWC.CrosshairMode.Normal : 0,
+      vertLine: { color: "rgba(179,154,255,.55)", width: 1, style: 3, labelBackgroundColor: "#2a2540" },
+      horzLine: { color: "rgba(179,154,255,.55)", width: 1, style: 3, labelBackgroundColor: "#2a2540" },
+    },
+    rightPriceScale: { borderColor: "rgba(255,255,255,.08)", scaleMargins: { top: 0.06, bottom: 0.26 } },
+    timeScale: { borderColor: "rgba(255,255,255,.08)", timeVisible: true, secondsVisible: false, rightOffset: 6 },
+    handleScroll: true, handleScale: true,
+  });
+  candleSeries = chart.addCandlestickSeries({
+    upColor: "#3fb98a", downColor: "#e0556b",
+    borderUpColor: "#3fb98a", borderDownColor: "#e0556b",
+    wickUpColor: "#5fcfa4", wickDownColor: "#ec6b80",
+    priceLineColor: "rgba(179,154,255,.7)", priceLineStyle: 2,
+  });
+  volSeries = chart.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "", color: VOL_UP, lastValueVisible: false, priceLineVisible: false });
+  chart.priceScale("").applyOptions({ scaleMargins: { top: 0.84, bottom: 0 } });
+  // EMA overlays — thin lines, no own price label / crosshair marker
+  const maOpts = { lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
+  maFastSeries = chart.addLineSeries({ ...maOpts, color: "rgba(179,154,255,.95)" });
+  maSlowSeries = chart.addLineSeries({ ...maOpts, color: "rgba(94,234,212,.9)" });
+  chart.subscribeCrosshairMove(onCrosshair);
+  chartReady = true;
+  if (candles.length) setChartData();
+}
+
+// match the price-scale precision to the coin's magnitude
+function applyPricePrecision(){
+  if (!candleSeries) return;
+  const px = lastPx ?? mids[coin] ?? (ctxByCoin[coin] ? +ctxByCoin[coin].markPx : 0);
+  let precision = 2, minMove = 0.01;
+  if (px && px < 1){ precision = 6; minMove = 1e-6; }
+  else if (px && px < 100){ precision = 4; minMove = 1e-4; }
+  candleSeries.applyOptions({ priceFormat: { type: "price", precision, minMove } });
+}
+// EMA over the close series → array of {time,value}, warmed up over `period` bars
+function emaSeries(period){
+  const out = []; let prev = null; const k = 2 / (period + 1);
+  for (let i = 0; i < candles.length; i++){
+    const c = candles[i].c;
+    prev = prev === null ? c : (c * k + prev * (1 - k));
+    if (i >= period - 1) out.push({ time: toSec(candles[i].t), value: prev });
+  }
+  return out;
+}
+function renderMAs(){
+  if (!maFastSeries || !maSlowSeries) return;
+  if (maOn && candles.length){
+    maFastData = emaSeries(MA_FAST); maSlowData = emaSeries(MA_SLOW);
+    maFastSeries.setData(maFastData); maSlowSeries.setData(maSlowData);
+    lastEmaFast = maFastData.length ? maFastData[maFastData.length-1].value : null;
+    lastEmaSlow = maSlowData.length ? maSlowData[maSlowData.length-1].value : null;
+  } else {
+    maFastData = []; maSlowData = [];
+    maFastSeries.setData([]); maSlowSeries.setData([]);
+    lastEmaFast = lastEmaSlow = null;
+  }
+  updateChartLegend();
+}
+// legend chip top-left of the chart; `vals` overrides with hovered EMA values
+function updateChartLegend(vals){
+  const el = $("hlChartLegend"); if (!el) return;
+  if (!maOn){ el.innerHTML = ""; return; }
+  const f = vals && vals.f != null ? vals.f : lastEmaFast;
+  const s = vals && vals.s != null ? vals.s : lastEmaSlow;
+  el.innerHTML =
+    `<span class="cl-ma f">EMA ${MA_FAST}<b>${f != null ? pxStr(f) : "—"}</b></span>` +
+    `<span class="cl-ma s">EMA ${MA_SLOW}<b>${s != null ? pxStr(s) : "—"}</b></span>`;
+}
+function setChartData(){
+  if (!chartReady || !candleSeries) return;
+  candleSeries.setData(candles.map(candlePoint));
+  volSeries.setData(candles.map(volPoint));
+  renderMAs();
+  applyPricePrecision();
+  syncPositionLines();
+  // default view: focus on the most recent ~90 bars so the price autoscale
+  // zooms into current action (user can pan left for history). Like a real desk.
+  try {
+    if (chart && candles.length > 12){
+      chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - 90), to: candles.length + 4 });
+    }
+  } catch {}
+  const ld = $("hlChartLoading"); if (ld && candles.length) ld.classList.add("hidden");
+}
+function chartUpdateLast(c){
+  if (!chartReady || !candleSeries || !c) return;
+  candleSeries.update(candlePoint(c));
+  volSeries.update(volPoint(c));
+  renderMAs();   // EMAs are cheap to recompute over the in-memory candle buffer
+}
+function toggleMA(){
+  maOn = !maOn;
+  try { localStorage.setItem("lz.hl.ma", maOn ? "1" : "0"); } catch {}
+  const btn = $("hlIndMA"); if (btn){ btn.classList.toggle("on", maOn); btn.setAttribute("aria-pressed", String(maOn)); }
+  renderMAs();
+}
+// Draw the open position's entry + liquidation as horizontal lines on the
+// chart for the coin currently shown (like the pro perps DEXes).
+function syncPositionLines(){
+  if (!chartReady || !candleSeries) return;
+  posPriceLines.forEach(l => { try { candleSeries.removePriceLine(l); } catch {} });
+  posPriceLines = [];
+  const p = (userData?.assetPositions || []).find(a => a.position.coin === coin && Number(a.position.szi) !== 0);
+  if (!p) return;
+  const szi = Number(p.position.szi);
+  const entry = Number(p.position.entryPx);
+  const liq = Number(p.position.liquidationPx);
+  const long = szi > 0;
+  if (isFinite(entry) && entry > 0){
+    posPriceLines.push(candleSeries.createPriceLine({
+      price: entry, color: long ? "#3fb98a" : "#e0556b", lineWidth: 1, lineStyle: 2,
+      axisLabelVisible: true, title: `${long ? "Long" : "Short"} ${Math.abs(szi)}`,
+    }));
+  }
+  if (isFinite(liq) && liq > 0){
+    posPriceLines.push(candleSeries.createPriceLine({
+      price: liq, color: "#e0556b", lineWidth: 1, lineStyle: 3,
+      axisLabelVisible: true, title: "Liq.",
+    }));
+  }
+}
+
+function onCrosshair(param){
+  const ro = $("hlReadout");
+  if (!ro) return;
+  if (!param || !param.time || !param.point || !candleSeries){ hovering = false; renderIdleReadout(); return; }
+  const c = param.seriesData.get(candleSeries);
+  if (!c){ hovering = false; renderIdleReadout(); return; }
+  hovering = true;
+  const up = c.close >= c.open;
+  const dv = c.open ? (c.close - c.open) / c.open * 100 : 0;
+  const v = volSeries ? param.seriesData.get(volSeries) : null;
+  ro.innerHTML = `<span class="${up?'up':'dn'}">O ${pxStr(c.open)} · H ${pxStr(c.high)} · L ${pxStr(c.low)} · C ${pxStr(c.close)} · ${pct(dv)}${v?` · V ${compact(v.value)}`:''}</span>`;
+  // mirror the EMA values at the hovered bar into the legend
+  if (maOn){
+    const mf = maFastSeries ? param.seriesData.get(maFastSeries) : null;
+    const ms = maSlowSeries ? param.seriesData.get(maSlowSeries) : null;
+    updateChartLegend({ f: mf ? mf.value : null, s: ms ? ms.value : null });
+  }
+}
+function renderIdleReadout(){
+  const ro = $("hlReadout");
+  if (!ro) return;
+  const lastC = candles[candles.length - 1];
+  if (!lastC){ ro.textContent = ""; return; }
+  const up = lastC.c >= lastC.o;
   const spanMs = INTERVAL_MS[interval] || 9e5;
   const intraday = spanMs < 86400e3;
-  const ticks = Math.min(6, n);
-  g.fillStyle = "rgba(160,160,168,.7)"; g.textBaseline = "alphabetic";
-  for (let i = 0; i < ticks; i++){
-    const idx = Math.round((i / (ticks - 1 || 1)) * (n - 1));
-    const c = view[idx];
-    if (!c) continue;
-    const x = padL + idx * cw + cw / 2;
-    g.textAlign = i === 0 ? "left" : (i === ticks - 1 ? "right" : "center");
-    const lab = intraday ? TIME_FMT.format(c.t) : DATE_FMT.format(c.t);
-    g.fillText(lab, Math.max(padL, Math.min(padL + plotW, x)), chartH - 7);
-  }
-
-  // candles
-  for (let i = 0; i < n; i++){
-    const c = view[i];
-    const x = padL + i * cw + cw / 2;
-    const up = c.c >= c.o;
-    const col = up ? CHART_COL.long : CHART_COL.short;
-    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1;
-    g.beginPath(); g.moveTo(x, yOf(c.h)); g.lineTo(x, yOf(c.l)); g.stroke();
-    const yO = yOf(c.o), yC = yOf(c.c);
-    const top = Math.min(yO, yC), h = Math.max(1, Math.abs(yC - yO));
-    g.fillRect(x - bodyW / 2, top, bodyW, h);
-  }
-
-  // helper: a pill-shaped price tag in the right gutter
-  const priceTag = (y, text, bg, fg) => {
-    const ty = Math.max(padT + 8, Math.min(padT + plotH - 8, y));
-    g.fillStyle = bg; g.fillRect(padL + plotW, ty - 8, padR, 16);
-    g.fillStyle = fg; g.textAlign = "left"; g.textBaseline = "middle";
-    g.fillText(text, padL + plotW + 6, ty);
-  };
-
-  // last price line + tag
-  const lastC = view[n - 1];
-  if (lastC){
-    const lp = lastPx ?? lastC.c;
-    const y = yOf(lp);
-    g.strokeStyle = "rgba(179,154,255,.55)"; g.lineWidth = 1;
-    g.setLineDash([4, 4]); g.beginPath(); g.moveTo(padL, y); g.lineTo(padL + plotW, y); g.stroke(); g.setLineDash([]);
-    priceTag(y, pxStr(lp), CHART_COL.accent, CHART_COL.ink);
-  }
-
-  // crosshair (vertical + horizontal) + OHLC readout + price tag at cursor
-  const ro = $("hlReadout");
-  if (hoverIdx >= 0 && hoverIdx < n){
-    const c = view[hoverIdx];
-    const x = padL + hoverIdx * cw + cw / 2;
-    g.strokeStyle = "rgba(255,255,255,.2)"; g.lineWidth = 1; g.setLineDash([3,3]);
-    g.beginPath(); g.moveTo(x, padT); g.lineTo(x, padT + plotH); g.stroke();
-    if (hoverY >= padT && hoverY <= padT + plotH){
-      g.beginPath(); g.moveTo(padL, hoverY); g.lineTo(padL + plotW, hoverY); g.stroke();
-      const pAt = hi - (hoverY - padT) / plotH * (hi - lo);
-      priceTag(hoverY, pxStr(pAt), "rgba(20,20,26,.96)", "#e8e8ee");
-    }
-    g.setLineDash([]);
-    // time tag for the hovered candle
-    g.fillStyle = "rgba(20,20,26,.96)";
-    const lab = intraday ? TIME_FMT.format(c.t) : DATE_FMT.format(c.t);
-    const tw = g.measureText(lab).width + 14;
-    let tx = Math.max(padL, Math.min(padL + plotW - tw, x - tw / 2));
-    g.fillRect(tx, chartH - 17, tw, 15);
-    g.fillStyle = "#e8e8ee"; g.textAlign = "center"; g.textBaseline = "middle";
-    g.fillText(lab, tx + tw / 2, chartH - 9.5);
-    if (ro){
-      const up = c.c >= c.o;
-      const dv = ((c.c - c.o) / c.o * 100);
-      ro.innerHTML = `<span class="${up?'up':'dn'}">O ${pxStr(c.o)} · H ${pxStr(c.h)} · L ${pxStr(c.l)} · C ${pxStr(c.c)} · ${pct(dv)}</span>`;
-    }
-  } else if (ro){ ro.textContent = ""; }
-}
-if (cv){
-  cv.addEventListener("mousemove", (e) => {
-    const r = cv.getBoundingClientRect();
-    const padL = 8, padR = 64;
-    const plotW = chartW - padR - padL;
-    const view = Math.min(candles.length, 120);
-    const cw = plotW / view;
-    const idx = Math.floor((e.clientX - r.left - padL) / cw);
-    hoverIdx = (idx >= 0 && idx < view) ? idx : -1;
-    hoverY = e.clientY - r.top;
-    drawChart();
-  });
-  cv.addEventListener("mouseleave", () => { hoverIdx = -1; hoverY = -1; drawChart(); });
-  new ResizeObserver(() => { if (active) drawChart(); }).observe(cv.parentElement);
+  const remain = intraday ? lastC.t + spanMs - Date.now() : 0;
+  const cd = (intraday && remain > 0) ? ` · close ${fmtCountdown(remain)}` : "";
+  ro.innerHTML = `<span class="${up?'up':'dn'}">O ${pxStr(lastC.o)} · H ${pxStr(lastC.h)} · L ${pxStr(lastC.l)} · C ${pxStr(lastC.c)} · V ${compact(lastC.v||0)}</span><span class="cd">${cd}</span>`;
+  updateChartLegend();   // legend back to latest EMA values when not hovering
 }
 
 /* ─── order ticket ─────────────────────────────────────────── */
@@ -642,6 +732,7 @@ function setSide(s){
   if (wrap) wrap.dataset.on = s;              // drives the sliding indicator (CSS)
   document.querySelectorAll("#hlSide button").forEach(b => b.classList.toggle("on", b.dataset.side === s));
   updateSubmitLabel();
+  renderNotional();   // refresh the est. liq. price for the new side
 }
 function setType(t){
   otype = t;
@@ -658,9 +749,25 @@ function ticketPrice(){
 function renderNotional(){
   const sz = Number($("hlSize").value);
   const px = ticketPrice();
-  const el = $("hlNotional");
-  if (sz > 0 && isFinite(px) && px > 0) el.textContent = usd(sz * px);
-  else el.textContent = "—";
+  const valid = sz > 0 && isFinite(px) && px > 0;
+  const notional = valid ? sz * px : 0;
+  const lev = Number($("hlLev")?.value) || 1;
+  const set = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+  set("hlNotional", valid ? usd(notional) : "—");
+  set("hlMargin",   valid ? usd(notional / lev) : "—");
+  set("hlFees",     valid ? usd(notional * TAKER_FEE) : "—");
+  /* Est. liquidation price (isolated, first-order: maintenance margin ≈ 0).
+   * long liquidates below entry, short above — by ~1/leverage. Labelled an
+   * estimate; real liq also depends on maintenance margin, fees and funding. */
+  const isLong = side === "buy";
+  const liqEl = $("hlLiq"); const liqSideEl = $("hlLiqSide");
+  if (liqSideEl) liqSideEl.textContent = isLong ? "long" : "short";
+  if (liqEl){
+    const liq = valid && lev > 0 ? px * (1 + (isLong ? -1 : 1) / lev) : NaN;
+    liqEl.textContent = (valid && lev > 0 && liq > 0) ? usd(liq) : "—";
+  }
+  const wd = Number(userData?.withdrawable);
+  set("hlAvail", isFinite(wd) ? usd(wd) : (state.account ? "—" : "connect wallet"));
 }
 function updateSubmitLabel(){
   const btn = $("hlSubmit");
@@ -722,6 +829,9 @@ function openReview(o){
   pendingOrder = o;
   const notional = o.sz * o.px;
   const isMain = HL.isMainnet();
+  const closing = o.reduceOnly && o.otype === "market";
+  const titleEl = $("hlModalTitle");
+  if (titleEl) titleEl.textContent = closing ? `Close ${o.coin} position` : "Review order";
   $("hlReview").innerHTML = `
     <div class="rv-row"><span>Market</span><b>${o.coin}-PERP</b></div>
     <div class="rv-row"><span>Side</span><b class="${o.side==='buy'?'long':'short'}">${o.side==='buy'?'Buy / Long':'Sell / Short'}</b></div>
@@ -729,6 +839,7 @@ function openReview(o){
     <div class="rv-row"><span>Size</span><b>${o.sz} ${o.coin}</b></div>
     <div class="rv-row"><span>${o.otype==='market'?'Est. price':'Limit price'}</span><b>${pxStr(o.px)}${o.otype==='market'?' <em>±5% slippage</em>':''}</b></div>
     <div class="rv-row"><span>Notional</span><b>${usd(notional)}</b></div>
+    <div class="rv-row"><span>Est. fees</span><b>${usd(notional * TAKER_FEE)} <em>taker</em></b></div>
     ${o.reduceOnly ? `<div class="rv-row"><span>Flag</span><b>Reduce only</b></div>` : ``}`;
   $("hlModalNet").className = "hl-modal-net " + (isMain ? "main" : "test");
   $("hlModalNet").innerHTML = isMain
@@ -803,6 +914,8 @@ async function pollUser(){
     firstUserPoll = false;
     renderPositions();
     updateSizeChipState();
+    renderNotional();
+    syncPositionLines();
   } catch (e){ firstUserPoll = false; renderPositions(); }
 }
 const ICON_WALLET = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 14h2"/></svg>`;
@@ -823,8 +936,38 @@ function goToMarket(c){
   toast(`market · ${c}`, "ok");
 }
 
+// open positions with a non-zero size, newest API order preserved
+function openPositions(){
+  return (userData?.assetPositions || []).filter(p => Number(p.position.szi) !== 0);
+}
+// keep the tab counters + contextual actions (e.g. Cancel all) in sync
+function updatePosMeta(){
+  const posN = state.account ? openPositions().length : 0;
+  const ordN = state.account ? userOrders.length : 0;
+  const pc = $("hlPosCount"), oc = $("hlOrdCount");
+  if (pc){ pc.textContent = posN; pc.hidden = !posN; }
+  if (oc){ oc.textContent = ordN; oc.hidden = !ordN; }
+  const act = $("hlPosActions");
+  if (act){
+    if (posTab === "orders" && ordN > 0){
+      act.innerHTML = `<button class="btn ghost xs" id="hlCancelAll">Cancel all</button>`;
+      on($("hlCancelAll"), "click", cancelAll);
+    } else { act.innerHTML = ""; }
+  }
+  // aggregate unrealized PnL across open positions
+  const agg = $("hlPosAgg");
+  if (agg){
+    if (state.account && posN > 0){
+      let up = 0; for (const p of openPositions()){ const v = Number(p.position.unrealizedPnl); if (isFinite(v)) up += v; }
+      agg.innerHTML = `<span class="k">Total uPnL</span> <b class="${up>=0?'long':'short'}">${up>=0?'+':'−'}${usd(Math.abs(up))}</b>`;
+      agg.hidden = false;
+    } else { agg.hidden = true; }
+  }
+}
+
 function renderPositions(){
   const body = $("hlPosBody");
+  updatePosMeta();
   if (!state.account){
     paintEmpty(body, {
       icon: ICON_WALLET,
@@ -837,32 +980,45 @@ function renderPositions(){
   }
   if (firstUserPoll && !userData){ body.innerHTML = skeleton({ rows: 4, height: 38 }); return; }
   if (posTab === "positions"){
-    const pos = (userData?.assetPositions || []).filter(p => Number(p.position.szi) !== 0);
+    const pos = openPositions();
     if (!pos.length){
       paintEmpty(body, { icon: ICON_POS, title: "No open positions",
         body: `You have no open positions on ${HL.getNetwork()}.` });
       return;
     }
-    body.innerHTML = `<div class="pos-table">
-      <div class="pt-head"><span>Coin</span><span>Side</span><span>Size</span><span>Entry</span><span>uPnL</span><span>Liq.</span></div>
+    body.innerHTML = `<div class="pos-table positions">
+      <div class="pt-head"><span>Coin</span><span>Side</span><span>Size</span><span>Entry</span><span>Mark</span><span>uPnL</span><span>Liq.</span><span class="pt-act">Close</span></div>
       ${pos.map(p => {
         const s = Number(p.position.szi);
         const pnl = Number(p.position.unrealizedPnl);
-        return `<div class="pt-row is-pickable" data-go-coin="${p.position.coin}" role="button" tabindex="0" aria-label="Open ${p.position.coin} market">
-          <span class="c">${p.position.coin}</span>
+        const roe = Number(p.position.returnOnEquity);
+        const mark = midOf(p.position.coin);
+        const c = p.position.coin;
+        return `<div class="pt-row" data-coin="${c}">
+          <span class="c is-pickable" data-go-coin="${c}" role="button" tabindex="0" aria-label="Open ${c} market">${c}</span>
           <span class="${s>0?'long':'short'}">${s>0?'Long':'Short'}</span>
           <span>${Math.abs(s)}</span>
           <span>${pxStr(p.position.entryPx)}</span>
-          <span class="${pnl>=0?'long':'short'}">${pnl>=0?'+':'−'}${usd(Math.abs(pnl))}</span>
+          <span>${isFinite(mark)?pxStr(mark):'—'}</span>
+          <span class="${pnl>=0?'long':'short'}">${pnl>=0?'+':'−'}${usd(Math.abs(pnl))}${isFinite(roe)?` <em>${pct(roe*100)}</em>`:''}</span>
           <span>${p.position.liquidationPx ? pxStr(p.position.liquidationPx) : '—'}</span>
+          <span class="pt-act">
+            <button class="btn ghost xs" data-close="${c}:0.5">50%</button>
+            <button class="btn ghost xs danger" data-close="${c}:1">Close</button>
+          </span>
         </div>`;
       }).join("")}
     </div>`;
-    body.querySelectorAll(".pt-row[data-go-coin]").forEach(r => {
+    body.querySelectorAll(".is-pickable[data-go-coin]").forEach(r => {
       const go = () => goToMarket(r.dataset.goCoin);
       r.addEventListener("click", go);
       r.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } });
     });
+    body.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const [c, fr] = b.dataset.close.split(":");
+      closePosition(c, Number(fr));
+    }));
   } else if (posTab === "orders"){
     if (!userOrders.length){
       paintEmpty(body, { icon: ICON_ORDERS, title: "No open orders",
@@ -870,25 +1026,40 @@ function renderPositions(){
       return;
     }
     body.innerHTML = `<div class="pos-table orders">
-      <div class="pt-head"><span>Coin</span><span>Side</span><span>Size</span><span>Price</span><span></span></div>
+      <div class="pt-head"><span>Coin</span><span>Side</span><span>Size</span><span>Price</span><span class="pt-act"></span></div>
       ${userOrders.map(o => `<div class="pt-row">
         <span class="c">${o.coin}</span>
         <span class="${o.side==='B'?'long':'short'}">${o.side==='B'?'Buy':'Sell'}</span>
         <span>${o.sz}</span>
         <span>${pxStr(o.limitPx)}</span>
-        <span><button class="btn ghost xs" data-cancel="${o.coin}:${o.oid}">Cancel</button></span>
+        <span class="pt-act"><button class="btn ghost xs" data-cancel="${o.coin}:${o.oid}">Cancel</button></span>
       </div>`).join("")}
     </div>`;
     body.querySelectorAll("[data-cancel]").forEach(b => b.addEventListener("click", () => cancel(b.dataset.cancel)));
   } else {
     const ms = userData?.marginSummary || {};
-    body.innerHTML = `<div class="acct-grid">
-      <div class="acct"><span class="k">Account value</span><span class="v">${usd(ms.accountValue||0)}</span></div>
-      <div class="acct"><span class="k">Withdrawable</span><span class="v">${usd(userData?.withdrawable||0)}</span></div>
-      <div class="acct"><span class="k">Margin used</span><span class="v">${usd(ms.totalMarginUsed||0)}</span></div>
-      <div class="acct"><span class="k">Position value</span><span class="v">${usd(ms.totalNtlPos||0)}</span></div>
-      <div class="acct wide"><span class="k">Account · ${HL.getNetwork()}</span><span class="v mono">${shortAddr(state.account)}</span></div>
-    </div>`;
+    const av = Number(ms.accountValue) || 0;
+    const used = Number(ms.totalMarginUsed) || 0;
+    const ntl = Number(ms.totalNtlPos) || 0;
+    const maint = Number(userData?.crossMaintenanceMarginUsed);
+    const usage = av > 0 ? (used / av * 100) : 0;
+    const ratio = (isFinite(maint) && av > 0) ? (maint / av * 100) : null;
+    const lev = av > 0 ? (ntl / av) : 0;
+    const tone = usage >= 80 ? "hot" : usage >= 50 ? "warn" : "";
+    body.innerHTML = `
+      <div class="acct-usage">
+        <div class="au-head"><span>Margin usage</span><span class="${tone}">${usage.toFixed(1)}%</span></div>
+        <div class="au-bar"><i class="${tone}" style="width:${Math.min(100, usage).toFixed(1)}%"></i></div>
+      </div>
+      <div class="acct-grid">
+        <div class="acct"><span class="k">Account value</span><span class="v">${usd(av)}</span></div>
+        <div class="acct"><span class="k">Withdrawable</span><span class="v">${usd(userData?.withdrawable||0)}</span></div>
+        <div class="acct"><span class="k">Margin used</span><span class="v">${usd(used)}</span></div>
+        <div class="acct"><span class="k">Position value</span><span class="v">${usd(ntl)}</span></div>
+        <div class="acct"><span class="k">Margin ratio</span><span class="v ${ratio!=null&&ratio>=50?'dn':''}">${ratio!=null?ratio.toFixed(2)+'%':'—'}</span></div>
+        <div class="acct"><span class="k">Account leverage</span><span class="v">${lev?lev.toFixed(2)+'×':'—'}</span></div>
+        <div class="acct wide"><span class="k">Account · ${HL.getNetwork()}</span><span class="v mono">${shortAddr(state.account)}</span></div>
+      </div>`;
   }
 }
 async function cancel(key){
@@ -898,6 +1069,33 @@ async function cancel(key){
     toast(`order cancelled · ${c}`, "ok");
     setTimeout(pollUser, 500);
   } catch (e){ toast("cancel failed · " + (e?.message || e), "err", 4000); }
+}
+async function cancelAll(){
+  if (!userOrders.length) return;
+  const orders = userOrders.slice();
+  toast(`cancelling ${orders.length} order${orders.length>1?'s':''}…`, "ok");
+  let ok = 0;
+  for (const o of orders){
+    try { await HL.cancelOrder({ account: state.account, coin: o.coin, oid: Number(o.oid) }); ok++; }
+    catch (e){ /* keep going */ }
+  }
+  toast(ok === orders.length ? `all orders cancelled` : `cancelled ${ok}/${orders.length}`, ok ? "ok" : "err");
+  setTimeout(pollUser, 500);
+}
+// Close (or partially close) a position by signing a reduce-only market
+// order on the opposite side — routed through the same review→sign modal as
+// a normal order, so the user always confirms before any funds move.
+function closePosition(c, frac){
+  const p = openPositions().find(x => x.position.coin === c);
+  if (!p){ toast("position not found — refresh", "err"); return; }
+  const szi = Number(p.position.szi);
+  if (!isFinite(szi) || szi === 0){ toast("nothing to close", "err"); return; }
+  const u = universe.find(x => x.name === c);
+  const dp = Math.max(0, Math.min(8, u ? u.szDecimals : szDecimals));
+  const sz = Number((Math.abs(szi) * (frac || 1)).toFixed(dp));
+  if (!(sz > 0)){ toast("size too small to close", "err"); return; }
+  const px = midOf(c);
+  openReview({ coin: c, side: szi > 0 ? "sell" : "buy", otype: "market", sz, px, reduceOnly: true });
 }
 
 /* ─── network toggle ───────────────────────────────────────── */
@@ -927,6 +1125,7 @@ function switchNetwork(net){
 function wire(){
   on($("hlCoin"), "change", async (e) => {
     coin = e.target.value;
+    try { localStorage.setItem("lz.hl.lastCoin", coin); } catch {}
     applyCoinMeta();
     lastPx = null; prevLast = null; candles = []; book = { bids:[], asks:[] };
     renderSymbol(); renderStats(); updateTriggerPx();
@@ -938,11 +1137,16 @@ function wire(){
   });
   $("hlIv").querySelectorAll("button").forEach(b => on(b, "click", async () => {
     interval = b.dataset.iv;
+    try { localStorage.setItem("lz.hl.lastIv", interval); } catch {}
     $("hlIv").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
     candles = [];
     if (active){ subscribeCoin(); }
     await loadCandles();
   }));
+  // reflect a restored interval onto the picker (HTML defaults to 15m)
+  $("hlIv").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.iv === interval));
+  // EMA overlay toggle
+  { const mb = $("hlIndMA"); if (mb){ mb.classList.toggle("on", maOn); mb.setAttribute("aria-pressed", String(maOn)); on(mb, "click", toggleMA); } }
   $("hlSide").querySelectorAll("button").forEach(b => on(b, "click", () => setSide(b.dataset.side)));
   $("hlType").querySelectorAll("button").forEach(b => on(b, "click", () => setType(b.dataset.type)));
   on($("hlSize"), "input", () => {
@@ -951,7 +1155,7 @@ function wire(){
     if (chips) chips.querySelectorAll("button.on").forEach(b => b.classList.remove("on"));
   });
   on($("hlPrice"), "input", () => { renderNotional(); updateTriggerPx(); });
-  on($("hlLev"), "input", renderLev);
+  on($("hlLev"), "input", () => { renderLev(); renderNotional(); });
   on($("hlLevApply"), "click", applyLeverage);
   // size quick-chips (25/50/75/Max of withdrawable buying power at leverage)
   const chips = $("hlSizeChips");
@@ -959,13 +1163,19 @@ function wire(){
   on($("hlSubmit"), "click", onSubmit);
   $("hlPosTabs").querySelectorAll("button").forEach(b => on(b, "click", () => {
     posTab = b.dataset.tab;
-    $("hlPosTabs").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    $("hlPosTabs").querySelectorAll("button").forEach(x => {
+      x.classList.toggle("on", x === b);
+      x.setAttribute("aria-selected", x === b ? "true" : "false");
+    });
     renderPositions();
   }));
+  const midTabs = $("hlMidTabs");
+  if (midTabs) midTabs.querySelectorAll("button").forEach(b => on(b, "click", () => setMidTab(b.dataset.mid)));
   document.querySelectorAll("#hlNetToggle button").forEach(b => on(b, "click", () => switchNetwork(b.dataset.net)));
   on($("hlCancel"), "click", closeReview);
   on($("hlConfirm"), "click", confirmOrder);
   on($("hlModal"), "click", (e) => { if (e.target === $("hlModal")) closeReview(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("hlModal").hidden) closeReview(); });
 
   onChange(() => { updateSubmitLabel(); updateSizeChipState(); if (active){ startUserPolling(); } });
   wireBookClicks();

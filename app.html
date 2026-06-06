@@ -12,21 +12,26 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@1&display=swap" />
 
-<link rel="stylesheet" href="/assets/css/base.css" />
-<link rel="stylesheet" href="/assets/css/ui.css" />
-<link rel="stylesheet" href="/assets/css/app.css" />
-<link rel="stylesheet" href="/assets/css/anima.css" />
-<link rel="stylesheet" href="/assets/css/trade.css" />
-<link rel="stylesheet" href="/assets/css/assistant.css" />
-<link rel="stylesheet" href="/assets/css/recovery.css" />
-<link rel="stylesheet" href="/assets/css/wallet-actions.css" />
-<link rel="stylesheet" href="/assets/css/coin-page.css" />
-<link rel="stylesheet" href="/assets/css/chat-charts.css" />
-<link rel="stylesheet" href="/assets/css/hl-markets.css" />
-<link rel="stylesheet" href="/assets/css/hl-depth.css" />
-<link rel="stylesheet" href="/assets/css/hl-portfolio.css" />
-<link rel="stylesheet" href="/assets/css/hl-orders-pro.css" />
-<script type="module" src="/assets/js/ui.js"></script>
+<link rel="stylesheet" href="/assets/css/base.css?v=3" />
+<link rel="stylesheet" href="/assets/css/ui.css?v=3" />
+<link rel="stylesheet" href="/assets/css/app.css?v=3" />
+<link rel="stylesheet" href="/assets/css/anima.css?v=3" />
+<link rel="stylesheet" href="/assets/css/trade.css?v=3" />
+<link rel="stylesheet" href="/assets/css/assistant.css?v=3" />
+<link rel="stylesheet" href="/assets/css/risk.css?v=3" />
+<link rel="stylesheet" href="/assets/css/recovery.css?v=3" />
+<link rel="stylesheet" href="/assets/css/wallet-actions.css?v=3" />
+<link rel="stylesheet" href="/assets/css/wallet-pro.css?v=3" />
+<link rel="stylesheet" href="/assets/css/coin-page.css?v=3" />
+<link rel="stylesheet" href="/assets/css/coin-page-pro.css?v=3" />
+<link rel="stylesheet" href="/assets/css/chat-charts.css?v=3" />
+<link rel="stylesheet" href="/assets/css/hl-markets.css?v=3" />
+<link rel="stylesheet" href="/assets/css/markets-pro.css?v=3" />
+<link rel="stylesheet" href="/assets/css/hl-depth.css?v=3" />
+<link rel="stylesheet" href="/assets/css/hl-portfolio.css?v=3" />
+<link rel="stylesheet" href="/assets/css/hl-orders-pro.css?v=3" />
+<link rel="stylesheet" href="/assets/css/glass.css?v=3" />
+<script type="module" src="/assets/js/ui.js?v=3"></script>
 </head>
 <body>
 
@@ -155,12 +160,13 @@
           <div>
             <div class="lab">total balance · usd</div>
             <div class="v" id="walletTotal">$0.00 <small id="walletDelta">+ 0.0%</small></div>
+            <div class="wal-alloc" id="walletAlloc" aria-hidden="true"></div>
           </div>
           <div class="row">
-            <button class="btn accent sm" id="walletSendTop">Send</button>
-            <button class="btn ghost sm" id="walletReceive">Receive</button>
-            <button class="btn ghost sm" id="walletSwap">Swap</button>
-            <button class="btn ghost sm" id="walletBridge">Bridge ↔</button>
+            <button class="btn accent sm" id="walletSendTop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send</button>
+            <button class="btn ghost sm" id="walletReceive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>Receive</button>
+            <button class="btn ghost sm" id="walletSwap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3l4 4-4 4"/><path d="M21 7H7"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h14"/></svg>Swap</button>
+            <button class="btn ghost sm" id="walletBridge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h18"/><path d="M3 12a4 4 0 0 1 4-4"/><path d="M21 12a4 4 0 0 0-4-4"/><path d="M7 12v5"/><path d="M17 12v5"/></svg>Bridge</button>
           </div>
         </div>
 
@@ -189,7 +195,7 @@
       </div>
 
       <div>
-        <div class="section-label" style="margin-bottom:14px"><span class="num">[ tokens ]</span></div>
+        <div class="section-label" style="margin-bottom:14px"><span class="num">[ tokens ]</span><span class="wal-count" id="walTokCount" hidden></span></div>
         <div class="token-list" id="tokenList"></div>
       </div>
 
@@ -216,6 +222,19 @@
         <div class="kpi"><div class="lab">24h volume</div><div class="v" id="kpiVol">—</div><div class="tr" id="kpiVolTr">—</div></div>
         <div class="kpi"><div class="lab">BTC dominance</div><div class="v" id="kpiDom">—</div><div class="tr">global</div></div>
         <div class="kpi"><div class="lab">Tracked coins</div><div class="v" id="kpiTracked">—</div><div class="tr">live</div></div>
+      </div>
+
+      <div class="mkt-toolbar">
+        <div class="mkt-search">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="mktSearch" placeholder="Search 100 coins by name or symbol…" autocomplete="off" spellcheck="false" aria-label="Search coins" />
+        </div>
+        <div class="mkt-filters" id="mktFilters" role="tablist">
+          <button class="mkt-chip on" data-filter="all" role="tab" aria-selected="true">All</button>
+          <button class="mkt-chip" data-filter="gainers" role="tab" aria-selected="false">Gainers</button>
+          <button class="mkt-chip" data-filter="losers" role="tab" aria-selected="false">Losers</button>
+        </div>
+        <span class="mkt-count" id="mktCount"></span>
       </div>
 
       <div class="markets-table">
@@ -438,7 +457,7 @@
         <div class="trade-stats">
           <div class="st"><span class="k">Mark</span><span class="v" id="hlMark">—</span></div>
           <div class="st"><span class="k">Oracle</span><span class="v" id="hlOracle">—</span></div>
-          <div class="st"><span class="k">Funding · 1h</span><span class="v" id="hlFunding">—</span></div>
+          <div class="st"><span class="k">Funding <em id="hlFundCd">·</em></span><span class="v" id="hlFunding">—</span></div>
           <div class="st"><span class="k">Open interest</span><span class="v" id="hlOI">—</span></div>
           <div class="st"><span class="k">24h volume</span><span class="v" id="hlVol">—</span></div>
         </div>
@@ -451,22 +470,40 @@
         <div class="trade-chart-card">
           <div class="chart-toolbar">
             <div class="iv-picker" id="hlIv">
+              <button data-iv="1m">1m</button>
               <button data-iv="5m">5m</button>
               <button data-iv="15m" class="on">15m</button>
               <button data-iv="1h">1h</button>
               <button data-iv="4h">4h</button>
               <button data-iv="1d">1d</button>
             </div>
+            <button class="ind-btn on" id="hlIndMA" type="button" aria-pressed="true" title="Toggle EMA 9 / 21 overlay">EMA</button>
             <div class="chart-readout" id="hlReadout"></div>
           </div>
-          <div class="chart-wrap"><canvas id="hlChart"></canvas></div>
+          <div class="chart-wrap" id="hlChart"><div class="chart-legend" id="hlChartLegend" aria-hidden="true"></div><div class="chart-loading" id="hlChartLoading"><span class="ring"></span><span>Loading chart…</span></div></div>
         </div>
 
-        <div class="book-card">
-          <div class="book-head"><span>Order book</span><span class="spread" id="hlSpread">—</span></div>
-          <div class="book asks" id="hlAsks"></div>
-          <div class="book-mid" id="hlBookMid">—</div>
-          <div class="book bids" id="hlBids"></div>
+        <div class="trade-mid-card">
+          <div class="mid-tabs" id="hlMidTabs" role="tablist">
+            <button data-mid="book" class="on" role="tab">Book</button>
+            <button data-mid="depth" role="tab">Depth</button>
+            <button data-mid="trades" role="tab">Trades</button>
+            <span class="mid-spread" id="hlSpread">—</span>
+          </div>
+          <div class="mid-pane" data-pane="book">
+            <div class="book asks" id="hlAsks"></div>
+            <div class="book-mid" id="hlBookMid">—</div>
+            <div class="book bids" id="hlBids"></div>
+            <div class="book-imb" id="hlImb">
+              <span class="ib b" id="hlImbB">—</span>
+              <span class="ib-bar"><i id="hlImbFill"></i></span>
+              <span class="ib a" id="hlImbA">—</span>
+            </div>
+          </div>
+          <!-- Depth chart pane (owned by hl-depth.js → #hlDepthMount) -->
+          <div class="mid-pane" data-pane="depth" hidden><div id="hlDepthMount"></div></div>
+          <!-- Live trades tape pane (owned by hl-depth.js → #hlTradesMount) -->
+          <div class="mid-pane" data-pane="trades" hidden><div id="hlTradesMount"></div></div>
         </div>
 
         <div class="ticket-card">
@@ -495,7 +532,13 @@
             <button class="btn ghost xs" id="hlLevApply">Set leverage on-chain</button>
           </div>
           <label class="ticket-reduce"><input type="checkbox" id="hlReduce" /> <span>Reduce only</span></label>
-          <div class="ticket-notional"><span>Notional</span><span id="hlNotional">—</span></div>
+          <div class="ticket-summary" id="hlSummary">
+            <div class="ts-row"><span>Order value</span><span id="hlNotional">—</span></div>
+            <div class="ts-row"><span>Margin required</span><span id="hlMargin">—</span></div>
+            <div class="ts-row"><span>Est. liq. price <em id="hlLiqSide">long</em></span><span id="hlLiq" class="ts-liq">—</span></div>
+            <div class="ts-row"><span>Est. fees <em>taker</em></span><span id="hlFees">—</span></div>
+            <div class="ts-row sub"><span>Available</span><span id="hlAvail">—</span></div>
+          </div>
           <button class="btn accent ticket-submit" id="hlSubmit">Connect wallet</button>
           <p class="ticket-hint" id="hlHint">Market data is live. Connect a wallet to trade.</p>
           <!-- Advanced order types: TP/SL, scale, TWAP, TIF (owned by hl-orders-pro.js) -->
@@ -503,17 +546,15 @@
         </div>
       </div>
 
-      <!-- Depth chart + live trades tape (owned by hl-depth.js) -->
-      <div id="hlAddonRow" class="hl-addon-row">
-        <div id="hlDepthMount"></div>
-        <div id="hlTradesMount"></div>
-      </div>
-
       <div class="trade-positions">
-        <div class="pos-tabs" id="hlPosTabs">
-          <button data-tab="positions" class="on">Positions</button>
-          <button data-tab="orders">Open orders</button>
-          <button data-tab="balance">Account</button>
+        <div class="pos-bar">
+          <div class="pos-tabs" id="hlPosTabs" role="tablist">
+            <button data-tab="positions" class="on" role="tab">Positions <span class="pos-count" id="hlPosCount" hidden>0</span></button>
+            <button data-tab="orders" role="tab">Open orders <span class="pos-count" id="hlOrdCount" hidden>0</span></button>
+            <button data-tab="balance" role="tab">Account</button>
+          </div>
+          <span class="pos-agg" id="hlPosAgg" hidden></span>
+          <div class="pos-actions" id="hlPosActions"></div>
         </div>
         <div class="pos-body" id="hlPosBody"><div class="pos-empty">Connect a wallet to see your positions and balance.</div></div>
       </div>
@@ -600,16 +641,20 @@
   </div>
 </aside>
 
-<script type="module" src="/assets/js/app.js"></script>
-<script type="module" src="/assets/js/trade.js"></script>
-<script type="module" src="/assets/js/assistant.js"></script>
-<script type="module" src="/assets/js/pillars.js"></script>
-<script type="module" src="/assets/js/wallet-actions.js"></script>
-<script type="module" src="/assets/js/coin-page.js"></script>
+<!-- TradingView lightweight-charts (vendored locally, no build, offline at runtime) -->
+<script src="/assets/vendor/lightweight-charts.standalone.production.js?v=3"></script>
+<script type="module" src="/assets/js/app.js?v=3"></script>
+<script type="module" src="/assets/js/trade.js?v=3"></script>
+<script type="module" src="/assets/js/risk.js?v=3"></script>
+<script type="module" src="/assets/js/risk-watch.js?v=3"></script>
+<script type="module" src="/assets/js/assistant.js?v=3"></script>
+<script type="module" src="/assets/js/pillars.js?v=3"></script>
+<script type="module" src="/assets/js/wallet-actions.js?v=3"></script>
+<script type="module" src="/assets/js/coin-page.js?v=3"></script>
 <!-- Hyperliquid parity add-ons (each module owns its own mount + files) -->
-<script type="module" src="/assets/js/hl-markets.js"></script>
-<script type="module" src="/assets/js/hl-depth.js"></script>
-<script type="module" src="/assets/js/hl-portfolio.js"></script>
-<script type="module" src="/assets/js/hl-orders-pro.js"></script>
+<script type="module" src="/assets/js/hl-markets.js?v=3"></script>
+<script type="module" src="/assets/js/hl-depth.js?v=3"></script>
+<script type="module" src="/assets/js/hl-portfolio.js?v=3"></script>
+<script type="module" src="/assets/js/hl-orders-pro.js?v=3"></script>
 </body>
 </html>

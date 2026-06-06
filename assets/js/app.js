@@ -301,6 +301,14 @@ const WALLET_CHAINS = [
 const SPAM_RX = /https?:|www\.|\.(com|io|xyz|app|org|net|fi|to|vip)\b|claim|reward|airdrop|voucher|visit|access|\$\s|\s/i;
 const WALLET_ICN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/><circle cx="17" cy="15" r="1.2"/></svg>`;
 let walletTokens = [];        // [{sym,nm,chain,amount,price,usd}]
+// chain key → { label, accent } for badges + allocation colours (network-free)
+const CHAIN_META = {
+  eth:  { label:"Ethereum", accent:"#7b8cff" },
+  arb:  { label:"Arbitrum", accent:"#33a4f4" },
+  op:   { label:"Optimism", accent:"#ff5d6c" },
+  base: { label:"Base",     accent:"#4f7cff" },
+};
+const chainMeta = (k) => CHAIN_META[k] || { label:(k||"chain"), accent:"#b39aff" };
 let walletLoading = false;
 let ethPrice = 3700;
 let walletRendered = false;
@@ -377,6 +385,35 @@ async function loadWallet(){
   renderWallet();
 }
 
+/* Portfolio allocation strip in the hero card, grouped by chain — shows
+   where value sits across Ethereum / Arbitrum / Optimism / Base. */
+function renderWalletAlloc(total){
+  const el = document.getElementById("walletAlloc");
+  const chip = document.getElementById("walTokCount");
+  if (chip){
+    if (walletTokens.length){
+      const chains = new Set(walletTokens.map(t => t.chain)).size;
+      chip.innerHTML = `<b>${walletTokens.length}</b> ${walletTokens.length === 1 ? "asset" : "assets"} · <b>${chains}</b> ${chains === 1 ? "chain" : "chains"}`;
+      chip.hidden = false;
+    } else { chip.hidden = true; }
+  }
+  if (!el) return;
+  if (!total || !walletTokens.length){ el.innerHTML = ""; return; }
+
+  const by = new Map();
+  for (const t of walletTokens){
+    const m = chainMeta(t.chain);
+    const e = by.get(t.chain) || { label:m.label, accent:m.accent, usd:0 };
+    e.usd += t.usd; by.set(t.chain, e);
+  }
+  const groups = [...by.values()].sort((a,b) => b.usd - a.usd);
+  const segs = groups.map(g =>
+    `<span class="wal-alloc-seg" style="flex-grow:${(g.usd/total).toFixed(4)};background:${g.accent}" title="${g.label} · ${((g.usd/total)*100).toFixed(1)}%"></span>`).join("");
+  const legend = groups.slice(0, 4).map(g =>
+    `<span class="wal-alloc-key"><i style="background:${g.accent}"></i>${g.label} <b>${((g.usd/total)*100).toFixed(0)}%</b></span>`).join("");
+  el.innerHTML = `<div class="wal-alloc-bar">${segs}</div><div class="wal-alloc-legend">${legend}</div>`;
+}
+
 function renderWallet(){
   const totalEl = document.getElementById("walletTotal");
   const list = document.getElementById("tokenList");
@@ -389,25 +426,38 @@ function renderWallet(){
       body: "Connect to see your real on-chain balances across Ethereum, Arbitrum, Optimism and Base.",
       actionLabel: "Connect Wallet", onAction: connectFlow }));
     txl.replaceChildren(emptyState({ title: "No activity yet", body: "Connect a wallet to see your balances here." }));
+    renderWalletAlloc(0);
     return;
   }
 
   if (walletLoading && !walletTokens.length){
     totalEl.innerHTML = `${fmt.usd(0)} <small id="walletDelta">reading chain…</small>`;
     list.innerHTML = skeleton({ rows: 3, height: 62 });
+    renderWalletAlloc(0);
   } else {
-    totalEl.innerHTML = `${fmt.usd(totalUSD())} <small id="walletDelta" class="wallet-live">● live · on-chain</small>`;
+    const total = totalUSD();
+    totalEl.innerHTML = `${fmt.usd(total)} <small id="walletDelta" class="wallet-live">live · on-chain</small>`;
     if (!walletTokens.length){
       list.replaceChildren(emptyState({ icon: WALLET_ICN, title: "No balances found",
         body: `No ETH or USDC on Ethereum, Arbitrum, Optimism or Base for ${shortAddr(state.account)}. Switch the wallet or top it up to see it here.` }));
     } else {
-      list.innerHTML = walletTokens.map((t, i) => `
-        <div class="token-row ${walletRendered ? "" : "stagger-in"}" style="--i:${i}">
+      list.innerHTML = walletTokens.map((t, i) => {
+        const m = chainMeta(t.chain);
+        const pct = total > 0 ? (t.usd / total) * 100 : 0;
+        const amt = t.amount.toLocaleString("en-US", { maximumFractionDigits: t.sym === "ETH" ? 5 : 2 });
+        return `
+        <div class="token-row ${walletRendered ? "" : "stagger-in"}" style="--i:${i};--tk-accent:${m.accent}">
           ${coinAvatarHTML(t.sym, 44)}
-          <div class="col"><span class="sym">${t.sym}</span><span class="nm">${t.nm} · ${t.amount.toLocaleString("en-US", { maximumFractionDigits: t.sym === "ETH" ? 5 : 2 })} ${t.sym}</span></div>
-          <div class="amount"><span class="v">${fmt.usd(t.usd)}</span><span class="usd">@ ${fmt.usd(t.price)}</span></div>
-        </div>`).join("");
+          <div class="col">
+            <span class="sym">${t.sym} <i class="tk-chain">${m.label}</i></span>
+            <span class="nm">${amt} ${t.sym}</span>
+            <span class="tk-share"><i style="width:${pct.toFixed(1)}%"></i></span>
+          </div>
+          <div class="amount"><span class="v">${fmt.usd(t.usd)}</span><span class="usd"><span class="tk-pct">${pct.toFixed(1)}%</span> · @ ${fmt.usd(t.price)}</span></div>
+        </div>`;
+      }).join("");
     }
+    renderWalletAlloc(total);
   }
   // Real per-tx history needs an indexer (Etherscan/Alchemy key + CORS), which a
   // keyless static app can't do — so we show an honest note instead of fake txs.
@@ -451,6 +501,18 @@ document.getElementById("sendBtn")?.addEventListener("click", () => {
 let marketsRows = [];
 let marketsLoaded = false;
 let demoNoticeShown = false;
+const marketsView = { q: "", filter: "all" };   // search + gainers/losers filter
+
+/* Apply the active search query + filter chip to the fetched coin list. */
+function visibleMarkets(){
+  const q = marketsView.q.trim().toLowerCase();
+  let rows = marketsRows;
+  if (q) rows = rows.filter(c =>
+    (c.symbol || "").toLowerCase().includes(q) || (c.name || "").toLowerCase().includes(q));
+  if (marketsView.filter === "gainers") rows = rows.filter(c => (c.price_change_percentage_24h || 0) > 0);
+  else if (marketsView.filter === "losers") rows = rows.filter(c => (c.price_change_percentage_24h || 0) < 0);
+  return rows;
+}
 
 /* Offline/rate-limited fallback so Markets is never an empty error screen. */
 const wave = (base, amp) => Array.from({length:8}, (_,i) => base + Math.sin(i/1.4)*amp - i*amp*0.05);
@@ -469,8 +531,8 @@ function useDemoMarkets(){
   marketsRows = DEMO_MARKETS;
   marketsDemo = true;
   renderMarkets();
-  document.getElementById("kpiMcap").textContent = fmt.usd(2.41e12);
-  document.getElementById("kpiVol").textContent  = fmt.usd(9.8e10);
+  document.getElementById("kpiMcap").textContent = "$" + fmt.compact(2.41e12);
+  document.getElementById("kpiVol").textContent  = "$" + fmt.compact(9.8e10);
   document.getElementById("kpiDom").textContent  = "53.6%";
   document.getElementById("kpiTracked").textContent = "12,840";
   document.getElementById("kpiMcapTr").textContent = fmt.pct(1.2);
@@ -494,7 +556,7 @@ async function fetchMarkets(){
     const rowsEl = document.getElementById("marketsRows");
     rowsEl.classList.remove("market-skel");
     rowsEl.innerHTML = skeleton({ rows: 8, height: 44, gap: 0, radius: 0 });
-    const r = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&page=1&sparkline=true&price_change_percentage=24h");
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=true&price_change_percentage=24h");
     if (!r.ok) throw new Error("rate-limited");
     marketsRows = await r.json();
     marketsLoaded = true;
@@ -504,8 +566,8 @@ async function fetchMarkets(){
     try {
       const g = await fetch("https://api.coingecko.com/api/v3/global");
       const gj = (await g.json()).data;
-      document.getElementById("kpiMcap").textContent = fmt.usd(gj.total_market_cap.usd);
-      document.getElementById("kpiVol").textContent  = fmt.usd(gj.total_volume.usd);
+      document.getElementById("kpiMcap").textContent = "$" + fmt.compact(gj.total_market_cap.usd);
+      document.getElementById("kpiVol").textContent  = "$" + fmt.compact(gj.total_volume.usd);
       document.getElementById("kpiDom").textContent  = (gj.market_cap_percentage.btc).toFixed(1) + "%";
       const ch = gj.market_cap_change_percentage_24h_usd;
       document.getElementById("kpiMcapTr").textContent = fmt.pct(ch);
@@ -533,9 +595,21 @@ function renderMarkets(){
       actionLabel: "Retry",
       onAction: fetchMarkets,
     }));
+    const cnt = document.getElementById("mktCount"); if (cnt) cnt.textContent = "";
     return;
   }
-  root.innerHTML = marketsRows.map((c, i) => {
+  const rows = visibleMarkets();
+  const cnt = document.getElementById("mktCount");
+  if (cnt) cnt.innerHTML = `<b>${rows.length}</b> of ${marketsRows.length} coins`;
+  if (!rows.length){
+    root.replaceChildren(emptyState({
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>`,
+      title: "No coins match",
+      body: marketsView.q ? `Nothing matches “${marketsView.q}”. Try another name or symbol.` : "No coins in this filter right now.",
+    }));
+    return;
+  }
+  root.innerHTML = rows.map((c, i) => {
     const up = (c.price_change_percentage_24h || 0) >= 0;
     const sparkUp = (c.sparkline_in_7d?.price?.[0] || 0) <= (c.sparkline_in_7d?.price?.at(-1) || 0);
     return `<div class="row stagger-in" data-id="${c.id ?? ""}" data-sym="${c.symbol}" data-name="${c.name}" role="button" tabindex="0" aria-haspopup="menu" style="--i:${i}">
@@ -550,6 +624,20 @@ function renderMarkets(){
 }
 
 document.getElementById("marketsRefresh")?.addEventListener("click", () => { fetchMarkets(); toast("refreshing markets…"); });
+
+/* live search + gainers/losers filter (operate on already-fetched rows) */
+document.getElementById("mktSearch")?.addEventListener("input", (e) => {
+  marketsView.q = e.target.value || "";
+  if (marketsRows.length) renderMarkets();
+});
+document.getElementById("mktFilters")?.addEventListener("click", (e) => {
+  const chip = e.target.closest(".mkt-chip"); if (!chip) return;
+  marketsView.filter = chip.dataset.filter || "all";
+  document.querySelectorAll("#mktFilters .mkt-chip").forEach(b => {
+    const on = b === chip; b.classList.toggle("on", on); b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  if (marketsRows.length) renderMarkets();
+});
 
 /* ----- market row → quick-actions menu (trade · external info) ----- */
 let coinMenuEl = null, coinMenuKey = null;
@@ -833,7 +921,7 @@ const ONROUTE = {
   markets: () => { if (!marketsLoaded) fetchMarkets(); else renderMarkets(); },
   network: () => {},
   identity: () => { reflectIdentity(); reflectIdentityDetails(); },
-  coin: () => { window.LZ.coinPage?.render(getRouteParam()); },
+  coin: () => { window.LZ?.coinPage?.render(getRouteParam()); },
 };
 
 /* =================================================================== *

@@ -322,13 +322,59 @@ function statCard(label, value, extra = "") {
   </div>`;
 }
 
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+/* 24h low → high bar with the current price marked. */
+function rangeBar(low, cur, hi) {
+  if (low == null || hi == null || cur == null || hi <= low) return "";
+  const pct = Math.max(0, Math.min(100, ((cur - low) / (hi - low)) * 100));
+  return `<div class="cp-mini cp-range">
+    <div class="cp-mini-head"><span>24h range</span></div>
+    <div class="cp-range-row">
+      <span class="cp-range-cap">${fmtPx(low)}</span>
+      <div class="cp-range-track"><i style="width:${pct.toFixed(1)}%"></i><b style="left:${pct.toFixed(1)}%"></b></div>
+      <span class="cp-range-cap">${fmtPx(hi)}</span>
+    </div>
+  </div>`;
+}
+
+/* Circulating-vs-max supply progress. */
+function supplyBar(circ, max, sym) {
+  if (!circ || !max || max <= 0) return "";
+  const pct = Math.max(0, Math.min(100, (circ / max) * 100));
+  return `<div class="cp-mini cp-supplybar">
+    <div class="cp-mini-head"><span>Circulating supply</span><b>${pct.toFixed(1)}%</b></div>
+    <div class="cp-supply-track"><i style="width:${pct.toFixed(1)}%"></i></div>
+    <div class="cp-mini-sub">${fmtSupply(circ)} / ${fmtSupply(max)} ${esc(sym || "")}</div>
+  </div>`;
+}
+
+/* About card: description + categories + external links (best-effort). */
+function aboutCard(md) {
+  const raw = md.description ? String(md.description).replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim() : "";
+  const desc = raw.length > 420 ? raw.slice(0, 420).replace(/\s+\S*$/, "") + "…" : raw;
+  const cats = (md.categories || []).map(c => `<span class="cp-cat">${esc(c)}</span>`).join("");
+  const links = [];
+  if (md.homepage) links.push(`<a class="cp-link" href="${esc(md.homepage)}" target="_blank" rel="noopener noreferrer">Website<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M3 13 13 3M6 3h7v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`);
+  if (md.explorer) links.push(`<a class="cp-link" href="${esc(md.explorer)}" target="_blank" rel="noopener noreferrer">Explorer<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M3 13 13 3M6 3h7v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`);
+  if (!desc && !cats && !links.length) return "";
+  return `<div class="cp-about">
+    <div class="cp-about-head">About ${esc(md.name || "")}</div>
+    ${cats ? `<div class="cp-cats">${cats}</div>` : ""}
+    ${desc ? `<p class="cp-about-text">${esc(desc)}</p>` : ""}
+    ${links.length ? `<div class="cp-links">${links.join("")}</div>` : ""}
+  </div>`;
+}
+
 function buildPage(root, md) {
   const up24 = (md.change_24h_pct || 0) >= 0;
   const up7   = (md.change_7d_pct  || 0) >= 0;
   const up30  = (md.change_30d_pct || 0) >= 0;
   const upAth = (md.ath_change_pct || 0) >= 0;
 
-  const iconHTML = `<span class="cp-icon" id="cpIcon">${(md.symbol || "?").slice(0, 1).toUpperCase()}</span>`;
+  const iconHTML = md.image
+    ? `<img class="cp-icon-img" id="cpIcon" src="${esc(md.image)}" alt="${esc(md.symbol || "")}" loading="lazy" />`
+    : `<span class="cp-icon" id="cpIcon">${(md.symbol || "?").slice(0, 1).toUpperCase()}</span>`;
 
   root.innerHTML = `
     <div class="cp-wrap">
@@ -364,6 +410,12 @@ function buildPage(root, md) {
         </button>
       </div>
 
+      ${(rangeBar(md.low_24h_usd, md.price_usd, md.high_24h_usd) || supplyBar(md.circulating_supply, md.max_supply, md.symbol))
+        ? `<div class="cp-subbar">
+            ${rangeBar(md.low_24h_usd, md.price_usd, md.high_24h_usd)}
+            ${supplyBar(md.circulating_supply, md.max_supply, md.symbol)}
+          </div>` : ""}
+
       <!-- chart section -->
       <div class="cp-chart-card">
         <div class="cp-chart-toolbar">
@@ -392,6 +444,9 @@ function buildPage(root, md) {
       <!-- DeFiLlama TVL placeholder (filled async) -->
       <div id="cpDlSection" class="cp-dl-section" hidden></div>
 
+      <!-- about / categories / links -->
+      ${aboutCard(md)}
+
     </div>
   `;
 
@@ -409,8 +464,9 @@ function buildPage(root, md) {
     }
   });
 
-  /* load coin icon from CoinGecko image (best-effort) */
-  loadCoinIcon(md.id, md.symbol, root.querySelector("#cpIcon"));
+  /* load coin icon from CoinGecko image (best-effort) — only when the
+     market-data response didn't already give us one (avoids a 2nd request). */
+  if (!md.image) loadCoinIcon(md.id, md.symbol, root.querySelector("#cpIcon"));
 
   /* wire chart range picker */
   const picker = root.querySelector("#cpRangePicker");
@@ -579,3 +635,13 @@ async function render(id) {
 /* ─── Export to global window.LZ.coinPage ───────────────────────── */
 window.LZ = window.LZ || {};
 window.LZ.coinPage = { render };
+
+/* Deep-link safety: if this module finished loading AFTER the router already
+   dispatched the initial route (e.g. a hard refresh / shared link straight to
+   #/coin/<id>), render now — the early ONROUTE.coin call would have no-op'd
+   because window.LZ.coinPage wasn't ready yet. */
+if (typeof location !== "undefined" && location.hash.startsWith("#/coin/")) {
+  const id = decodeURIComponent(location.hash.split("/")[2] || "");
+  const root = typeof document !== "undefined" && document.getElementById("coinPage");
+  if (id && root && !root.querySelector(".cp-wrap")) render(id);
+}

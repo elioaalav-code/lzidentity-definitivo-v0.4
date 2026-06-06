@@ -1,96 +1,100 @@
 /* =====================================================================
- *  hl-markets.js — ALL-PERPS MARKETS EXPLORER (Hyperliquid parity)
+ *  hl-markets.js — COMPACT TRIGGER + DRAWER MARKETS BROWSER  v2
  *  ---------------------------------------------------------------------
- *  STATUS: STUB. You (the MARKETS-EXPLORER agent) implement this file
- *  and assets/css/hl-markets.css ONLY. Do not touch any other file.
+ *  Owned by the MARKETS agent. Edit ONLY this file and hl-markets.css.
  *
- *  GOAL: a sortable, searchable table of EVERY Hyperliquid perp — the
- *  equivalent of Hyperliquid's perps directory — mounted in the trade view.
+ *  Architecture:
+ *   · #hlMarketsMount  → compact single-row trigger bar (top movers)
+ *   · .hlmd-overlay    → fixed-position drawer (appended to <body>)
  *
- *  MOUNT POINT (already in app.html, inside <section data-view="trade">):
- *      <div id="hlMarketsMount"></div>
- *  Render your whole UI inside it. It should be collapsible (a header bar
- *  with a chevron) so it doesn't crowd the trade screen; default collapsed
- *  or compact is fine.
- *
- *  COLUMNS (match Hyperliquid): Symbol · Mark/Last px · 24h change % ·
- *  8h funding % · Open interest ($) · 24h volume ($) · a tiny sparkline.
- *  Make every column sortable (click header toggles asc/desc). Add a
- *  search/filter <input> that filters by symbol. Highlight the row of the
- *  currently-selected coin. Clicking a row selects that market and scrolls
- *  the ticket into view (see INTEGRATION).
- *
- *  DATA — import the keyless HL layer:
- *      import * as HL from "./hyperliquid.js";
- *    · HL.metaAndCtxs() -> [meta, assetCtxs]
- *        meta.universe[i] = { name, szDecimals, maxLeverage }
- *        assetCtxs[i]     = { markPx, oraclePx, midPx, prevDayPx, funding,
- *                             openInterest, dayNtlVlm, premium, ... }   (strings)
- *        24h change % = (markPx - prevDayPx) / prevDayPx * 100
- *        funding is the 1h rate as a decimal string; HL shows 8h ≈ funding*8*100 %.
- *        OI ($) ≈ openInterest * markPx.  volume ($) = dayNtlVlm.
- *    · For sparklines: HL.candleSnapshot(coin, "1h", startMs, endMs) -> [{t,o,h,l,c,v}].
- *      Fetch lazily / cache; don't hammer the API for 100+ coins at once
- *      (e.g. only fetch sparkline data for visible rows, or skip if costly).
- *    · Poll HL.metaAndCtxs() every ~5s to keep prices live (only while the
- *      trade view is active AND your panel is expanded — check document
- *      .querySelector('[data-view="trade"]').classList or the mount being
- *      visible; stop polling when hidden to save the API).
- *
- *  INTEGRATION SURFACE (read-only helpers, already provided):
- *    · window.LZ.hl.setCoin("ETH")  -> switches the active trade market.
- *    · window.LZ.hl.coin()          -> current selected coin (string).
- *    · window.LZ.hl.universe()      -> [{name, szDecimals, maxLeverage}].
- *    · Listen for coin changes to move the row highlight:
- *        window.addEventListener("lz:hl:coin", (e) => { e.detail.coin });
- *    · Listen for network changes to reload everything:
- *        window.addEventListener("lz:hl:net", (e) => { e.detail.network });
- *    · On row click: window.LZ.hl.setCoin(sym); then
- *        document.querySelector(".ticket-card")?.scrollIntoView({behavior:"smooth"});
- *
- *  STYLE: dark aesthetic. Mirror the markets table + .kpi conventions in
- *  assets/css/app.css and the trade tables in assets/css/trade.css. Put all
- *  styling in assets/css/hl-markets.css. Reuse base.css tokens (--accent,
- *  --long/--short or --up/--down, --border, --surface, --mono, --text-dim).
- *
- *  HARD CONSTRAINTS: no build, no npm, no external chart/table libs. Pure
- *  DOM + canvas/SVG. Escape any text you inject as HTML. Guard every
- *  window.LZ / DOM access (the mount may not exist on non-trade pages).
- *  `node --check assets/js/hl-markets.js` must pass.
+ *  Public events:
+ *   · listens: lz:hl:coin, lz:hl:net, lz:route
+ *   · emits:   none (selects via window.LZ.hl.setCoin)
  * ===================================================================== */
 
 import * as HL from "./hyperliquid.js";
+import { coinAvatarHTML } from "./ui.js";
 
 /* ── constants ──────────────────────────────────────────────────────── */
 
-const POLL_INTERVAL   = 5_000;    // ms between metaAndCtxs polls
-const SPARK_HOURS     = 24;       // hours of history for sparklines
-const SPARK_INTERVAL  = "1h";     // candle interval for sparklines
-const SPARK_BATCH     = 6;        // fetch sparklines N at a time to avoid hammering
-const SPARK_BATCH_DELAY = 200;    // ms between batches
+const POLL_INTERVAL    = 5_000;
+const TOP_MOVERS_COUNT = 5;
+const FAV_KEY          = "lz.hl.favorites";
+const PREFS_KEY        = "lz.hl.markets.prefs";
+const DENSITY_KEY      = "lz.hl.markets.density"; // "comfortable" | "compact"
 
 /* ── module state ───────────────────────────────────────────────────── */
 
-/** @type {Array<{name:string,szDecimals:number,maxLeverage:number,
- *   markPx:number,prevDayPx:number,funding:number,
- *   openInterest:number,dayNtlVlm:number,chgPct:number,
- *   oi:number,fund8h:number}>} */
-let _rows       = [];          // merged meta + ctx rows
-let _filtered   = [];          // after search filter
-let _sortCol    = "vol";       // default sort column
-let _sortAsc    = false;       // descending by default
-let _query      = "";          // search query
-let _pollTimer  = null;        // setInterval handle
-let _isOpen     = false;       // panel expanded?
+/** @type {Array<{name:string,maxLev:number,markPx:number,prevDayPx:number,
+ *   chgPct:number,fund8h:number,oi:number,vol:number,sector:string}>} */
+let _rows        = [];
+let _filtered    = [];
+let _sortCol     = "vol";
+let _sortAsc     = false;
+let _query       = "";
+let _filterChip  = "all";   // "all" | "fav" | "topvol" | "gainers" | "losers" | sector key
+let _pollTimer   = null;
+let _drawerOpen  = false;
+let _initialized = false;
+let _lastUpd     = 0;
+let _kbIdx       = -1;      // keyboard-nav highlighted row index in _filtered
+let _density     = "comfortable"; // "comfortable" | "compact"
 
-/** spark cache: coin -> SVG string (or "" if failed) */
-const _sparkCache = new Map();
-/** which coins are currently being fetched */
-const _sparkFetching = new Set();
+/* cached DOM refs */
+let _mount       = null;
+let _trigger     = null;
+let _overlay     = null;
+let _drawerEl    = null;
+let _bodyEl      = null;
+let _searchEl    = null;
+let _countEl     = null;
+let _liveEl      = null;
+let _moversEl    = null;
+let _statStripEl = null;   // header stat strip
+let _glCountEl   = null;   // gainers/losers in trigger
 
-/* ── helpers ────────────────────────────────────────────────────────── */
+/* ── persistence helpers ────────────────────────────────────────────── */
 
-/** Safely escape a string for innerHTML injection */
+function loadPrefs(){
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
+    if (p.sortCol)   _sortCol   = p.sortCol;
+    if (p.sortAsc != null) _sortAsc = !!p.sortAsc;
+    if (p.filterChip) _filterChip = p.filterChip;
+  } catch {}
+}
+
+function savePrefs(){
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({
+      sortCol: _sortCol, sortAsc: _sortAsc, filterChip: _filterChip
+    }));
+  } catch {}
+}
+
+function loadDensity(){
+  try {
+    const v = localStorage.getItem(DENSITY_KEY);
+    if (v === "compact" || v === "comfortable") _density = v;
+  } catch {}
+}
+
+function saveDensity(){
+  try { localStorage.setItem(DENSITY_KEY, _density); } catch {}
+}
+
+function applyDensity(){
+  if (!_drawerEl) return;
+  _drawerEl.classList.toggle("hlmd-compact", _density === "compact");
+  if (_drawerEl){
+    _drawerEl.querySelectorAll(".hlmd-density-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.density === _density);
+    });
+  }
+}
+
+/* ── formatters ─────────────────────────────────────────────────────── */
+
 function esc(s){
   return String(s)
     .replace(/&/g,"&amp;")
@@ -100,127 +104,86 @@ function esc(s){
     .replace(/'/g,"&#39;");
 }
 
-/** Compact dollar formatter — e.g. 1.23B, 456M, 1.2K */
 function fmtUsd(n){
   if (!isFinite(n)) return "—";
-  if (n >= 1e9)  return "$" + (n / 1e9).toFixed(2) + "B";
-  if (n >= 1e6)  return "$" + (n / 1e6).toFixed(1) + "M";
-  if (n >= 1e3)  return "$" + (n / 1e3).toFixed(1) + "K";
+  if (n >= 1e9)  return "$" + (n/1e9).toFixed(2)  + "B";
+  if (n >= 1e6)  return "$" + (n/1e6).toFixed(1)  + "M";
+  if (n >= 1e3)  return "$" + (n/1e3).toFixed(1)  + "K";
   return "$" + n.toFixed(2);
 }
 
-/** Format a price number with up to 6 sig-figs, trimming trailing zeros */
 function fmtPx(n){
   if (!isFinite(n) || n <= 0) return "—";
   if (n >= 10000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (n >= 1)     return n.toPrecision(6).replace(/\.?0+$/, "");
-  return n.toPrecision(4).replace(/\.?0+$/, "");
+  if (n >= 1)     return n.toPrecision(6).replace(/\.?0+$/,"");
+  return n.toPrecision(4).replace(/\.?0+$/,"");
 }
 
-/** Format a percentage with sign and 4 decimal places for funding */
 function fmtPct(n, decimals = 2){
   if (!isFinite(n)) return "—";
-  const s = (n >= 0 ? "+" : "") + n.toFixed(decimals) + "%";
-  return s;
+  return (n >= 0 ? "+" : "") + n.toFixed(decimals) + "%";
 }
 
-/** Build a sparkline SVG from an array of close prices */
-function sparkSVG(closes, up){
-  if (!closes || closes.length < 2) return "";
-  const W = 72, H = 22;
-  const min = Math.min(...closes);
-  const max = Math.max(...closes);
-  const range = max - min || 1;
-  const pts = closes.map((v, i) =>
-    `${((i / (closes.length - 1)) * W).toFixed(1)},${(H - ((v - min) / range) * H).toFixed(1)}`
-  ).join(" ");
-  const color = up ? "var(--long)" : "var(--short)";
-  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" preserveAspectRatio="none" aria-hidden="true">` +
-    `<polyline fill="none" stroke="${color}" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" points="${pts}"/>` +
-    `</svg>`;
+function fmtFund(n){
+  if (!isFinite(n)) return "—";
+  return (n >= 0 ? "+" : "") + n.toFixed(4) + "%";
 }
 
-/** Check if the trade view is currently visible */
-function tradeViewVisible(){
-  return !!document.querySelector('[data-view="trade"].active');
+/** Compact OI label: shows $ value */
+function fmtOI(n){
+  return fmtUsd(n);
 }
 
-/** Get current selected coin from window.LZ (guarded) */
 function activeCoin(){
   try { return window.LZ?.hl?.coin?.() || ""; } catch { return ""; }
 }
 
-/* ── sparkline lazy-fetch ───────────────────────────────────────────── */
-
-/**
- * Fetches sparklines for a batch of coins that are visible in the table.
- * Respects the per-batch limit to avoid hammering the API.
- */
-async function fetchSparklinesForVisible(){
-  if (!_filtered.length) return;
-
-  // Collect coins not yet cached and not already being fetched
-  const needed = _filtered
-    .map(r => r.name)
-    .filter(c => !_sparkCache.has(c) && !_sparkFetching.has(c))
-    .slice(0, SPARK_BATCH);
-
-  if (!needed.length) return;
-
-  needed.forEach(c => _sparkFetching.add(c));
-
-  const now     = Date.now();
-  const startMs = now - SPARK_HOURS * 3_600_000;
-
-  for (let i = 0; i < needed.length; i++){
-    const coin = needed[i];
-    try {
-      const candles = await HL.candleSnapshot(coin, SPARK_INTERVAL, startMs, now);
-      if (Array.isArray(candles) && candles.length >= 2){
-        const closes = candles.map(c => parseFloat(c.c));
-        const up = closes[0] <= closes[closes.length - 1];
-        _sparkCache.set(coin, sparkSVG(closes, up));
-      } else {
-        _sparkCache.set(coin, "");
-      }
-    } catch {
-      _sparkCache.set(coin, "");
-    }
-    _sparkFetching.delete(coin);
-    // inject the sparkline into the existing DOM row if present
-    injectSparkInRow(coin);
-    // small delay between each request
-    if (i < needed.length - 1){
-      await new Promise(r => setTimeout(r, SPARK_BATCH_DELAY));
-    }
-  }
+function getFavs(){
+  try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch { return []; }
 }
 
-/** Update just the sparkline cell in a rendered row, without full re-render */
-function injectSparkInRow(coin){
-  const row = document.querySelector(`.hlm-row[data-coin="${CSS.escape(coin)}"] .spark`);
-  if (!row) return;
-  const svg = _sparkCache.get(coin);
-  row.innerHTML = svg || "";
+function setFavs(arr){
+  try { localStorage.setItem(FAV_KEY, JSON.stringify(arr)); } catch {}
+}
+
+function isFav(sym){
+  return getFavs().includes(sym);
+}
+
+function toggleFav(sym){
+  const favs = getFavs();
+  const idx  = favs.indexOf(sym);
+  if (idx >= 0) favs.splice(idx, 1);
+  else favs.push(sym);
+  setFavs(favs);
+  return idx < 0;
+}
+
+function sectorOf(name){
+  const n = name.toUpperCase();
+  if (["BTC","ETH","SOL","BNB","XRP","ADA","AVAX","DOT","ATOM","NEAR","FTM","OP","ARB","MATIC","TRX","LTC","BCH","ETC","LINK","UNI","AAVE","MKR","CRV","SNX","COMP"].includes(n)) return "L1/L2";
+  if (["DOGE","SHIB","PEPE","BONK","WIF","FLOKI","MEME","TURBO","NEIRO","PNUT","FARTCOIN","GOAT","MOG","POPCAT"].includes(n)) return "Meme";
+  if (["BNB","FTT","OKB","CRO","HT","KCS"].includes(n)) return "Exchange";
+  if (["AAVE","COMP","MKR","SNX","UNI","CRV","BAL","SUSHI","YFI","CVX","FXS","LDO","RPL","PENDLE","EIGEN","USUAL","ETHFI","ONDO"].includes(n)) return "DeFi";
+  if (["AXS","SAND","MANA","ENJ","GALA","IMX","MAGIC","GMT","BLUR","LOOKS","X2Y2"].includes(n)) return "Gaming/NFT";
+  if (["FIL","AR","STORJ","GRT","API3","BAND","LINK","PYTH","TIA","CELR"].includes(n)) return "Infra";
+  return "Alt";
+}
+
+function tradeViewVisible(){
+  return !!document.querySelector('[data-view="trade"].active');
 }
 
 /* ── data fetch + merge ─────────────────────────────────────────────── */
 
 async function fetchData(){
   let raw;
-  try {
-    raw = await HL.metaAndCtxs();
-  } catch (err){
-    console.error("[hl-markets] metaAndCtxs error:", err);
-    return;
-  }
+  try { raw = await HL.metaAndCtxs(); }
+  catch (err){ console.error("[hl-markets] fetch error:", err); return; }
 
-  // metaAndCtxs returns [meta, assetCtxs]
-  // meta.universe[i] has perp assets; assetCtxs[i] matches by index.
-  // Spot assets appear only in meta, not ctxs — so we use the ctxs length.
   const [meta, ctxs] = Array.isArray(raw) ? raw : [null, null];
   if (!meta || !Array.isArray(meta.universe) || !Array.isArray(ctxs)){
-    console.warn("[hl-markets] unexpected metaAndCtxs shape:", raw);
+    console.warn("[hl-markets] unexpected shape:", raw);
     return;
   }
 
@@ -232,332 +195,715 @@ async function fetchData(){
 
     const markPx    = parseFloat(ctx.markPx)      || 0;
     const prevDayPx = parseFloat(ctx.prevDayPx)   || 0;
-    const funding1h = parseFloat(ctx.funding)      || 0;   // 1h rate
-    const oi        = parseFloat(ctx.openInterest) || 0;   // in base units
-    const vol       = parseFloat(ctx.dayNtlVlm)    || 0;   // already in USD
-
-    const chgPct  = prevDayPx > 0 ? ((markPx - prevDayPx) / prevDayPx) * 100 : 0;
-    const fund8h  = funding1h * 8 * 100;       // convert 1h decimal → 8h %
-    const oiUsd   = oi * markPx;               // OI in USD
+    const funding1h = parseFloat(ctx.funding)      || 0;
+    const oi        = parseFloat(ctx.openInterest) || 0;
+    const vol       = parseFloat(ctx.dayNtlVlm)    || 0;
 
     _rows.push({
-      name:       u.name,
-      maxLev:     u.maxLeverage || 1,
+      name:     u.name,
+      maxLev:   u.maxLeverage || 1,
       markPx,
       prevDayPx,
-      chgPct,
-      fund8h,
-      oi:         oiUsd,
+      chgPct:   prevDayPx > 0 ? ((markPx - prevDayPx) / prevDayPx) * 100 : 0,
+      fund8h:   funding1h * 8 * 100,
+      oi:       oi * markPx,
       vol,
+      sector:   sectorOf(u.name),
     });
   }
 
+  _lastUpd = Date.now();
   applyFilterAndSort();
-  renderRows();
-  updateFooter();
-  // kick off lazy sparkline fetching for newly visible rows
-  fetchSparklinesForVisible();
+
+  if (_drawerOpen) renderRows();
+  renderTopMovers();
+  updateCount();
+  updateStatStrip();
 }
 
-/* ── filter + sort ──────────────────────────────────────────────────── */
+/* ── filter / sort ──────────────────────────────────────────────────── */
 
 function applyFilterAndSort(){
-  const q = _query.trim().toLowerCase();
-  _filtered = q
-    ? _rows.filter(r => r.name.toLowerCase().includes(q))
-    : _rows.slice();
+  const q    = _query.trim().toLowerCase();
+  const favs = getFavs();
+  let base   = _rows.slice();
 
-  // sort
-  const COL_KEY = {
+  if (_filterChip === "fav"){
+    base = base.filter(r => favs.includes(r.name));
+  } else if (_filterChip === "topvol"){
+    const top20 = new Set(_rows.slice().sort((a,b) => b.vol - a.vol).slice(0,20).map(r => r.name));
+    base = base.filter(r => top20.has(r.name));
+  } else if (_filterChip === "gainers"){
+    // sort by best % (handled below), optionally keep positive only
+    base = base.filter(r => r.chgPct > 0);
+    if (!q) { base.sort((a,b) => b.chgPct - a.chgPct); _filtered = q ? base.filter(r => r.name.toLowerCase().includes(q)) : base; return; }
+  } else if (_filterChip === "losers"){
+    base = base.filter(r => r.chgPct < 0);
+    if (!q) { base.sort((a,b) => a.chgPct - b.chgPct); _filtered = q ? base.filter(r => r.name.toLowerCase().includes(q)) : base; return; }
+  } else if (_filterChip !== "all"){
+    base = base.filter(r => r.sector === _filterChip);
+  }
+
+  if (q) base = base.filter(r => r.name.toLowerCase().includes(q));
+
+  const KEY = {
     sym:  r => r.name,
     px:   r => r.markPx,
     chg:  r => r.chgPct,
     fund: r => r.fund8h,
     oi:   r => r.oi,
     vol:  r => r.vol,
+    lev:  r => r.maxLev,
   };
-  const key = COL_KEY[_sortCol] || COL_KEY.vol;
-  _filtered.sort((a, b) => {
+  const key = KEY[_sortCol] || KEY.vol;
+  base.sort((a, b) => {
     const va = key(a), vb = key(b);
-    // string sort for symbol
     if (typeof va === "string") return _sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
     return _sortAsc ? va - vb : vb - va;
   });
+
+  _filtered = base;
 }
 
-/* ── DOM building ───────────────────────────────────────────────────── */
-
-let _mount   = null;   // #hlMarketsMount
-let _panel   = null;   // .hlm-panel
-let _scrollEl= null;   // .hlm-scroll
-let _tableEl = null;   // .hlm-table (rows only)
-let _countEl = null;   // .hlm-count
-let _footerEl= null;   // .hlm-footer
-let _liveEl  = null;   // .hlm-live
-let _lastUpd = 0;      // timestamp of last successful update
-
-function buildPanel(){
-  _mount = document.getElementById("hlMarketsMount");
-  if (!_mount) return;
-
-  _panel = document.createElement("div");
-  _panel.className = "hlm-panel";   // default: collapsed
-
-  // ── header ──
-  const header = document.createElement("div");
-  header.className = "hlm-header";
-  header.setAttribute("role", "button");
-  header.setAttribute("tabindex", "0");
-  header.setAttribute("aria-expanded", "false");
-  header.setAttribute("aria-label", "All-perps markets explorer — click to expand");
-  header.innerHTML = `
-    <span class="hlm-title">All Perps</span>
-    <span class="hlm-count hlm-count-el">—</span>
-    <span class="hlm-live hlm-live-el"><span class="dot"></span>Live</span>
-    <svg class="hlm-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <polyline points="6 9 12 15 18 9"/>
-    </svg>`;
-
-  header.addEventListener("click", togglePanel);
-  header.addEventListener("keydown", e => {
-    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); togglePanel(); }
-  });
-
-  // ── body ──
-  const body = document.createElement("div");
-  body.className = "hlm-body";
-
-  // toolbar
-  const toolbar = document.createElement("div");
-  toolbar.className = "hlm-toolbar";
-  toolbar.innerHTML = `
-    <div class="hlm-search-wrap">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      <input type="search" class="hlm-search" placeholder="Filter by symbol…"
-             aria-label="Filter markets by symbol" autocomplete="off" spellcheck="false"/>
-      <span class="hlm-clear" aria-label="Clear search" role="button" tabindex="0">×</span>
-    </div>
-    <span class="hlm-sort-label">Sort: <span class="hlm-sort-col">Volume ↓</span></span>`;
-
-  // table (header row + scroll area for data rows)
-  const tableWrap = document.createElement("div");
-  tableWrap.className = "hlm-table";
-
-  const thead = buildTableHead();
-  const scroll = document.createElement("div");
-  scroll.className = "hlm-scroll";
-
-  const tbody = document.createElement("div");
-  tbody.className = "hlm-tbody";
-  // initial skeleton
-  tbody.innerHTML = buildSkeleton(12);
-
-  scroll.appendChild(tbody);
-  tableWrap.appendChild(thead);
-  tableWrap.appendChild(scroll);
-
-  // footer
-  const footer = document.createElement("div");
-  footer.className = "hlm-footer";
-  footer.innerHTML = `<span class="hlm-row-count"></span><span class="last-upd"></span>`;
-
-  body.appendChild(toolbar);
-  body.appendChild(tableWrap);
-  body.appendChild(footer);
-
-  _panel.appendChild(header);
-  _panel.appendChild(body);
-  _mount.appendChild(_panel);
-
-  // cache refs
-  _countEl  = _panel.querySelector(".hlm-count-el");
-  _liveEl   = _panel.querySelector(".hlm-live-el");
-  _scrollEl = scroll;
-  _tableEl  = tbody;
-  _footerEl = footer;
-
-  // wire up search input
-  const inp  = toolbar.querySelector(".hlm-search");
-  const clr  = toolbar.querySelector(".hlm-clear");
-  inp.addEventListener("input", () => {
-    _query = inp.value;
-    clr.classList.toggle("vis", !!_query);
-    applyFilterAndSort();
-    renderRows();
-    updateFooter();
-    fetchSparklinesForVisible();
-  });
-  clr.addEventListener("click", () => {
-    inp.value = "";
-    _query = "";
-    clr.classList.remove("vis");
-    applyFilterAndSort();
-    renderRows();
-    updateFooter();
-  });
-  clr.addEventListener("keydown", e => {
-    if (e.key === "Enter" || e.key === " ") clr.click();
-  });
+function uniqueSectors(){
+  const seen = new Set();
+  for (const r of _rows) seen.add(r.sector);
+  return [...seen].sort();
 }
 
-function buildTableHead(){
-  const head = document.createElement("div");
-  head.className = "hlm-head";
+/* ── TOP MOVERS strip ───────────────────────────────────────────────── */
 
-  const COLS = [
-    { id: "sym",  label: "Symbol"   },
-    { id: "px",   label: "Mark px"  },
-    { id: "chg",  label: "24h %"    },
-    { id: "fund", label: "8h Fund"  },
-    { id: "oi",   label: "OI"       },
-    { id: "vol",  label: "Volume"   },
-    { id: "",     label: "Spark",   noSort: true },
-  ];
+function renderTopMovers(){
+  if (!_moversEl) return;
+  if (!_rows.length){ _moversEl.innerHTML = ""; return; }
 
-  COLS.forEach(col => {
-    const btn = document.createElement("button");
-    btn.className = "hlm-th" + (col.id === _sortCol ? " active " + (_sortAsc ? "asc" : "desc") : "");
-    btn.dataset.col = col.id;
-    btn.setAttribute("aria-label", col.noSort ? col.label : `Sort by ${col.label}`);
-    if (col.noSort) btn.style.cursor = "default";
-    btn.innerHTML = esc(col.label) + (col.noSort ? "" : `<span class="sort-arrow"></span>`);
-
-    if (!col.noSort){
-      btn.addEventListener("click", () => {
-        if (_sortCol === col.id){
-          _sortAsc = !_sortAsc;
-        } else {
-          _sortCol = col.id;
-          _sortAsc = col.id === "sym";   // symbol sorts A→Z by default
-        }
-        // update all th states
-        head.querySelectorAll(".hlm-th").forEach(el => {
-          el.classList.remove("active","asc","desc");
-          if (el.dataset.col === _sortCol){
-            el.classList.add("active", _sortAsc ? "asc" : "desc");
-          }
-        });
-        // update sort label
-        const lbl = _panel?.querySelector(".hlm-sort-col");
-        if (lbl) lbl.textContent = col.label + (_sortAsc ? " ↑" : " ↓");
-
-        applyFilterAndSort();
-        renderRows();
-      });
-    }
-    head.appendChild(btn);
-  });
-
-  return head;
-}
-
-function buildSkeleton(n){
+  // Pick largest absolute movers; include both gainers and losers
+  const sorted = _rows.slice().sort((a,b) => Math.abs(b.chgPct) - Math.abs(a.chgPct));
+  const top    = sorted.slice(0, TOP_MOVERS_COUNT);
   let html = "";
-  for (let i = 0; i < n; i++){
-    html += `<div class="hlm-skel-row">
-      <div class="hlm-skel-cell wide"></div>
-      <div class="hlm-skel-cell narrow"></div>
-      <div class="hlm-skel-cell narrow"></div>
-      <div class="hlm-skel-cell narrow"></div>
-      <div class="hlm-skel-cell narrow"></div>
-      <div class="hlm-skel-cell narrow"></div>
-      <div class="hlm-skel-cell narrow"></div>
-    </div>`;
+  for (const r of top){
+    const up = r.chgPct >= 0;
+    html += `<button class="hlmd-mover${up?" up":" dn"}" data-coin="${esc(r.name)}" aria-label="${esc(r.name)} ${esc(fmtPct(r.chgPct))}">
+      ${coinAvatarHTML(r.name, 16)}
+      <span class="hlmd-mover-sym">${esc(r.name)}</span>
+      <span class="hlmd-mover-pct">${esc(fmtPct(r.chgPct))}</span>
+    </button>`;
   }
-  return html;
-}
+  _moversEl.innerHTML = html;
 
-/* ── row rendering ──────────────────────────────────────────────────── */
-
-function renderRows(){
-  if (!_tableEl) return;
-
-  if (!_filtered.length){
-    _tableEl.innerHTML = `<div class="hlm-empty">${_query ? "No coins match “" + esc(_query) + "”" : "No data yet"}</div>`;
-    return;
-  }
-
-  const active = activeCoin();
-  let html = "";
-
-  for (const r of _filtered){
-    const chgUp  = r.chgPct >= 0;
-    const fundUp = r.fund8h >= 0;
-    const spark  = _sparkCache.get(r.name) || "";
-    const isActive = r.name === active;
-
-    html += `<div class="hlm-row${isActive ? " selected" : ""}"
-      data-coin="${esc(r.name)}"
-      role="button"
-      tabindex="0"
-      aria-label="${esc(r.name)} — click to trade"
-      aria-pressed="${isActive}">
-      <div class="hlm-cell hlm-sym-cell">
-        <span class="hlm-sym">${esc(r.name)}-PERP</span>
-        <span class="hlm-max-lev">${esc(String(r.maxLev))}x max</span>
-      </div>
-      <div class="hlm-cell num px">${esc(fmtPx(r.markPx))}</div>
-      <div class="hlm-cell num chg ${chgUp ? "up" : "dn"}">${esc(fmtPct(r.chgPct))}</div>
-      <div class="hlm-cell num fund ${fundUp ? "up" : "dn"}">${esc(fmtPct(r.fund8h, 4))}</div>
-      <div class="hlm-cell num oi">${esc(fmtUsd(r.oi))}</div>
-      <div class="hlm-cell num vol">${esc(fmtUsd(r.vol))}</div>
-      <div class="hlm-cell spark">${spark}</div>
-    </div>`;
-  }
-
-  _tableEl.innerHTML = html;
-
-  // wire click + keyboard on each row
-  _tableEl.querySelectorAll(".hlm-row").forEach(el => {
-    el.addEventListener("click",   () => selectCoin(el.dataset.coin));
-    el.addEventListener("keydown", e => {
-      if (e.key === "Enter" || e.key === " "){ e.preventDefault(); selectCoin(el.dataset.coin); }
+  _moversEl.querySelectorAll(".hlmd-mover").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const coin = btn.dataset.coin;
+      if (coin) selectCoin(coin);
     });
   });
 }
 
-/** Update just the highlight without a full re-render */
-function updateHighlight(coin){
-  if (!_tableEl) return;
-  _tableEl.querySelectorAll(".hlm-row").forEach(el => {
-    const match = el.dataset.coin === coin;
-    el.classList.toggle("selected", match);
-    el.setAttribute("aria-pressed", match ? "true" : "false");
+/* ── TRIGGER build ──────────────────────────────────────────────────── */
+
+function buildTrigger(){
+  _mount = document.getElementById("hlMarketsMount");
+  if (!_mount) return;
+
+  _trigger = document.createElement("div");
+  _trigger.className = "hlmd-trigger";
+  _trigger.setAttribute("role", "button");
+  _trigger.setAttribute("tabindex", "0");
+  _trigger.setAttribute("aria-label", "Open markets browser");
+  _trigger.setAttribute("aria-haspopup", "dialog");
+
+  _trigger.innerHTML = `
+    <button class="hlmd-open-btn" aria-label="Browse all markets" tabindex="-1">
+      <svg viewBox="0 0 18 18" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="1" y="1" width="7" height="7" rx="1.5"/><rect x="10" y="1" width="7" height="7" rx="1.5"/>
+        <rect x="1" y="10" width="7" height="7" rx="1.5"/><rect x="10" y="10" width="7" height="7" rx="1.5"/>
+      </svg>
+      <span>Markets</span>
+    </button>
+    <div class="hlmd-trigger-sep" aria-hidden="true"></div>
+    <div class="hlmd-movers" aria-label="Top movers" role="list"></div>
+    <span class="hlmd-count" aria-live="polite">—</span>
+    <span class="hlmd-gl-count" aria-live="polite"></span>`;
+
+  _mount.appendChild(_trigger);
+
+  _moversEl  = _trigger.querySelector(".hlmd-movers");
+  _countEl   = _trigger.querySelector(".hlmd-count");
+  _glCountEl = _trigger.querySelector(".hlmd-gl-count");
+
+  _trigger.addEventListener("click", openDrawer);
+  _trigger.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); openDrawer(); }
   });
 }
 
-function updateFooter(){
-  if (!_footerEl) return;
-  const countEl  = _footerEl.querySelector(".hlm-row-count");
-  const updEl    = _footerEl.querySelector(".last-upd");
-  if (countEl) countEl.textContent = `${_filtered.length} / ${_rows.length} markets`;
-  if (updEl && _lastUpd){
+function computeStats(){
+  let totalVol = 0, gainers = 0, losers = 0;
+  for (const r of _rows){
+    totalVol += r.vol;
+    if (r.chgPct > 0) gainers++;
+    else if (r.chgPct < 0) losers++;
+  }
+  return { totalVol, gainers, losers };
+}
+
+function updateCount(){
+  if (!_rows.length){ if (_countEl) _countEl.textContent = "—"; return; }
+  const { gainers, losers } = computeStats();
+  const glText = gainers || losers ? ` · ▲${gainers} / ▼${losers}` : "";
+  if (_countEl) _countEl.textContent = _rows.length + " perps" + glText;
+  if (_glCountEl) _glCountEl.textContent = gainers || losers ? `▲${gainers} / ▼${losers}` : "";
+}
+
+function updateStatStrip(){
+  if (!_statStripEl || !_rows.length) return;
+  const { totalVol, gainers, losers } = computeStats();
+  _statStripEl.querySelector(".hlmd-stat-vol").textContent  = fmtUsd(totalVol);
+  _statStripEl.querySelector(".hlmd-stat-gain").textContent = "▲" + gainers;
+  _statStripEl.querySelector(".hlmd-stat-lose").textContent = "▼" + losers;
+}
+
+/* ── DRAWER build ───────────────────────────────────────────────────── */
+
+function buildDrawer(){
+  if (_overlay) return;
+
+  _overlay = document.createElement("div");
+  _overlay.className = "hlmd-overlay";
+  _overlay.setAttribute("aria-hidden", "true");
+  _overlay.innerHTML = `<div class="hlmd-backdrop" aria-hidden="true"></div>`;
+
+  _drawerEl = document.createElement("div");
+  _drawerEl.className  = "hlmd-drawer";
+  _drawerEl.setAttribute("role", "dialog");
+  _drawerEl.setAttribute("aria-modal", "true");
+  _drawerEl.setAttribute("aria-label", "Markets browser");
+  _drawerEl.tabIndex   = -1;
+
+  _drawerEl.innerHTML = `
+    <div class="hlmd-dhead">
+      <div class="hlmd-dhead-left">
+        <svg class="hlmd-dhead-icon" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="1" y="1" width="7" height="7" rx="1.5"/><rect x="10" y="1" width="7" height="7" rx="1.5"/>
+          <rect x="1" y="10" width="7" height="7" rx="1.5"/><rect x="10" y="10" width="7" height="7" rx="1.5"/>
+        </svg>
+        <span class="hlmd-dtitle">Perp Markets</span>
+        <span class="hlmd-live hlmd-live-el" aria-label="Live data"><span class="dot" aria-hidden="true"></span><span class="hlmd-live-txt">Live</span></span>
+      </div>
+      <div class="hlmd-dhead-right">
+        <div class="hlmd-stat-strip" aria-label="Market summary">
+          <span class="hlmd-stat-item">
+            <span class="hlmd-stat-label">24h Vol</span>
+            <span class="hlmd-stat-vol hlmd-stat-value">—</span>
+          </span>
+          <span class="hlmd-stat-sep" aria-hidden="true"></span>
+          <span class="hlmd-stat-item hlmd-stat-gl">
+            <span class="hlmd-stat-gain up" aria-label="Gainers">▲0</span>
+            <span class="hlmd-stat-slash" aria-hidden="true">/</span>
+            <span class="hlmd-stat-lose dn" aria-label="Losers">▼0</span>
+          </span>
+        </div>
+        <div class="hlmd-density-wrap" role="group" aria-label="Row density">
+          <button class="hlmd-density-btn active" data-density="comfortable" aria-label="Comfortable density">Comfy</button>
+          <button class="hlmd-density-btn" data-density="compact" aria-label="Compact density">Compact</button>
+        </div>
+        <span class="hlmd-dcount" aria-live="polite">—</span>
+        <button class="hlmd-close" aria-label="Close markets browser">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="hlmd-toolbar">
+      <div class="hlmd-search-wrap">
+        <svg class="hlmd-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" class="hlmd-search" placeholder="Search symbol… ( / )" aria-label="Search markets" autocomplete="off" spellcheck="false" />
+        <button class="hlmd-clr" aria-label="Clear search" hidden>
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true"><path d="M8 6.94 13.47 1.47a.75.75 0 1 1 1.06 1.06L9.06 8l5.47 5.47a.75.75 0 0 1-1.06 1.06L8 9.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L6.94 8 1.47 2.53A.75.75 0 0 1 2.53 1.47L8 6.94Z"/></svg>
+        </button>
+      </div>
+      <div class="hlmd-chips" role="group" aria-label="Filter and sort markets">
+        <button class="hlmd-chip active" data-chip="all">All</button>
+        <button class="hlmd-chip chip-gain" data-chip="gainers">
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true"><path d="M4 1 7.5 6.5H.5z"/></svg>Gainers
+        </button>
+        <button class="hlmd-chip chip-loss" data-chip="losers">
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true"><path d="M4 7 .5 1.5h7z"/></svg>Losers
+        </button>
+        <button class="hlmd-chip" data-chip="fav">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>Favs
+        </button>
+        <button class="hlmd-chip" data-chip="topvol">Top Vol</button>
+      </div>
+    </div>
+
+    <div class="hlmd-thead" role="row">
+      <div class="hlmd-th hlmd-sym-col" data-col="sym" role="columnheader" aria-sort="none">Symbol<span class="sa" aria-hidden="true"></span></div>
+      <div class="hlmd-th num" data-col="px"   role="columnheader" aria-sort="none">Last<span class="sa" aria-hidden="true"></span></div>
+      <div class="hlmd-th num" data-col="chg"  role="columnheader" aria-sort="none">24h %<span class="sa" aria-hidden="true"></span></div>
+      <div class="hlmd-th num" data-col="vol"  role="columnheader" aria-sort="none">Vol<span class="sa" aria-hidden="true"></span></div>
+      <div class="hlmd-th num hlmd-th-fund" data-col="fund" role="columnheader" aria-sort="none">Fund 8h<span class="sa" aria-hidden="true"></span></div>
+      <div class="hlmd-th num hlmd-th-oi" data-col="oi"   role="columnheader" aria-sort="none">OI<span class="sa" aria-hidden="true"></span></div>
+    </div>
+
+    <div class="hlmd-body" role="listbox" aria-label="Markets list">
+      <div class="hlmd-body-rows" id="hlmdBodyRows"></div>
+    </div>
+
+    <div class="hlmd-dfooter">
+      <span class="hlmd-fcount" aria-live="polite">Loading…</span>
+      <span class="hlmd-kbd-hint" aria-hidden="true">↑↓ navigate · Enter select · / search · Esc close</span>
+      <span class="hlmd-lupd"></span>
+    </div>`;
+
+  _overlay.appendChild(_drawerEl);
+  document.body.appendChild(_overlay);
+
+  _searchEl    = _drawerEl.querySelector(".hlmd-search");
+  _liveEl      = _drawerEl.querySelector(".hlmd-live-el");
+  _bodyEl      = _drawerEl.querySelector(".hlmd-body-rows");
+  _statStripEl = _drawerEl.querySelector(".hlmd-stat-strip");
+
+  // density toggle buttons
+  _drawerEl.querySelector(".hlmd-density-wrap").addEventListener("click", e => {
+    const btn = e.target.closest(".hlmd-density-btn");
+    if (!btn) return;
+    _density = btn.dataset.density;
+    saveDensity();
+    applyDensity();
+  });
+
+  // close button
+  _drawerEl.querySelector(".hlmd-close").addEventListener("click", closeDrawer);
+
+  // backdrop click
+  _overlay.querySelector(".hlmd-backdrop").addEventListener("click", closeDrawer);
+
+  // search input
+  const clrBtn = _drawerEl.querySelector(".hlmd-clr");
+  _searchEl.addEventListener("input", () => {
+    _query = _searchEl.value;
+    clrBtn.hidden = !_query;
+    _kbIdx = -1;
+    applyFilterAndSort();
+    renderRows();
+    updateDrawerFooter();
+  });
+  clrBtn.addEventListener("click", () => {
+    _searchEl.value = "";
+    _query = "";
+    clrBtn.hidden = true;
+    _kbIdx = -1;
+    applyFilterAndSort();
+    renderRows();
+    updateDrawerFooter();
+    _searchEl.focus();
+  });
+
+  // chip filters
+  const chipWrap = _drawerEl.querySelector(".hlmd-chips");
+  chipWrap.addEventListener("click", e => {
+    const chip = e.target.closest(".hlmd-chip");
+    if (!chip) return;
+    chipWrap.querySelectorAll(".hlmd-chip").forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    _filterChip = chip.dataset.chip;
+    _kbIdx = -1;
+    savePrefs();
+    applyFilterAndSort();
+    renderRows();
+    updateDrawerFooter();
+  });
+
+  // column sort headers
+  _drawerEl.querySelector(".hlmd-thead").addEventListener("click", e => {
+    const th = e.target.closest("[data-col]");
+    if (!th || !th.dataset.col) return;
+    const col = th.dataset.col;
+    if (_sortCol === col) _sortAsc = !_sortAsc;
+    else { _sortCol = col; _sortAsc = col === "sym"; }
+    _kbIdx = -1;
+    savePrefs();
+    syncSortHeaders();
+    applyFilterAndSort();
+    renderRows();
+  });
+
+  // keyboard nav (arrow keys + enter + / for search focus)
+  _drawerEl.addEventListener("keydown", handleDrawerKey);
+
+  // global "/" shortcut while drawer is open
+  syncSortHeaders();
+  applyDensity();
+}
+
+/* ── sync sort header visual state ─────────────────────────────────── */
+
+function syncSortHeaders(){
+  if (!_drawerEl) return;
+  _drawerEl.querySelectorAll(".hlmd-th[data-col]").forEach(el => {
+    const isCur = el.dataset.col === _sortCol;
+    el.classList.toggle("active", isCur);
+    el.setAttribute("aria-sort", isCur ? (_sortAsc ? "ascending" : "descending") : "none");
+  });
+}
+
+/* ── DRAWER sector chips ────────────────────────────────────────────── */
+
+function renderSectorChips(){
+  if (!_drawerEl) return;
+  const chipWrap = _drawerEl.querySelector(".hlmd-chips");
+  chipWrap.querySelectorAll(".hlmd-chip[data-sector]").forEach(c => c.remove());
+
+  for (const sec of uniqueSectors()){
+    const btn = document.createElement("button");
+    btn.className      = "hlmd-chip";
+    btn.dataset.chip   = sec;
+    btn.dataset.sector = "1";
+    btn.textContent    = sec;
+    if (_filterChip === sec) btn.classList.add("active");
+    chipWrap.appendChild(btn);
+  }
+}
+
+/* ── restore active chip UI from prefs ─────────────────────────────── */
+
+function syncChipUI(){
+  if (!_drawerEl) return;
+  const chipWrap = _drawerEl.querySelector(".hlmd-chips");
+  if (!chipWrap) return;
+  chipWrap.querySelectorAll(".hlmd-chip").forEach(c => {
+    c.classList.toggle("active", c.dataset.chip === _filterChip);
+  });
+}
+
+/* ── DRAWER row rendering ───────────────────────────────────────────── */
+
+function renderRows(){
+  if (!_bodyEl) return;
+  _kbIdx = -1;
+
+  if (!_rows.length){
+    _bodyEl.innerHTML = `<div class="hlmd-loading" aria-label="Loading markets">${buildSkel(10)}</div>`;
+    return;
+  }
+
+  if (!_filtered.length){
+    const msg = _query
+      ? `No results for "<strong>${esc(_query)}</strong>"`
+      : (_filterChip === "fav"
+          ? "No favorites yet — star a coin to add it."
+          : _filterChip === "gainers"
+          ? "No gainers right now."
+          : _filterChip === "losers"
+          ? "No losers right now."
+          : "No markets match this filter.");
+    _bodyEl.innerHTML = `<div class="hlmd-empty" role="status">${msg}</div>`;
+    return;
+  }
+
+  const active = activeCoin();
+  const favs   = new Set(getFavs());
+  const frag   = document.createDocumentFragment();
+
+  _filtered.forEach((r, i) => {
+    const up      = r.chgPct >= 0;
+    const fundUp  = r.fund8h >= 0;
+    const fav     = favs.has(r.name);
+    const sel     = r.name === active;
+    const fundAbs = Math.abs(r.fund8h);
+    const fundHigh = fundAbs >= 0.05; // highlight when funding is notable
+
+    const row = document.createElement("div");
+    row.className = "hlmd-row" + (sel ? " selected" : "");
+    row.dataset.coin  = r.name;
+    row.dataset.idx   = String(i);
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", String(sel));
+    row.setAttribute("tabindex", "-1");
+    // stagger delay for entrance animation (cap at 40 rows for perf)
+    if (i < 40) row.style.setProperty("--row-i", String(i));
+
+    row.innerHTML = `
+      <div class="hlmd-cell hlmd-sym-col">
+        <div class="hlmd-avatar">${coinAvatarHTML(r.name, 26)}</div>
+        <div class="hlmd-sym-info">
+          <span class="hlmd-sym">${esc(r.name)}</span>
+          <span class="hlmd-tag">${esc(r.sector)}</span>
+        </div>
+        <button class="hlmd-star${fav?" on":""}" data-coin="${esc(r.name)}" aria-label="${fav?"Remove from":"Add to"} favorites" aria-pressed="${fav}" tabindex="-1">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="${fav?"currentColor":"none"}" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+        </button>
+      </div>
+      <div class="hlmd-cell num px">${esc(fmtPx(r.markPx))}</div>
+      <div class="hlmd-cell num chg ${up?"up":"dn"}">${esc(fmtPct(r.chgPct))}</div>
+      <div class="hlmd-cell num vol">${esc(fmtUsd(r.vol))}</div>
+      <div class="hlmd-cell num fund ${fundUp?"up":"dn"}${fundHigh?" high":""}" title="8h funding: ${esc(fmtFund(r.fund8h))}">
+        <span class="fund-sign" aria-hidden="true">${fundUp?"▲":"▼"}</span>${esc(fmtFund(r.fund8h))}
+      </div>
+      <div class="hlmd-cell num oi">${esc(fmtOI(r.oi))}</div>`;
+
+    row.addEventListener("click", e => {
+      if (e.target.closest(".hlmd-star")) return;
+      selectCoin(row.dataset.coin);
+    });
+
+    row.querySelector(".hlmd-star").addEventListener("click", e => {
+      e.stopPropagation();
+      const coin  = e.currentTarget.dataset.coin;
+      const nowOn = toggleFav(coin);
+      const btn   = e.currentTarget;
+      btn.classList.toggle("on", nowOn);
+      btn.setAttribute("aria-pressed", String(nowOn));
+      btn.setAttribute("aria-label", (nowOn ? "Remove from" : "Add to") + " favorites");
+      const svgEl = btn.querySelector("svg");
+      if (svgEl) svgEl.setAttribute("fill", nowOn ? "currentColor" : "none");
+      if (_filterChip === "fav"){ applyFilterAndSort(); renderRows(); updateDrawerFooter(); }
+    });
+
+    frag.appendChild(row);
+  });
+
+  _bodyEl.innerHTML = "";
+  _bodyEl.appendChild(frag);
+}
+
+/* ── price snapshot for flash detection ────────────────────────────── */
+
+/** @type {Map<string, number>} coin → previous markPx */
+const _prevPx = new Map();
+
+/* ── in-place price patch (smooth for 100+ rows) ───────────────────── */
+
+function patchPrices(){
+  if (!_bodyEl) return;
+  const active = activeCoin();
+  for (const r of _rows){
+    const row = _bodyEl.querySelector(`.hlmd-row[data-coin="${CSS.escape(r.name)}"]`);
+    if (!row) continue;
+    const cells = row.querySelectorAll(".hlmd-cell");
+    // 0=sym, 1=px, 2=chg, 3=vol, 4=fund, 5=oi
+
+    if (cells[1]){
+      const prev = _prevPx.get(r.name);
+      const newVal = fmtPx(r.markPx);
+      const oldTxt = cells[1].textContent;
+      // Only flash if the formatted price actually changed (avoids spurious flashes)
+      if (prev !== undefined && newVal !== oldTxt){
+        const dir = r.markPx > prev ? "up" : "dn";
+        cells[1].textContent = newVal;
+        // Remove any prior flash class, then re-add to retrigger animation
+        cells[1].classList.remove("hlmd-flash-up", "hlmd-flash-dn");
+        // Force reflow so re-adding works
+        void cells[1].offsetWidth; // eslint-disable-line no-void
+        cells[1].classList.add("hlmd-flash-" + dir);
+      } else {
+        cells[1].textContent = newVal;
+      }
+    }
+
+    if (cells[2]){
+      const up = r.chgPct >= 0;
+      cells[2].textContent = fmtPct(r.chgPct);
+      cells[2].className = "hlmd-cell num chg " + (up ? "up" : "dn");
+    }
+    if (cells[3]) cells[3].textContent = fmtUsd(r.vol);
+    if (cells[4]){
+      const fundUp  = r.fund8h >= 0;
+      const fundHigh = Math.abs(r.fund8h) >= 0.05;
+      // rebuild funding cell content
+      cells[4].innerHTML = `<span class="fund-sign" aria-hidden="true">${fundUp?"▲":"▼"}</span>${esc(fmtFund(r.fund8h))}`;
+      cells[4].className = "hlmd-cell num fund " + (fundUp ? "up" : "dn") + (fundHigh ? " high" : "");
+      cells[4].title = "8h funding: " + fmtFund(r.fund8h);
+    }
+    if (cells[5]) cells[5].textContent = fmtOI(r.oi);
+
+    const sel = r.name === active;
+    row.classList.toggle("selected", sel);
+    row.setAttribute("aria-selected", String(sel));
+
+    // Update snapshot after patching
+    _prevPx.set(r.name, r.markPx);
+  }
+}
+
+/* Snapshot prices before first patch so flash only fires on genuine changes */
+function snapshotPrices(){
+  for (const r of _rows) _prevPx.set(r.name, r.markPx);
+}
+
+function updateHighlight(coin){
+  if (!_bodyEl) return;
+  _bodyEl.querySelectorAll(".hlmd-row").forEach(el => {
+    const match = el.dataset.coin === coin;
+    el.classList.toggle("selected", match);
+    el.setAttribute("aria-selected", String(match));
+    if (match) el.scrollIntoView({ block: "nearest" });
+  });
+}
+
+function updateDrawerFooter(){
+  if (!_drawerEl) return;
+  const fc = _drawerEl.querySelector(".hlmd-fcount");
+  const lu = _drawerEl.querySelector(".hlmd-lupd");
+  const dc = _drawerEl.querySelector(".hlmd-dcount");
+  if (fc) fc.textContent = `${_filtered.length} / ${_rows.length} markets`;
+  if (dc) dc.textContent = _rows.length ? _rows.length + " perps" : "";
+  if (lu && _lastUpd){
     const d = new Date(_lastUpd);
-    updEl.textContent = "Updated " + String(d.getUTCHours()).padStart(2,"0") + ":" +
+    lu.textContent = "Updated " +
+      String(d.getUTCHours()).padStart(2,"0")   + ":" +
       String(d.getUTCMinutes()).padStart(2,"0") + ":" +
       String(d.getUTCSeconds()).padStart(2,"0") + " UTC";
   }
 }
 
-/* ── panel open / close ─────────────────────────────────────────────── */
+/* ── skeleton rows ──────────────────────────────────────────────────── */
 
-function togglePanel(){
-  _isOpen = !_isOpen;
-  _panel.classList.toggle("open", _isOpen);
-  const header = _panel.querySelector(".hlm-header");
-  if (header) header.setAttribute("aria-expanded", _isOpen ? "true" : "false");
-
-  if (_isOpen){
-    startPolling();
-    if (!_rows.length) fetchData();
-    else fetchSparklinesForVisible();
-  } else {
-    stopPolling();
+function buildSkel(n){
+  let h = "";
+  for (let i = 0; i < n; i++){
+    const w = 40 + Math.round(Math.random() * 40);
+    h += `<div class="hlmd-skel-row">
+      <div class="hlmd-skel-cell wide"></div>
+      <div class="hlmd-skel-cell" style="width:${w}%"></div>
+      <div class="hlmd-skel-cell" style="width:${w}%"></div>
+      <div class="hlmd-skel-cell" style="width:${w}%"></div>
+      <div class="hlmd-skel-cell" style="width:${w}%"></div>
+      <div class="hlmd-skel-cell" style="width:${w}%"></div>
+    </div>`;
   }
+  return h;
+}
+
+/* ── keyboard navigation ────────────────────────────────────────────── */
+
+function handleDrawerKey(e){
+  // Esc: close
+  if (e.key === "Escape"){ e.preventDefault(); closeDrawer(); return; }
+
+  // "/" focuses search (unless already in input)
+  if (e.key === "/" && document.activeElement !== _searchEl){
+    e.preventDefault();
+    _searchEl?.focus();
+    return;
+  }
+
+  // Arrow up/down nav
+  if (e.key === "ArrowDown" || e.key === "ArrowUp"){
+    e.preventDefault();
+    if (!_filtered.length) return;
+    if (e.key === "ArrowDown"){
+      _kbIdx = Math.min(_kbIdx + 1, _filtered.length - 1);
+    } else {
+      _kbIdx = Math.max(_kbIdx - 1, 0);
+    }
+    applyKbFocus();
+    return;
+  }
+
+  // Enter selects kb-highlighted row
+  if (e.key === "Enter"){
+    if (_kbIdx >= 0 && _kbIdx < _filtered.length){
+      e.preventDefault();
+      selectCoin(_filtered[_kbIdx].name);
+    }
+    return;
+  }
+}
+
+function applyKbFocus(){
+  if (!_bodyEl || _kbIdx < 0) return;
+  _bodyEl.querySelectorAll(".hlmd-row").forEach((el, i) => {
+    el.classList.toggle("kb-focus", i === _kbIdx);
+  });
+  const target = _bodyEl.querySelector(`.hlmd-row[data-idx="${_kbIdx}"]`);
+  if (target) target.scrollIntoView({ block: "nearest" });
+}
+
+/* ── open / close drawer ────────────────────────────────────────────── */
+
+function openDrawer(){
+  if (_drawerOpen) return;
+  if (!_overlay) buildDrawer();
+
+  _drawerOpen = true;
+  _kbIdx      = -1;
+  _overlay.setAttribute("aria-hidden", "false");
+  _overlay.classList.add("open");
+
+  // sync active chip with prefs
+  syncChipUI();
+  syncSortHeaders();
+
+  if (_rows.length){
+    renderSectorChips();
+    applyFilterAndSort();
+    renderRows();
+    updateDrawerFooter();
+    updateStatStrip();
+    snapshotPrices();
+  } else {
+    if (_bodyEl) _bodyEl.innerHTML = `<div class="hlmd-loading">${buildSkel(12)}</div>`;
+    fetchData().then(() => {
+      renderSectorChips();
+      syncChipUI();
+      applyFilterAndSort();
+      renderRows();
+      updateDrawerFooter();
+      updateStatStrip();
+      snapshotPrices();
+    });
+  }
+
+  startPolling();
+
+  requestAnimationFrame(() => { _searchEl?.focus(); });
+
+  document.addEventListener("keydown", _trapFocus);
+  document.body.style.overflow = "hidden";
+}
+
+function closeDrawer(){
+  if (!_drawerOpen) return;
+  _drawerOpen = false;
+  _overlay.classList.remove("open");
+  _overlay.setAttribute("aria-hidden", "true");
+
+  stopPolling();
+  document.removeEventListener("keydown", _trapFocus);
+  document.body.style.overflow = "";
+  _trigger?.querySelector(".hlmd-open-btn")?.focus();
+}
+
+/* ── focus trap ─────────────────────────────────────────────────────── */
+
+function _trapFocus(e){
+  if (e.key === "Escape"){ closeDrawer(); return; }
+  if (e.key !== "Tab" || !_drawerEl) return;
+
+  const focusable = _drawerEl.querySelectorAll(
+    "button:not([disabled]),input,[tabindex='0']"
+  );
+  const first = focusable[0];
+  const last  = focusable[focusable.length - 1];
+
+  if (e.shiftKey){
+    if (document.activeElement === first){ e.preventDefault(); last?.focus(); }
+  } else {
+    if (document.activeElement === last){ e.preventDefault(); first?.focus(); }
+  }
+}
+
+/* ── coin selection ─────────────────────────────────────────────────── */
+
+function selectCoin(sym){
+  if (!sym) return;
+  try { window.LZ?.hl?.setCoin?.(sym); } catch (err){ console.warn("[hl-markets] setCoin:", err); }
+  updateHighlight(sym);
+  closeDrawer();
+  document.querySelector(".ticket-card")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 /* ── polling ────────────────────────────────────────────────────────── */
@@ -566,13 +912,11 @@ function startPolling(){
   if (_pollTimer) return;
   _liveEl?.classList.add("on");
   _pollTimer = setInterval(async () => {
-    if (!tradeViewVisible() || !_isOpen){
-      stopPolling();
-      return;
-    }
+    if (!tradeViewVisible() || !_drawerOpen){ stopPolling(); return; }
     await fetchData();
-    _lastUpd = Date.now();
-    updateFooter();
+    if (_drawerOpen){ patchPrices(); updateStatStrip(); }
+    else renderTopMovers();
+    updateDrawerFooter();
   }, POLL_INTERVAL);
 }
 
@@ -581,53 +925,34 @@ function stopPolling(){
   _liveEl?.classList.remove("on");
 }
 
-/* ── coin selection ─────────────────────────────────────────────────── */
-
-function selectCoin(sym){
-  if (!sym) return;
-  try {
-    window.LZ?.hl?.setCoin?.(sym);
-  } catch (err){
-    console.warn("[hl-markets] setCoin error:", err);
-  }
-  updateHighlight(sym);
-  // scroll the order ticket into view
-  document.querySelector(".ticket-card")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-}
-
-/* ── count badge update ─────────────────────────────────────────────── */
-
-function updateCount(){
-  if (_countEl) _countEl.textContent = _rows.length ? String(_rows.length) : "—";
-}
-
-/* ── event listeners ────────────────────────────────────────────────── */
+/* ── global event listeners ─────────────────────────────────────────── */
 
 function bindEvents(){
-  // another module changed the active coin
   window.addEventListener("lz:hl:coin", e => {
     const coin = e?.detail?.coin;
     if (coin) updateHighlight(coin);
   });
 
-  // network changed — flush all cached data and re-fetch
   window.addEventListener("lz:hl:net", () => {
-    _rows         = [];
-    _filtered     = [];
-    _sparkCache.clear();
-    _sparkFetching.clear();
-    if (_tableEl) _tableEl.innerHTML = buildSkeleton(8);
-    if (_isOpen) fetchData();
+    _rows = [];
+    _filtered = [];
+    if (_bodyEl) _bodyEl.innerHTML = buildSkel(8);
+    if (_drawerOpen){
+      fetchData().then(() => {
+        renderSectorChips();
+        applyFilterAndSort();
+        renderRows();
+        updateDrawerFooter();
+      });
+    } else {
+      fetchData();
+    }
   });
 
-  // route changes — start/stop polling when the trade view is entered/left
   window.addEventListener("lz:route", e => {
     const route = e?.detail?.route;
-    if (route === "trade"){
-      if (_isOpen) startPolling();
-    } else {
-      stopPolling();
-    }
+    if (route !== "trade") stopPolling();
+    else if (_drawerOpen) startPolling();
   });
 }
 
@@ -636,14 +961,16 @@ function bindEvents(){
 (function initHlMarkets(){
   const mount = document.getElementById("hlMarketsMount");
   if (!mount) return;
+  if (_initialized) return;
+  _initialized = true;
 
-  buildPanel();
+  loadPrefs();
+  loadDensity();
+  buildTrigger();
   bindEvents();
 
-  // do a silent initial fetch so the count badge populates even when collapsed
   fetchData().then(() => {
-    _lastUpd = Date.now();
+    renderTopMovers();
     updateCount();
-    updateFooter();
   });
 })();

@@ -1,0 +1,160 @@
+/* =================================================================== *
+ *  glass.css — pervasive liquid-glass application (LOADS LAST so it wins
+ *  the cascade over per-view backgrounds). Uses base.css glass tokens.
+ *
+ *  Strategy for performance: BLUR only large, non-repeated containers;
+ *  repeated/live rows get a cheap FLAT translucent treatment (no blur,
+ *  no outer shadow). See base.css for the --glass-* tokens.
+ * =================================================================== */
+
+/* ---- big blurred glass surfaces (cards · modals · popovers · panels) ---- */
+.card,
+.wa-card,
+.lz-select-pop,
+.cmenu,
+.copilot,
+.toast,
+.lz-risk,
+.kpi,
+.cp-stat, .cp-chart-card, .cp-about, .cp-mini, .cp-dl-card,
+[data-view="wallet"] .balance-card,
+[data-view="wallet"] .send-card,
+.trade-view .ticket-card,
+.trade-view .trade-chart-card,
+.trade-view .trade-top,
+.trade-view .trade-positions,
+.network-stream{
+  background:var(--glass-sheen),var(--glass);
+  border:0;                            /* borderless: edges = luminous rim + shadow */
+  -webkit-backdrop-filter:blur(20px) saturate(180%) brightness(1.06);
+  backdrop-filter:blur(20px) saturate(180%) brightness(1.06);
+  box-shadow:var(--glass-stack);
+}
+
+/* a touch stronger for the top-level floating overlays */
+.wa-card,.copilot,.lz-select-pop,.cmenu{
+  background:var(--glass-sheen),var(--glass-strong-bg);
+  border:0;
+  -webkit-backdrop-filter:blur(28px) saturate(190%) brightness(1.08);
+  backdrop-filter:blur(28px) saturate(190%) brightness(1.08);
+}
+
+/* =================================================================== *
+ *  Liquid dropdowns (tendine) — frosted, borderless, specular, glowy
+ * =================================================================== */
+.lz-select-trigger{
+  border-color:transparent !important;
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.015)),rgba(20,20,26,.5) !important;
+  box-shadow:var(--glass-hl),var(--glass-ring) !important;
+  -webkit-backdrop-filter:blur(12px) saturate(150%);backdrop-filter:blur(12px) saturate(150%);
+}
+.lz-select.open .lz-select-trigger,.lz-select-trigger:hover{
+  box-shadow:var(--glass-hl),0 0 0 1px rgba(179,154,255,.35),0 8px 26px -10px rgba(179,154,255,.4) !important;
+}
+.lz-select-pop{
+  position:relative;border-radius:18px;overflow:hidden;
+  box-shadow:var(--glass-hl),var(--glass-ring),0 30px 70px -22px rgba(0,0,0,.72),0 0 0 1px rgba(179,154,255,.14);
+}
+/* specular top sheen on the panel — the "liquid" cue */
+.lz-select-pop::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:42%;pointer-events:none;z-index:0;
+  background:linear-gradient(180deg,rgba(255,255,255,.12),transparent);
+}
+.lz-select-search,.lz-select-list{position:relative;z-index:1}
+/* frosted, borderless search with a soft gradient divider */
+.lz-select-search{
+  border-bottom:0 !important;
+  background:linear-gradient(180deg,rgba(255,255,255,.05),transparent);
+  box-shadow:inset 0 -1px 0 rgba(255,255,255,.06);
+}
+/* rows become soft glass pills on hover/active */
+.lz-select-row{border-radius:12px}
+.lz-select-row:hover,.lz-select-row.active{
+  background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.02)) !important;
+  box-shadow:var(--glass-hl),inset 0 0 0 1px rgba(255,255,255,.07);
+}
+.lz-select-row.sel{background:linear-gradient(180deg,rgba(179,154,255,.16),rgba(179,154,255,.05)) !important}
+/* the group sticky header reads as frosted glass too */
+.lz-select-group{background:linear-gradient(180deg,rgba(16,16,21,.7),rgba(16,16,21,.35)) !important;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+
+/* ---- live / dense containers: blur the CONTAINER once, isolate paint ---- */
+.trade-view .trade-mid-card,
+.trade-view .book,
+[data-view="markets"] #marketsRows{
+  background:var(--glass-sheen),var(--glass-strong-bg);
+  border:0;
+  box-shadow:var(--glass-hl),var(--glass-rim),var(--glass-drop);
+  contain:paint;transform:translateZ(0);
+}
+
+/* markets table: let the inner glass read (container was opaque) + frosted-OPAQUE
+   sticky header so scrolling rows can't bleed through it (fixes "overlap"). */
+[data-view="markets"] .markets-table{background:transparent;border:0;box-shadow:none}
+[data-view="markets"] .markets-table .head{
+  background:linear-gradient(180deg,rgba(28,29,38,.96),rgba(22,23,30,.92));
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  box-shadow:0 1px 0 rgba(255,255,255,.05),0 8px 18px -10px rgba(0,0,0,.6);
+}
+/* frosted-OPAQUE sticky group headers inside dropdowns */
+.lz-select-group{background:linear-gradient(180deg,rgba(24,25,33,.96),rgba(20,21,28,.9)) !important}
+
+/* ---- repeated / live ROWS: cheap flat glass — NO blur, NO outer shadow ---- */
+[data-view="wallet"] .token-row,
+.tx-row,
+.chat-item,
+.stream-item,
+.markets-table .row,
+.cm-b{
+  background:var(--glass-sheen),rgba(22,23,30,.34);
+  border-color:transparent;
+  box-shadow:var(--glass-hl),var(--glass-ring);
+}
+
+/* book levels stay the lightest (they repaint constantly) */
+.trade-view .book .lvl{ background:transparent; }
+
+/* =================================================================== *
+ *  Liquid hover sheen on KEY cards (reuses @keyframes lzGlassSweep)
+ *  Full sheen (top highlight + sweep) on clean self-contained cards;
+ *  sweep-only on token rows (their ::before is the chain accent bar).
+ * =================================================================== */
+.kpi,.cp-stat,.lz-risk{position:relative;overflow:hidden;isolation:isolate}
+.kpi::before,.cp-stat::before,.lz-risk::before{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,.12),transparent 24%),
+             radial-gradient(120% 60% at 50% -12%,rgba(255,255,255,.09),transparent 60%);}
+.kpi::after,.cp-stat::after,.lz-risk::after,
+[data-view="wallet"] .token-row::after{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;opacity:0;
+  background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.16) 50%,transparent 65%);
+  background-size:220% 100%;background-position:140% 0;transition:opacity .3s ease;}
+[data-view="wallet"] .token-row{overflow:hidden;isolation:isolate}
+.kpi:hover::after,.cp-stat:hover::after,.lz-risk:hover::after,
+[data-view="wallet"] .token-row:hover::after{opacity:1;animation:lzGlassSweep 1s ease-out}
+
+@media (prefers-reduced-motion: reduce){
+  .kpi:hover::after,.cp-stat:hover::after,.lz-risk:hover::after,
+  [data-view="wallet"] .token-row:hover::after{animation:none}
+}
+
+@media (prefers-reduced-transparency: reduce){
+  .card,.wa-card,.lz-select-pop,.cmenu,.copilot,.toast,.lz-risk,.kpi,
+  .cp-stat,.cp-chart-card,.cp-about,.cp-mini,.cp-dl-card,
+  [data-view="wallet"] .balance-card,[data-view="wallet"] .send-card,
+  .trade-view .ticket-card,.trade-view .trade-chart-card,.trade-view .trade-top,
+  .trade-view .trade-positions,.network-stream,
+  .trade-view .trade-mid-card,.trade-view .book,[data-view="markets"] #marketsRows{
+    -webkit-backdrop-filter:none;backdrop-filter:none;background:var(--surface);
+  }
+}
+
+/* =================================================================== *
+ *  Tactile hover — the glass edge brightens (material focus)
+ * =================================================================== */
+.card,.kpi,.cp-stat,.lz-risk,.cp-chart-card,.cp-about,.cp-mini,
+[data-view="wallet"] .balance-card,[data-view="wallet"] .send-card,
+.trade-view .ticket-card{transition:box-shadow .25s ease,transform .25s ease}
+.kpi:hover,.cp-stat:hover,.lz-risk:hover,.cp-chart-card:hover,.cp-about:hover,
+[data-view="wallet"] .balance-card:hover,[data-view="wallet"] .send-card:hover{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.40),inset 0 0 0 1px rgba(255,255,255,.16),var(--glass-bevel),0 26px 60px -22px rgba(0,0,0,.72);
+}

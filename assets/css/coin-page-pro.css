@@ -1,0 +1,78 @@
+/* =================================================================== *
+ *  coin-page-pro.css — v0.3 coin-detail enrichment
+ *  24h range bar · supply bar · About card. Scoped under .cp-wrap.
+ *  Loads after coin-page.css. Tokens only.
+ * =================================================================== */
+
+/* sub-bar under the header: range + supply side by side */
+.cp-wrap .cp-subbar{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 4px;
+}
+@media (max-width:680px){ .cp-wrap .cp-subbar{grid-template-columns:1fr} }
+
+.cp-wrap .cp-mini{
+  padding:14px 16px;border:1px solid var(--border);border-radius:var(--r,14px);
+  background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,.004)),#0b0b10;
+  display:flex;flex-direction:column;gap:9px;
+}
+.cp-wrap .cp-mini-head{
+  display:flex;align-items:center;justify-content:space-between;
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-mute);
+}
+.cp-wrap .cp-mini-head b{color:var(--text);font-weight:600;letter-spacing:0}
+.cp-wrap .cp-mini-sub{font-family:var(--mono);font-size:11px;color:var(--text-dim)}
+
+/* 24h range */
+.cp-wrap .cp-range-row{display:flex;align-items:center;gap:10px}
+.cp-wrap .cp-range-cap{font-family:var(--mono);font-size:11px;color:var(--text-dim);white-space:nowrap}
+.cp-wrap .cp-range-track{
+  position:relative;flex:1;height:6px;border-radius:6px;overflow:visible;
+  background:linear-gradient(90deg,var(--short,#e0556b),rgba(255,255,255,.10) 50%,var(--long,#3fb98a));
+  opacity:.85;
+}
+.cp-wrap .cp-range-track i{display:none}
+.cp-wrap .cp-range-track b{
+  position:absolute;top:50%;width:13px;height:13px;border-radius:50%;
+  transform:translate(-50%,-50%);background:var(--text);
+  border:2px solid #0a0a0c;box-shadow:0 0 0 3px rgba(179,154,255,.4),0 2px 6px rgba(0,0,0,.5);
+}
+
+/* supply */
+.cp-wrap .cp-supply-track{
+  height:8px;border-radius:6px;background:rgba(255,255,255,.05);overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);
+}
+.cp-wrap .cp-supply-track i{
+  display:block;height:100%;border-radius:6px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  box-shadow:0 0 12px -2px var(--accent);transition:width .5s var(--ease,ease);
+}
+
+/* About card */
+.cp-wrap .cp-about{
+  margin-top:14px;padding:20px 22px;border:1px solid var(--border);border-radius:var(--r-lg,20px);
+  background:linear-gradient(180deg,rgba(255,255,255,.022),rgba(255,255,255,.004)),#0b0b10;
+}
+.cp-wrap .cp-about-head{font-size:15px;font-weight:500;letter-spacing:-.01em;margin-bottom:12px}
+.cp-wrap .cp-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.cp-wrap .cp-cat{
+  font-family:var(--mono);font-size:10px;letter-spacing:.03em;padding:3px 9px;border-radius:999px;
+  color:var(--accent);background:rgba(179,154,255,.08);border:1px solid rgba(179,154,255,.22);
+}
+.cp-wrap .cp-about-text{
+  font-size:13.5px;line-height:1.65;color:var(--text-dim);margin:0 0 14px;max-width:74ch;
+}
+.cp-wrap .cp-links{display:flex;flex-wrap:wrap;gap:10px}
+.cp-wrap .cp-link{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text);
+  padding:8px 14px;border-radius:10px;border:1px solid var(--border);
+  background:rgba(255,255,255,.02);text-decoration:none;
+  transition:border-color var(--t-fast,.15s) var(--ease),background var(--t-fast,.15s) var(--ease),transform var(--t-fast,.15s) var(--ease);
+}
+.cp-wrap .cp-link:hover{border-color:var(--accent);background:rgba(179,154,255,.06);transform:translateY(-1px);color:var(--accent)}
+.cp-wrap .cp-link svg{opacity:.8}
+
+@media (prefers-reduced-motion:reduce){
+  .cp-wrap .cp-supply-track i{transition:none}
+}

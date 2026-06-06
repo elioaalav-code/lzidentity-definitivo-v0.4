@@ -35,14 +35,14 @@
 .side-foot .row .d{width:6px;height:6px;border-radius:50%;background:var(--success);box-shadow:0 0 8px var(--success);animation:pulse 1.8s ease-in-out infinite;display:inline-block;margin-right:4px;vertical-align:middle}
 
 /* Main view */
-.main{grid-area:main;padding:32px;display:flex;flex-direction:column;gap:24px;min-width:0;overflow-x:hidden}
-@media (max-width:560px){.main{padding:20px 16px}}
+.main{grid-area:main;padding:40px 40px 60px;display:flex;flex-direction:column;gap:30px;min-width:0;overflow-x:hidden}
+@media (max-width:560px){.main{padding:20px 16px 36px;gap:22px}}
 
-.view{display:none;flex-direction:column;gap:24px;animation:fadeUp .35s ease}
+.view{display:none;flex-direction:column;gap:30px;animation:fadeUp .35s ease}
 .view.active{display:flex}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
-.view-header{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.view-header{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;padding-bottom:22px;border-bottom:1px solid rgba(255,255,255,.06)}
 .view-header h1{font-size:clamp(28px,3.4vw,42px);font-weight:300;letter-spacing:-.02em;line-height:1}
 .view-header h1 small{font-family:var(--mono);font-size:13px;color:var(--text-dim);font-weight:400;letter-spacing:.04em;margin-left:10px}
 .view-header p{color:var(--text-dim);font-size:14px;margin-top:6px}
@@ -162,7 +162,7 @@
 .kpi{padding:18px;border:1px solid var(--border);border-radius:var(--r);background:rgba(255,255,255,.02);transition:border-color .18s ease,transform .2s cubic-bezier(.22,.8,.36,1),background .2s ease}
 .kpi:hover{border-color:var(--border-strong);transform:translateY(-2px);background:rgba(255,255,255,.035)}
 .kpi .lab{font-family:var(--mono);font-size:10px;color:var(--text-mute);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}
-.kpi .v{font-size:22px;font-weight:500;letter-spacing:-.02em;line-height:1}
+.kpi .v{font-size:22px;font-weight:500;letter-spacing:-.02em;line-height:1;white-space:nowrap}
 .kpi .tr{font-family:var(--mono);font-size:11px;color:var(--success);margin-top:6px;font-weight:600}
 .kpi .tr.dn{color:var(--error)}
 

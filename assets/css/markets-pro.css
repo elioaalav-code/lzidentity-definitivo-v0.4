@@ -1,0 +1,67 @@
+/* =================================================================== *
+ *  markets-pro.css — v0.3 Markets toolbar (search · filters · count)
+ *  Scoped to [data-view="markets"]. Loads after hl-markets.css.
+ * =================================================================== */
+
+[data-view="markets"] .mkt-toolbar{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin:4px 0 14px;
+}
+
+/* search box */
+[data-view="markets"] .mkt-search{
+  display:flex;align-items:center;gap:9px;flex:1 1 260px;min-width:0;max-width:420px;
+  padding:9px 13px;border-radius:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01)),#0b0b10;
+  border:1px solid var(--border);color:var(--text-mute);
+  transition:border-color var(--t-fast,.15s) var(--ease),box-shadow var(--t-fast,.15s) var(--ease);
+}
+[data-view="markets"] .mkt-search:focus-within{
+  border-color:var(--accent);box-shadow:0 0 0 3px rgba(179,154,255,.12);color:var(--accent);
+}
+[data-view="markets"] .mkt-search svg{flex:0 0 auto}
+[data-view="markets"] .mkt-search input{
+  flex:1;min-width:0;background:transparent;border:0;outline:0;
+  font-family:var(--sans);font-size:13.5px;color:var(--text);
+}
+[data-view="markets"] .mkt-search input::placeholder{color:var(--text-mute)}
+
+/* filter chips */
+[data-view="markets"] .mkt-filters{display:flex;gap:6px;flex:0 0 auto}
+[data-view="markets"] .mkt-chip{
+  padding:7px 14px;border-radius:999px;cursor:pointer;
+  font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.03em;
+  color:var(--text-dim);background:rgba(255,255,255,.02);
+  border:1px solid var(--border);
+  transition:color var(--t-fast,.15s) var(--ease),background var(--t-fast,.15s) var(--ease),
+             border-color var(--t-fast,.15s) var(--ease),transform var(--t-fast,.15s) var(--ease);
+}
+[data-view="markets"] .mkt-chip:hover{color:var(--text);border-color:var(--border-strong);transform:translateY(-1px)}
+[data-view="markets"] .mkt-chip.on{
+  color:#0a0a0c;background:linear-gradient(135deg,var(--accent),#c9b6ff);
+  border-color:transparent;box-shadow:0 4px 14px -6px var(--accent);
+}
+[data-view="markets"] .mkt-chip[data-filter="gainers"].on{background:linear-gradient(135deg,#3fb98a,#5ad0a0);box-shadow:0 4px 14px -6px #3fb98a}
+[data-view="markets"] .mkt-chip[data-filter="losers"].on{background:linear-gradient(135deg,#e0556b,#f07a8c);box-shadow:0 4px 14px -6px #e0556b}
+
+/* count */
+[data-view="markets"] .mkt-count{
+  margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--text-dim);
+  letter-spacing:.02em;white-space:nowrap;
+}
+[data-view="markets"] .mkt-count b{color:var(--text);font-weight:600}
+
+/* The markets list scrolls with the PAGE (no inner scroller). An inner
+   overflow:auto put a scrollbar INSIDE #marketsRows that shrank the rows by
+   ~10px while the header (outside the scroller) stayed full width → the columns
+   drifted out of alignment once the 100 coins loaded and overflowed. Letting the
+   page scroll keeps header and rows on the exact same width. */
+[data-view="markets"] .markets-table{display:flex;flex-direction:column}
+[data-view="markets"] #marketsRows{max-height:none;overflow:visible;contain:none;transform:none}
+/* column header stays put while scrolling the long list */
+[data-view="markets"] .markets-table .head{position:sticky;top:0;z-index:2}
+
+@media (max-width:640px){
+  [data-view="markets"] .mkt-search{flex-basis:100%;max-width:none;order:-1}
+  [data-view="markets"] .mkt-count{margin-left:0}
+}

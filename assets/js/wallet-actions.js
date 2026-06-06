@@ -33,6 +33,10 @@ const NATIVE = "0x0000000000000000000000000000000000000000";
 const CHAIN_ID = { eth: 1, arb: 42161, op: 10, base: 8453 };
 const ID_TO_KEY = { 1: "eth", 42161: "arb", 10: "op", 8453: "base" };
 
+/* Stargate brand mark — vendored inline SVG recreation (network-free; no
+   hotlink to stargate.finance). A ringed-portal/planet, Stargate's motif. */
+const STARGATE_MARK = `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="sgGrad" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse"><stop stop-color="#9be8ff"/><stop offset="1" stop-color="#1f8fff"/></linearGradient></defs><ellipse cx="16" cy="16" rx="14.5" ry="5.4" transform="rotate(-24 16 16)" stroke="url(#sgGrad)" stroke-width="2"/><circle cx="16" cy="16" r="7.6" fill="url(#sgGrad)"/><circle cx="16" cy="16" r="7.6" fill="none" stroke="#fff" stroke-opacity=".45"/><circle cx="13" cy="13" r="2.2" fill="#fff" fill-opacity=".6"/></svg>`;
+
 /* ─── tiny safe accessors for the app surface ─────────────────────── */
 const LZ = () => (typeof window !== "undefined" && window.LZ) ? window.LZ : null;
 const account = () => { try { return LZ()?.account?.() || null; } catch { return null; } };
@@ -388,7 +392,11 @@ function qrToSvg(matrix, px = 200){
  * =================================================================== */
 async function lifiGet(path, params){
   const url = new URL(LIFI + path);
-  if (params) for (const [k, v] of Object.entries(params)) if (v != null && v !== "") url.searchParams.set(k, v);
+  if (params) for (const [k, v] of Object.entries(params)){
+    if (v == null || v === "") continue;
+    if (Array.isArray(v)) v.forEach((x) => { if (x != null && x !== "") url.searchParams.append(k, x); });
+    else url.searchParams.set(k, v);
+  }
   let r;
   try {
     r = await fetch(url.toString(), { headers: { accept: "application/json" } });
@@ -528,12 +536,12 @@ function closeModal(){
   _openModal = null;
 }
 
-function openModal({ title, bodyHtml, onMount }){
+function openModal({ title, bodyHtml, onMount, cardClass = "" }){
   closeModal();
   const el = document.createElement("div");
   el.className = "wa-modal";
   el.innerHTML = `
-    <div class="wa-card" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <div class="wa-card ${esc(cardClass)}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
       <div class="wa-head">
         <h3>${esc(title)}</h3>
         <button class="wa-x" type="button" aria-label="Close">✕</button>
@@ -560,23 +568,29 @@ async function openReceive(){
   const addr = await ensureAccount();
   if (!addr) return;
   const chains = walletChains();
-  const chainHint = chains.map((c) => c.name).join(" · ");
 
   let qrSvg = "";
   try { qrSvg = qrToSvg(QR.generate(addr), 220); }
   catch (e) { qrSvg = `<div class="wa-qr-fail">QR unavailable</div>`; }
 
+  const chainChips = chains.map((c) => `<span class="wa-recv-chip">${esc(c.name)}</span>`).join("");
   const card = openModal({
     title: "Receive",
+    cardClass: "wa-receivemodal",
     bodyHtml: `
       <div class="wa-receive">
+        <div class="wa-swap-banner wa-recv-banner">
+          <span class="wa-swap-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></span>
+          <span class="wa-swap-txt"><b>Receive assets</b><em>one address · every EVM chain you hold</em></span>
+        </div>
         <div class="wa-qr">${qrSvg}</div>
         <div class="wa-addr-box">
           <div class="wa-addr-lab">your address</div>
           <div class="wa-addr-val" id="waAddrVal">${esc(addr)}</div>
-          <button class="btn ghost sm" id="waCopy" type="button">Copy address</button>
+          <button class="btn ghost sm" id="waCopy" type="button"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy address</button>
         </div>
-        <p class="wa-hint">Same address on every chain you hold here:<br><b>${esc(chainHint)}</b>. Only send assets on these EVM networks.</p>
+        <div class="wa-recv-chains">${chainChips}</div>
+        <p class="wa-hint">Only send assets on these EVM networks.</p>
       </div>`,
   });
 
@@ -623,6 +637,7 @@ async function openExchange(mode){
   // show modal with a loading state while tokens load
   const card = openModal({
     title: mode === "bridge" ? "Bridge" : "Swap",
+    cardClass: mode === "bridge" ? "wa-stargate" : "wa-swapmodal",
     bodyHtml: `<div class="wa-loading"><span class="wa-spin"></span> Loading tokens…</div>`,
   });
 
@@ -649,8 +664,15 @@ async function openExchange(mode){
 
 function renderExchangeForm({ mode, chains, fromChainKey, toChainKey, fromList, toList, defFrom, defTo }){
   const crossChain = mode === "bridge";
+  const banner = crossChain
+    ? `<div class="wa-sg-banner"><span class="wa-sg-logo">${STARGATE_MARK}</span>
+         <span class="wa-sg-txt"><b>Cross-chain bridge</b><em>powered by Stargate</em></span>
+         <span class="wa-sg-badge">STG</span></div>`
+    : `<div class="wa-swap-banner"><span class="wa-swap-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3l4 4-4 4"/><path d="M21 7H7"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h14"/></svg></span>
+         <span class="wa-swap-txt"><b>Instant swap</b><em>same chain · best rate via LI.FI</em></span></div>`;
   return `
-    <div class="wa-ex" data-mode="${mode}">
+    <div class="wa-ex ${crossChain ? "wa-ex-bridge" : "wa-ex-swap"}" data-mode="${mode}">
+      ${banner}
       <div class="wa-leg">
         <div class="wa-leg-head"><span>From</span></div>
         <div class="wa-leg-row">
@@ -746,6 +768,9 @@ function wireExchangeForm(card, { mode, addr, chains, tokens }){
         fromAmount: amt.toString(),
         fromAddress: addr,
         slippage: SLIPPAGE,
+        // Bridge mode routes exclusively through Stargate so "powered by
+        // Stargate" is literally true (covers ETH/USDC on eth/arb/op/base).
+        ...(mode === "bridge" ? { allowBridges: ["stargate", "stargateV2"] } : {}),
       });
       if (!q || !q.transactionRequest || !q.estimate) throw new Error("No route available");
       lastQuote = q;

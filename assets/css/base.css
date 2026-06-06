@@ -45,7 +45,6 @@
   --glow-accent:0 0 0 1px rgba(179,154,255,.2),0 8px 30px -8px rgba(179,154,255,.35);
   --glow-teal:0 0 0 1px rgba(94,234,212,.2),0 8px 30px -8px rgba(94,234,212,.3);
   /* surfaces */
-  --glass:rgba(18,18,22,.7);
   --hairline:rgba(255,255,255,.06);
   /* spacing scale */
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:72px;
@@ -54,6 +53,22 @@
   --lift-sh-sm:0 6px 18px -10px rgba(0,0,0,.5);
   --ring-accent:0 0 0 1px rgba(179,154,255,.4);
   --ring-teal:0 0 0 1px rgba(94,234,212,.4);
+  /* obsidian glass — dark frosted panels that read on pure black */
+  --glass-soft:rgba(24,25,32,.46);
+  --glass:rgba(22,23,31,.56);
+  --glass-strong-bg:rgba(20,21,29,.66);
+  /* material sheen: a soft light source from top-left + a top band — reads as "lit glass" */
+  --glass-sheen:
+    radial-gradient(130% 90% at 16% -12%,rgba(255,255,255,.10),transparent 52%),
+    linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0) 42%);
+  /* beveled edge light: bright specular top · luminous hairline rim · dark bottom bevel */
+  --glass-hl:inset 0 1px 0 rgba(255,255,255,.28);
+  --glass-rim:inset 0 0 0 1px rgba(255,255,255,.10);
+  --glass-bevel:inset 0 -1px 0 rgba(0,0,0,.45);
+  --glass-ring:inset 0 0 0 1px rgba(255,255,255,.06);
+  --glass-depth:inset 0 -16px 36px -18px rgba(0,0,0,.40);
+  --glass-drop:0 22px 56px -22px rgba(0,0,0,.66);
+  --glass-stack:var(--glass-hl),var(--glass-rim),var(--glass-bevel),var(--glass-depth),var(--glass-drop);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none !important}
@@ -69,6 +84,47 @@ ul,ol{list-style:none}
 /* film grain */
 .grain{position:fixed;inset:0;pointer-events:none;z-index:200;opacity:.05;mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* =================================================================== *
+ *  Liquid glass — reusable surface treatment (single source of truth)
+ *  .lz-glass(+strong/soft) blur the backdrop; .lz-glass-flat does not
+ *  (for live/dense panels). All share the layered-shadow recipe.
+ * =================================================================== */
+.lz-glass,.lz-glass-strong,.lz-glass-soft,.lz-glass-flat{
+  border:0;                            /* edges defined by the luminous rim, not a drawn line */
+  background:var(--glass-sheen),var(--glass);
+  box-shadow:var(--glass-stack);
+}
+.lz-glass{-webkit-backdrop-filter:blur(20px) saturate(180%) brightness(1.06);backdrop-filter:blur(20px) saturate(180%) brightness(1.06)}
+.lz-glass-strong{background:var(--glass-sheen),var(--glass-strong-bg);-webkit-backdrop-filter:blur(28px) saturate(190%) brightness(1.08);backdrop-filter:blur(28px) saturate(190%) brightness(1.08);box-shadow:var(--glass-hl),var(--glass-rim),var(--glass-depth),0 28px 74px -22px rgba(0,0,0,.7)}
+.lz-glass-soft{background:var(--glass-sheen),var(--glass-soft);-webkit-backdrop-filter:blur(12px) saturate(150%) brightness(1.04);backdrop-filter:blur(12px) saturate(150%) brightness(1.04)}
+/* flat glass: same look, NO backdrop-filter — for continuously-updating panels. */
+.lz-glass-flat{
+  background:var(--glass-sheen),var(--glass-strong-bg);
+}
+/* isolate scroll/paint on glass containers that scroll or update live */
+.lz-glass-iso{contain:paint;transform:translateZ(0)}
+
+/* "liquid" specular sheen — top-edge highlight + hover sweep */
+.lz-glass-sheen{position:relative;overflow:hidden;isolation:isolate}
+.lz-glass-sheen::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,.14),transparent 22%),
+             radial-gradient(120% 60% at 50% -10%,rgba(255,255,255,.10),transparent 60%);}
+.lz-glass-sheen::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;opacity:0;
+  background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.16) 50%,transparent 65%);
+  background-size:220% 100%;background-position:140% 0;transition:opacity .3s ease}
+.lz-glass-sheen:hover::after{opacity:1;animation:lzGlassSweep 1s ease-out}
+@keyframes lzGlassSweep{from{background-position:140% 0}to{background-position:-60% 0}}
+
+/* ---- accessibility fallbacks ---- */
+@media (prefers-reduced-transparency: reduce){
+  .lz-glass,.lz-glass-strong,.lz-glass-soft,.lz-glass-flat{
+    background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;}
+  body{background:var(--bg)}
+}
+@media (prefers-reduced-motion: reduce){
+  .lz-glass-sheen:hover::after{animation:none}
 }
 
 /* preloader */

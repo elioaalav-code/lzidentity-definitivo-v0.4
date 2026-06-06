@@ -51,13 +51,34 @@ export async function cgMarketData(coin_id){
     change_30d_pct: round(m.price_change_percentage_30d),
     ath_usd: num(m.ath?.usd), ath_change_pct: round(m.ath_change_percentage?.usd),
     circulating_supply: num(m.circulating_supply), total_supply: num(m.total_supply),
+    max_supply: num(m.max_supply),
+    high_24h_usd: num(m.high_24h?.usd), low_24h_usd: num(m.low_24h?.usd),
+    image: d.image?.small || d.image?.thumb || null,
+    homepage: (d.links?.homepage || []).find(Boolean) || null,
+    explorer: (d.links?.blockchain_site || []).find(Boolean) || null,
+    categories: (d.categories || []).filter(Boolean).slice(0, 4),
+    description: (d.description?.en || "").trim() || null,
   };
 }
 export async function cgChart(coin_id, days = 7){
   const id = String(coin_id || "").toLowerCase();
-  const rows = await getJSON(`${CG}/coins/${encodeURIComponent(id)}/ohlc?vs_currency=usd&days=${encodeURIComponent(days)}`, { ttl: 120_000 });
-  const out = (rows || []).slice(-60).map(([t, o, h, l, c]) => ({ t, o, h, l, c }));
-  return { coin_id: id, days, candles: out };
+  // Primary: OHLC candles. Falls back to market_chart line when OHLC is
+  // rate-limited or CORS-blocked, synthesising candles from close points so
+  // the chart is never an empty "no data" void.
+  try {
+    const rows = await getJSON(`${CG}/coins/${encodeURIComponent(id)}/ohlc?vs_currency=usd&days=${encodeURIComponent(days)}`, { ttl: 120_000 });
+    const out = (rows || []).slice(-60).map(([t, o, h, l, c]) => ({ t, o, h, l, c }));
+    if (out.length) return { coin_id: id, days, candles: out };
+    throw new Error("empty ohlc");
+  } catch {
+    const d = await getJSON(`${CG}/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=${encodeURIComponent(days)}`, { ttl: 120_000 });
+    const prices = d.prices || [];
+    const step = Math.max(1, Math.ceil(prices.length / 60));
+    const pts = prices.filter((_, i) => i % step === 0 || i === prices.length - 1);
+    let prev = pts.length ? pts[0][1] : 0;
+    const out = pts.map(([t, p]) => { const o = prev, c = p; prev = c; return { t, o, c, h: Math.max(o, c), l: Math.min(o, c) }; });
+    return { coin_id: id, days, candles: out, line: true };
+  }
 }
 export async function cgTrending(){
   const d = await getJSON(`${CG}/search/trending`, { ttl: 120_000 });

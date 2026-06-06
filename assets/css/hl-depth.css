@@ -1,4 +1,375 @@
-/* hl-depth.css — styles for the depth chart + trades tape.
-   Owned by the DEPTH+TAPE agent. See assets/js/hl-depth.js header for the
-   contract. The row layout container is #hlAddonRow.hl-addon-row (you own
-   its styling too). Mirror .book-card in trade.css; reuse base.css tokens. */
+/* hl-depth.css — depth chart + trades tape  (v2.2 "Refined onyx terminal")
+   Owned by the DEPTH+TAPE agent.
+   Narrow-tabbed layout (~240–340px). Scales to ~600px.
+   Uses design-system tokens from base.css + trade.css. */
+
+/* ── shared ──────────────────────────────────────────────────────── */
+/* All number spans use tabular figures */
+.hl-tp,
+.hl-ts,
+.hl-tt,
+.hl-depth-readout,
+.hl-depth-label,
+.hl-tape-label,
+.hl-zoom-btn,
+.hl-tfilter-btn,
+.hl-tape-cols span,
+.hl-depth-imbal,
+.hl-tape-pressure-text {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── depth card ──────────────────────────────────────────────────── */
+.hl-depth-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Thin mono header strip */
+.hl-depth-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px 6px;
+  border-bottom: 1px solid var(--hairline, rgba(255,255,255,.06));
+  flex-shrink: 0;
+}
+
+.hl-depth-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.hl-depth-readout {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: right;
+}
+.hl-depth-readout .hl-up  { color: var(--long); }
+.hl-depth-readout .hl-dn  { color: var(--short); }
+.hl-depth-readout .hl-depth-pct {
+  color: var(--text-mute);
+  font-size: 9px;
+}
+
+/* Zoom pill row */
+.hl-depth-zoom {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--hairline, rgba(255,255,255,.06));
+}
+
+.hl-zoom-btn {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .06em;
+  color: var(--text-mute);
+  padding: 3px 7px;
+  border-radius: var(--r-full, 999px);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.hl-zoom-btn:hover {
+  color: var(--text-dim);
+  background: rgba(255,255,255,.05);
+}
+.hl-zoom-btn.on {
+  color: var(--accent);
+  background: rgba(179,154,255,.1);
+  border-color: rgba(179,154,255,.25);
+}
+
+/* Canvas body */
+.hl-depth-body {
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.hl-depth-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+/* ── [ADD] depth imbalance readout — bottom-right corner of canvas body ── */
+.hl-depth-imbal {
+  position: absolute;
+  bottom: 28px; /* above the bottom axis labels */
+  right: 6px;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: .05em;
+  color: var(--text-mute);
+  pointer-events: none;
+  white-space: nowrap;
+  line-height: 1;
+}
+/* tint the text slightly toward the dominant side */
+.hl-depth-imbal[data-side="bid"]     { color: rgba(63,185,138,.7);  }
+.hl-depth-imbal[data-side="ask"]     { color: rgba(224,85,107,.7); }
+.hl-depth-imbal[data-side="neutral"] { color: var(--text-mute);    }
+
+/* ── trades tape card ────────────────────────────────────────────── */
+.hl-tape-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Thin mono header: label + filter toggle */
+.hl-tape-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px 6px;
+  border-bottom: 1px solid var(--hairline, rgba(255,255,255,.06));
+  flex-shrink: 0;
+}
+
+.hl-tape-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Buy/Sell/All filter toggle */
+.hl-tape-filter {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(255,255,255,.04);
+  border-radius: var(--r-full, 999px);
+  border: 1px solid var(--hairline, rgba(255,255,255,.06));
+}
+
+.hl-tfilter-btn {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .04em;
+  color: var(--text-mute);
+  padding: 2px 8px;
+  border-radius: var(--r-full, 999px);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.hl-tfilter-btn:hover {
+  color: var(--text-dim);
+}
+.hl-tfilter-btn.on[data-filter="all"] {
+  color: var(--text);
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.12);
+}
+.hl-tfilter-btn.on[data-filter="buy"] {
+  color: var(--long);
+  background: rgba(63,185,138,.12);
+  border-color: rgba(63,185,138,.22);
+}
+.hl-tfilter-btn.on[data-filter="sell"] {
+  color: var(--short);
+  background: rgba(224,85,107,.12);
+  border-color: rgba(224,85,107,.22);
+}
+
+/* ── [ADD] buy/sell pressure strip — between tape header and col labels ── */
+.hl-tape-pressure {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--hairline, rgba(255,255,255,.06));
+  flex-shrink: 0;
+}
+
+.hl-tape-pressure-text {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: .05em;
+  color: var(--text-mute);
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* thin two-tone bar: green (buy side) left, red (sell side) right */
+.hl-tape-pressure-track {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(224,85,107,.35); /* ask/sell base */
+  overflow: hidden;
+  position: relative;
+}
+
+.hl-tape-pressure-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(63,185,138,.6); /* bid/buy */
+  border-radius: 2px 0 0 2px;
+  transition: width .3s var(--ease, cubic-bezier(.4,0,.2,1));
+  will-change: width;
+}
+
+/* Column header: Time · Price · Size */
+.hl-tape-cols {
+  display: grid;
+  grid-template-columns: 70px 1fr 1fr;
+  padding: 5px 12px 4px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  border-bottom: 1px solid var(--hairline, rgba(255,255,255,.06));
+  flex-shrink: 0;
+}
+.hl-tape-cols span:nth-child(2) { text-align: center; }
+.hl-tape-cols span:last-child   { text-align: right; }
+
+/* Scrollable list — thin custom scrollbar */
+.hl-tape-list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.07) transparent;
+}
+.hl-tape-list::-webkit-scrollbar         { width: 2px; }
+.hl-tape-list::-webkit-scrollbar-track   { background: transparent; }
+.hl-tape-list::-webkit-scrollbar-thumb   {
+  background: rgba(255,255,255,.07);
+  border-radius: 2px;
+}
+.hl-tape-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,.14);
+}
+
+/* Individual trade row — perfectly tabular */
+.hl-tape-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 1fr;
+  padding: 3px 12px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  border-bottom: 1px solid rgba(255,255,255,.022);
+  cursor: default;
+  transition: background var(--t-fast) var(--ease);
+}
+.hl-tape-row:hover {
+  background: rgba(255,255,255,.03);
+}
+
+/* Time */
+.hl-tt {
+  color: var(--text-mute);
+  white-space: nowrap;
+  overflow: hidden;
+}
+/* Price */
+.hl-tp {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+/* Size */
+.hl-ts {
+  color: var(--text-dim);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Side colouring */
+.hl-tape-row.buy  .hl-tp { color: var(--long); }
+.hl-tape-row.sell .hl-tp { color: var(--short); }
+
+/* Directional flash animations */
+@keyframes hlTapeFlashBuy {
+  0%   { background: rgba(63,185,138,.16); }
+  100% { background: transparent; }
+}
+@keyframes hlTapeFlashSell {
+  0%   { background: rgba(224,85,107,.14); }
+  100% { background: transparent; }
+}
+.hl-tape-row.buy.is-new  { animation: hlTapeFlashBuy  .6s var(--ease-out, cubic-bezier(.16,1,.3,1)) forwards; }
+.hl-tape-row.sell.is-new { animation: hlTapeFlashSell .6s var(--ease-out, cubic-bezier(.16,1,.3,1)) forwards; }
+
+/* Empty / loading state */
+.hl-tape-empty {
+  padding: 32px 16px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-mute);
+}
+
+/* ── reduced-motion overrides ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .hl-tape-row.buy.is-new,
+  .hl-tape-row.sell.is-new {
+    animation: none;
+  }
+  .hl-tape-row,
+  .hl-zoom-btn,
+  .hl-tfilter-btn,
+  .hl-tape-pressure-fill {
+    transition: none;
+  }
+}
+
+/* ── width breakpoint: at ~400px + show a slightly larger font ────── */
+@container (min-width: 380px) {
+  .hl-tape-row   { font-size: 11px; }
+  .hl-zoom-btn,
+  .hl-tfilter-btn { font-size: 9.5px; }
+}
