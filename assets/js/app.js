@@ -961,7 +961,7 @@ makeValueCopyable(idNpub, "npub");
  *  ROUTE HOOKS — onEnter
  * =================================================================== */
 const ONROUTE = {
-  chat: () => { renderChatList(""); renderThread(); },
+  chat: () => bootCommunities(),
   wallet: () => { loadWallet(); },
   markets: () => { if (!marketsLoaded) fetchMarkets(); else renderMarkets(); },
   network: () => {},
@@ -972,8 +972,15 @@ const ONROUTE = {
 /* =================================================================== *
  *  BOOT
  * =================================================================== */
-renderChatList("");
-renderThread();
+/* Communities (chat) view: init once communities.js has self-mounted. app.js
+   evaluates before that module, so init on window 'load' (all modules ready)
+   and on every chat-route enter; idempotent — the flag is only set once init exists. */
+let commBooted = false;
+function bootCommunities(){
+  if (commBooted) return;
+  if (window.LZ?.communities?.init){ commBooted = true; window.LZ.communities.init(); }
+}
+window.addEventListener("load", () => { if (getRoute() === "chat") bootCommunities(); });
 renderWallet();
 bootstrapWallet().then(() => { reflectWalletButton(); });
 

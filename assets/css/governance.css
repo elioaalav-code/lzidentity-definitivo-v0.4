@@ -1,0 +1,256 @@
+/* =================================================================== *
+ *  governance.css — v0.3 Governance tab (proposals + vote)
+ *  Scoped to .gov-root so it never leaks into other views.
+ *  Reuses the obsidian-glass tokens from base.css (--accent, --accent-2,
+ *  --glass*, --text*, --r*, --ease, --spring …). No new palette.
+ *  Loads after the Communities styles. Honors prefers-reduced-motion.
+ * =================================================================== */
+
+.gov-root{
+  --gov-for:    var(--accent-2);          /* teal  — For / Activate */
+  --gov-against:#fda4af;                  /* error rose — Against */
+  --gov-abstain:#a0a0a8;                  /* dim   — Abstain */
+  --gov-alt:    var(--accent);            /* violet — extra choices */
+  display:flex;flex-direction:column;gap:14px;
+  font-family:var(--sans);color:var(--text);
+  min-height:120px;
+}
+
+/* ===================== LIST ===================== */
+.gov-root .gov-list{display:flex;flex-direction:column;gap:12px}
+
+.gov-root .gov-card{
+  position:relative;
+  padding:16px 18px;border-radius:var(--r,14px);
+  background:var(--glass,rgba(22,23,31,.56));
+  background-image:var(--glass-sheen);
+  box-shadow:var(--glass-rim),var(--glass-hl),var(--glass-bevel),var(--sh-2,0 8px 24px -8px rgba(0,0,0,.5));
+  -webkit-backdrop-filter:blur(14px) saturate(1.2);
+  backdrop-filter:blur(14px) saturate(1.2);
+  transition:transform var(--t-fast,.15s) var(--ease),box-shadow var(--t-fast,.15s) var(--ease),
+             border-color var(--t-fast,.15s) var(--ease);
+}
+.gov-root .gov-card:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--glass-rim),var(--glass-hl),var(--glass-bevel),var(--lift-sh,0 10px 30px -12px rgba(0,0,0,.55));
+}
+
+.gov-root .gov-card-head{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;
+}
+
+/* state pill */
+.gov-root .gov-state{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 10px;border-radius:var(--r-full,999px);
+  font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;
+  border:1px solid var(--border,rgba(255,255,255,.08));
+  color:var(--text-dim);background:rgba(255,255,255,.03);
+}
+.gov-root .gov-state::before{
+  content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:0 0 auto;
+}
+.gov-root .gov-state-live{
+  color:var(--accent-2);border-color:rgba(94,234,212,.32);background:rgba(94,234,212,.08);
+}
+.gov-root .gov-state-live::before{
+  box-shadow:0 0 0 0 currentColor;animation:govPulse 2s ease-out infinite;
+}
+.gov-root .gov-state-good{color:var(--success,#86efac);border-color:rgba(134,239,172,.3);background:rgba(134,239,172,.07)}
+.gov-root .gov-state-bad{color:var(--error,#fda4af);border-color:rgba(253,164,175,.3);background:rgba(253,164,175,.07)}
+.gov-root .gov-state-wait{color:var(--warn,#fde68a);border-color:rgba(253,230,138,.3);background:rgba(253,230,138,.07)}
+.gov-root .gov-state-neutral{color:var(--text-mute)}
+
+@keyframes govPulse{0%{box-shadow:0 0 0 0 rgba(94,234,212,.5)}70%,100%{box-shadow:0 0 0 6px rgba(94,234,212,0)}}
+
+.gov-root .gov-dates{
+  margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--text-mute);letter-spacing:.02em;
+  white-space:nowrap;
+}
+
+.gov-root .gov-title{
+  font-family:var(--serif,Georgia,serif);font-weight:400;
+  font-size:clamp(17px,2.2vw,20px);line-height:1.25;letter-spacing:-.01em;
+  color:var(--text);margin:2px 0 12px;
+}
+
+/* ===================== TALLY BAR + LEGEND ===================== */
+.gov-root .gov-bar{
+  display:flex;gap:2px;height:9px;border-radius:6px;overflow:hidden;
+  background:rgba(255,255,255,.04);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);
+  margin-bottom:9px;
+}
+.gov-root .gov-bar-seg{
+  height:100%;min-width:2px;border-radius:2px;
+  transition:flex-grow .5s var(--ease,ease),opacity var(--t-fast,.15s);
+}
+.gov-root .gov-bar-seg:hover{opacity:.82}
+.gov-root .gov-tone-for{background:var(--gov-for)}
+.gov-root .gov-tone-against{background:var(--gov-against)}
+.gov-root .gov-tone-abstain{background:var(--gov-abstain)}
+.gov-root .gov-tone-alt{background:var(--gov-alt)}
+.gov-root .gov-tone-empty{background:rgba(255,255,255,.06)}
+
+.gov-root .gov-legend{display:flex;flex-wrap:wrap;gap:6px 16px}
+.gov-root .gov-legend-key{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10.5px;color:var(--text-dim);letter-spacing:.02em;
+}
+.gov-root .gov-legend-key i{width:8px;height:8px;border-radius:2px;flex:0 0 auto}
+.gov-root .gov-legend-key i.gov-tone-for{background:var(--gov-for)}
+.gov-root .gov-legend-key i.gov-tone-against{background:var(--gov-against)}
+.gov-root .gov-legend-key i.gov-tone-abstain{background:var(--gov-abstain)}
+.gov-root .gov-legend-key i.gov-tone-alt{background:var(--gov-alt)}
+.gov-root .gov-legend-key b{color:var(--text);font-weight:600}
+.gov-root .gov-legend-key em{color:var(--text-mute);font-style:normal;opacity:.85}
+
+/* ===================== FOOTER / EXPAND ===================== */
+.gov-root .gov-card-foot{
+  display:flex;align-items:center;gap:12px;margin-top:12px;
+}
+.gov-root .gov-expand{
+  padding:6px 12px;border-radius:var(--r-full,999px);
+  font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.03em;
+  color:var(--text-dim);background:rgba(255,255,255,.03);
+  border:1px solid var(--border,rgba(255,255,255,.08));
+  transition:color var(--t-fast,.15s) var(--ease),border-color var(--t-fast,.15s) var(--ease),
+             background var(--t-fast,.15s) var(--ease);
+}
+.gov-root .gov-expand:hover{color:var(--text);border-color:var(--border-strong,rgba(255,255,255,.16))}
+.gov-root .gov-link{
+  margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--accent);
+  letter-spacing:.02em;transition:opacity var(--t-fast,.15s);
+}
+.gov-root .gov-link:hover{opacity:.78;text-decoration:underline}
+
+/* ===================== DETAIL ===================== */
+.gov-root .gov-detail{
+  margin-top:14px;padding-top:14px;
+  border-top:1px solid var(--hairline,rgba(255,255,255,.06));
+  animation:govReveal var(--t,.28s) var(--ease);
+}
+@keyframes govReveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+.gov-root .gov-body{
+  font-size:13px;line-height:1.65;color:var(--text-dim);
+  white-space:pre-wrap;word-break:break-word;
+  max-height:280px;overflow:auto;margin-bottom:14px;
+}
+
+/* ===================== VOTE ROW ===================== */
+.gov-root .gov-vote-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.gov-root .gov-vote-btn{
+  flex:1 1 auto;min-width:120px;
+  padding:10px 16px;border-radius:var(--r-sm,8px);
+  font-family:var(--sans);font-size:13px;font-weight:600;letter-spacing:.01em;
+  color:var(--text);background:rgba(255,255,255,.04);
+  border:1px solid var(--border,rgba(255,255,255,.08));
+  transition:transform var(--t-fast,.15s) var(--ease),background var(--t-fast,.15s) var(--ease),
+             border-color var(--t-fast,.15s) var(--ease),box-shadow var(--t-fast,.15s) var(--ease),
+             opacity var(--t-fast,.15s);
+}
+.gov-root .gov-vote-btn:hover:not(:disabled){transform:translateY(-1px);border-color:var(--border-strong,rgba(255,255,255,.16))}
+.gov-root .gov-vote-btn:active:not(:disabled){transform:translateY(0)}
+.gov-root .gov-vote-btn:disabled{opacity:.4;cursor:not-allowed}
+
+.gov-root .gov-vote-for{
+  color:#062b22;background:linear-gradient(135deg,var(--accent-2),#8af0dc);
+  border-color:transparent;box-shadow:0 4px 14px -6px var(--accent-2);
+}
+.gov-root .gov-vote-for:hover:not(:disabled){box-shadow:0 6px 20px -6px var(--accent-2)}
+.gov-root .gov-vote-against{
+  color:#2b0610;background:linear-gradient(135deg,var(--gov-against),#ffc2cb);
+  border-color:transparent;box-shadow:0 4px 14px -6px var(--gov-against);
+}
+.gov-root .gov-vote-against:hover:not(:disabled){box-shadow:0 6px 20px -6px var(--gov-against)}
+.gov-root .gov-vote-abstain{color:var(--text-dim)}
+
+/* layerzero referendum choices use the violet accent */
+.gov-root .gov-card[data-id] .gov-vote-btn[data-vote]:not(.gov-vote-for):not(.gov-vote-against):not(.gov-vote-abstain){
+  border-color:rgba(179,154,255,.28);
+}
+
+.gov-root .gov-vote-closed{
+  font-family:var(--mono);font-size:11.5px;color:var(--text-mute);letter-spacing:.02em;
+  padding:8px 0;text-transform:capitalize;
+}
+
+.gov-root .gov-vote-msg{
+  flex-basis:100%;margin-top:6px;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.02em;color:var(--text-dim);
+}
+.gov-root .gov-msg-ok{color:var(--success,#86efac)}
+.gov-root .gov-msg-err{color:var(--error,#fda4af)}
+.gov-root .gov-msg-warn{color:var(--warn,#fde68a)}
+
+/* ===================== LOAD OLDER ===================== */
+.gov-root .gov-more{display:flex;justify-content:center;padding:6px 0 2px}
+.gov-root .gov-load-older{
+  padding:9px 18px;border-radius:var(--r-full,999px);
+  font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;
+  color:var(--text-dim);background:rgba(255,255,255,.03);
+  border:1px solid var(--border,rgba(255,255,255,.08));
+  transition:color var(--t-fast,.15s) var(--ease),border-color var(--t-fast,.15s) var(--ease),
+             transform var(--t-fast,.15s) var(--ease);
+}
+.gov-root .gov-load-older:hover:not(:disabled){color:var(--text);border-color:var(--border-strong,rgba(255,255,255,.16));transform:translateY(-1px)}
+.gov-root .gov-load-older:disabled{opacity:.5;cursor:default}
+
+/* ===================== EMPTY / ERROR ===================== */
+.gov-root .gov-empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  text-align:center;padding:48px 24px;
+  border:1px dashed var(--border,rgba(255,255,255,.08));border-radius:var(--r-lg,20px);
+  background:var(--glass-soft,rgba(24,25,32,.46));
+}
+.gov-root .gov-empty-icon{
+  font-size:30px;color:var(--text-mute);opacity:.6;line-height:1;margin-bottom:2px;
+}
+.gov-root .gov-empty h3{
+  font-family:var(--serif,Georgia,serif);font-weight:400;font-size:18px;color:var(--text);
+}
+.gov-root .gov-empty p{font-size:13px;color:var(--text-mute);max-width:340px;line-height:1.55}
+.gov-root .gov-retry{
+  margin-top:10px;padding:8px 18px;border-radius:var(--r-full,999px);
+  font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;
+  color:#0a0a0c;background:linear-gradient(135deg,var(--accent),#c9b6ff);
+  border:1px solid transparent;box-shadow:0 4px 14px -6px var(--accent);
+  transition:transform var(--t-fast,.15s) var(--ease),box-shadow var(--t-fast,.15s) var(--ease);
+}
+.gov-root .gov-retry:hover{transform:translateY(-1px);box-shadow:0 6px 20px -6px var(--accent)}
+
+/* ===================== LOADING SKELETON ===================== */
+.gov-root .gov-loading{display:flex;flex-direction:column;gap:12px}
+.gov-root .gov-skel{
+  padding:16px 18px;border-radius:var(--r,14px);
+  background:var(--glass-soft,rgba(24,25,32,.46));
+  border:1px solid var(--hairline,rgba(255,255,255,.06));
+  display:flex;flex-direction:column;gap:10px;
+}
+.gov-root .gov-skel span{
+  height:11px;border-radius:6px;
+  background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(255,255,255,.09),rgba(255,255,255,.04));
+  background-size:200% 100%;animation:govShimmer 1.4s linear infinite;
+}
+.gov-root .gov-skel span:nth-child(1){width:38%}
+.gov-root .gov-skel span:nth-child(2){width:80%;height:16px}
+.gov-root .gov-skel span:nth-child(3){width:60%}
+@keyframes govShimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+
+/* ===================== REDUCED MOTION ===================== */
+@media (prefers-reduced-motion: reduce){
+  .gov-root *,
+  .gov-root *::before,
+  .gov-root *::after{
+    animation:none !important;
+    transition:none !important;
+  }
+}
+.gov-root[data-reduced="1"] *,
+.gov-root[data-reduced="1"] *::before,
+.gov-root[data-reduced="1"] *::after{
+  animation:none !important;
+  transition:none !important;
+}
