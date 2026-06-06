@@ -3,6 +3,7 @@ import {
   onChange, state, shortAddr, shortNpub, toast, fmt, copyToClipboard,
 } from "./shared.js";
 import { CustomSelect, coinAvatarHTML, skeleton, emptyState } from "./ui.js";
+import { mountSigil } from "./sigil.js";
 
 const prefersReduced = () =>
   window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -112,6 +113,7 @@ function reflectWalletButton(){
   renderBanner();
   reflectIdentity();
   reflectIdentityDetails();
+  reflectSigil();
 }
 
 function renderBanner(){
@@ -850,6 +852,25 @@ function reflectIdentityDetails(){
   }
 }
 
+/* The generative Sigil — materializes once an identity is derived. */
+const sigilCanvas = document.getElementById("sigilCanvas");
+const sigilHero   = document.getElementById("sigilHero");
+let sigilHandle = null;
+function reflectSigil(){
+  if (!sigilCanvas || !sigilHero) return;
+  if (state.derived){
+    // (re)mount at the canvas' current visible size so the npub's sigil is live
+    sigilHandle?.stop();
+    sigilHandle = mountSigil(sigilCanvas, state.derived.npub);
+    sigilHero.classList.add("born");
+  } else {
+    sigilHandle?.stop(); sigilHandle = null;
+    sigilHero.classList.remove("born");
+    const c = sigilCanvas.getContext("2d");
+    if (c) c.clearRect(0, 0, sigilCanvas.width || 1, sigilCanvas.height || 1);
+  }
+}
+
 const mbFlow = document.querySelector('[data-view="identity"] .mb-flow');
 function setDeriving(on){
   mbFlow?.classList.toggle("deriving", on);
@@ -920,7 +941,7 @@ const ONROUTE = {
   wallet: () => { loadWallet(); },
   markets: () => { if (!marketsLoaded) fetchMarkets(); else renderMarkets(); },
   network: () => {},
-  identity: () => { reflectIdentity(); reflectIdentityDetails(); },
+  identity: () => { reflectIdentity(); reflectIdentityDetails(); reflectSigil(); },
   coin: () => { window.LZ?.coinPage?.render(getRouteParam()); },
 };
 

@@ -31,6 +31,7 @@
 <link rel="stylesheet" href="/assets/css/hl-portfolio.css?v=3" />
 <link rel="stylesheet" href="/assets/css/hl-orders-pro.css?v=3" />
 <link rel="stylesheet" href="/assets/css/glass.css?v=3" />
+<link rel="stylesheet" href="/assets/css/sigil.css?v=3" />
 <script type="module" src="/assets/js/ui.js?v=3"></script>
 </head>
 <body>
@@ -268,7 +269,7 @@
     </section>
 
     <!-- ===== IDENTITY VIEW ===== -->
-    <section class="view" data-view="identity">
+    <section class="view id-view" data-view="identity">
       <div class="view-header">
         <div>
           <h1>Identity <small>one signature · two networks</small></h1>
@@ -276,35 +277,57 @@
         </div>
       </div>
 
-      <div class="identity-grid">
-        <div class="identity-card">
-          <div class="mb-flow">
-            <div class="mb-node" id="nodeEvm">
-              <span class="label">[ A ] EVM wallet</span>
+      <div class="id-stage mb-flow">
+        <!-- HERO · the generative sigil -->
+        <div class="sigil-hero" id="sigilHero">
+          <div class="sigil-orb">
+            <canvas id="sigilCanvas" aria-hidden="true"></canvas>
+            <div class="sigil-idle" id="sigilIdle">
+              <span class="sigil-ring"></span>
+              <span class="sigil-idle-cap">your sigil<br><b>awaits</b></span>
+            </div>
+            <div class="sigil-scan"></div>
+          </div>
+          <div class="sigil-cap" id="sigilCap">One you — every chain.</div>
+        </div>
+
+        <!-- ACTS · the 3-step becoming -->
+        <div class="id-acts">
+          <div class="id-act" id="nodeEvm">
+            <span class="id-step">01</span>
+            <div class="id-act-body">
+              <span class="label">EVM wallet</span>
               <div class="val dim" id="evmAddr">— not connected —</div>
               <span class="chip"><span class="d"></span><span id="evmChip">awaiting connect</span></span>
             </div>
-            <div class="arrow" id="arr1">→</div>
-            <div class="mb-node" id="nodeHash">
-              <span class="label">[ B ] sha256 ( signature )</span>
+          </div>
+          <div class="id-conn" id="arr1"></div>
+          <div class="id-act" id="nodeHash">
+            <span class="id-step">02</span>
+            <div class="id-act-body">
+              <span class="label">signature seed · sha256</span>
               <div class="val dim" id="hashOut">···</div>
               <span class="chip"><span class="d"></span><span id="hashChip">idle</span></span>
             </div>
-            <div class="arrow" id="arr2">→</div>
-            <div class="mb-node" id="nodeNpub">
-              <span class="label">[ C ] Nostr identity</span>
+          </div>
+          <div class="id-conn" id="arr2"></div>
+          <div class="id-act" id="nodeNpub">
+            <span class="id-step">03</span>
+            <div class="id-act-body">
+              <span class="label">Nostr identity</span>
               <div class="val dim" id="npubOut">npub1···</div>
               <span class="chip"><span class="d"></span><span id="npubChip">idle</span></span>
             </div>
           </div>
-          <div class="mb-actions">
-            <button class="btn accent" id="deriveBtn">Sign &amp; derive →</button>
+          <div class="id-actions">
+            <button class="btn accent" id="deriveBtn" data-motion="magnet">Sign &amp; derive →</button>
             <button class="btn ghost" id="resetBtn" style="display:none">Reset identity</button>
             <span class="mb-status" id="mbStatus">Connect a wallet, then click "Sign &amp; derive".</span>
           </div>
         </div>
+      </div>
 
-        <div class="id-details">
+      <div class="id-details">
           <div class="id-row">
             <div class="lab"><span>EVM ADDRESS</span><button data-copy="addr">copy</button></div>
             <div class="v" id="idAddr">—</div>
