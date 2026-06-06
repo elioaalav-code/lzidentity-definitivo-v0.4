@@ -109,5 +109,110 @@ export const COMMUNITIES = [
 ];
 
 export function getCommunity(id){
-  return COMMUNITIES.find((c) => c.id === id) || null;
+  return allCommunities().find((c) => c.id === id) || null;
+}
+
+/* ============================================================ *
+ *  Adding your own communities (search engine + manual add).
+ *  User-added communities persist in localStorage and merge with
+ *  the seed registry. Governance resolves hybrid: a known on-chain
+ *  Governor when we have one, else the Snapshot adapter.
+ * ============================================================ */
+
+/* Curated Snapshot-space → on-chain Governor map (real on-chain voting).
+   Keyed by lowercased Snapshot space id. Add more over time. */
+export const KNOWN_GOVERNORS = {
+  "uniswapgovernance.eth": { chain: 1, governor: "0x408ED6354d4973f66138C91495F2f2FCbd8724C3" },
+  "ens.eth":               { chain: 1, governor: "0x323A76393544d5ecca80cd6ef2A560C6a395b7E3" },
+};
+
+const ACCENTS = ["#b39aff", "#5eead4", "#ff7a59", "#7c8ef8", "#86efac", "#fde68a"];
+function pickAccent(seed){
+  let h = 0; const s = String(seed || "");
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return ACCENTS[h % ACCENTS.length];
+}
+/** A clean #hashtag for a community feed, derived from a name/handle. */
+function toHashtag(s){
+  return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "dao";
+}
+
+/** Resolve governance for a Snapshot space: known on-chain Governor else Snapshot. */
+function govForSpace(spaceId){
+  const k = KNOWN_GOVERNORS[String(spaceId || "").toLowerCase()];
+  if (k) return { adapter: "governor", cfg: { chain: k.chain, rpc: RPC[k.chain] || RPC[1], governor: k.governor } };
+  return { adapter: "snapshot", cfg: { space: spaceId } };
+}
+
+/** Build a community from a Snapshot search result {id,name,network,followers}. */
+export function communityFromSnapshot(space){
+  const id = "snap:" + space.id;
+  return {
+    id, name: space.name || space.id, handle: space.id, kind: "dao",
+    accent: pickAccent(space.id),
+    blurb: `${space.name || space.id} — governance via ${KNOWN_GOVERNORS[String(space.id).toLowerCase()] ? "on-chain Governor" : "Snapshot"}.`,
+    nostr: { relays: RELAYS, feedHashtag: toHashtag(space.name || space.id), channels: [{ id: id + ":general", name: "general", root: "" }] },
+    gov: govForSpace(space.id),
+  };
+}
+
+/** Build a Nostr-group community from a raw hashtag (with or without leading #). */
+export function communityFromHashtag(tag){
+  const t = toHashtag(tag);
+  const id = "tag:" + t;
+  return {
+    id, name: "#" + t, handle: t, kind: "nostr-group",
+    accent: pickAccent(t),
+    blurb: `Posts tagged #${t} across the Nostr relays.`,
+    nostr: { relays: RELAYS, feedHashtag: t, channels: [{ id: id + ":general", name: "general", root: "" }] },
+    gov: null,
+  };
+}
+
+/** Build a community from a raw on-chain Governor {name,chain,governor}. */
+export function communityFromGovernor({ name, chain, governor }){
+  const id = "gov:" + chain + ":" + String(governor || "").toLowerCase();
+  return {
+    id, name: name || ("Governor " + String(governor).slice(0, 8)), handle: String(governor).slice(0, 10), kind: "dao",
+    accent: pickAccent(governor),
+    blurb: "Custom on-chain Governor.",
+    nostr: { relays: RELAYS, feedHashtag: toHashtag(name || "dao"), channels: [{ id: id + ":general", name: "general", root: "" }] },
+    gov: { adapter: "governor", cfg: { chain: Number(chain), rpc: RPC[Number(chain)] || RPC[1], governor } },
+  };
+}
+
+/* ── persistence (localStorage) ─────────────────────────────── */
+const USER_KEY = "lz:communities";
+export function loadUserCommunities(){
+  try { const v = JSON.parse(localStorage.getItem(USER_KEY) || "[]"); return Array.isArray(v) ? v : []; }
+  catch (_) { return []; }
+}
+function saveUserCommunities(list){
+  try { localStorage.setItem(USER_KEY, JSON.stringify(list)); } catch (_) {}
+}
+/** Add (idempotent by id). Returns true if newly added. */
+export function addUserCommunity(c){
+  if (!c || !c.id) return false;
+  if (COMMUNITIES.some((s) => s.id === c.id)) return false;   // seed already covers it
+  const list = loadUserCommunities();
+  if (list.some((u) => u.id === c.id)) return false;
+  list.push(c); saveUserCommunities(list); return true;
+}
+export function removeUserCommunity(id){
+  const list = loadUserCommunities().filter((u) => u.id !== id);
+  saveUserCommunities(list);
+}
+/** True if this community was user-added (removable). */
+export function isUserCommunity(id){
+  return loadUserCommunities().some((u) => u.id === id);
+}
+
+/** Seed + user communities, deduped by id (seed wins). */
+export function allCommunities(){
+  const out = COMMUNITIES.slice();
+  const seen = new Set(out.map((c) => c.id));
+  for (const u of loadUserCommunities()){
+    if (u && u.id && !seen.has(u.id)){ out.push(u); seen.add(u.id); }
+  }
+  return out;
 }

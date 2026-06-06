@@ -172,6 +172,19 @@
   border-color:rgba(179,154,255,.28);
 }
 
+/* snapshot proposals carry their OWN multiple choices — render each as a
+   violet-tinted choice button (no fixed for/against semantics). */
+.gov-root .gov-vote-snap{
+  flex:1 1 calc(50% - 8px);min-width:140px;
+  color:var(--text);
+  background:rgba(179,154,255,.06);
+  border-color:rgba(179,154,255,.24);
+}
+.gov-root .gov-vote-snap:hover:not(:disabled){
+  border-color:rgba(179,154,255,.5);
+  box-shadow:0 4px 16px -8px var(--accent);
+}
+
 .gov-root .gov-vote-closed{
   font-family:var(--mono);font-size:11.5px;color:var(--text-mute);letter-spacing:.02em;
   padding:8px 0;text-transform:capitalize;

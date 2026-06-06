@@ -1,0 +1,107 @@
+/* ============================================================ *
+ *  community-add.css — the "Add a community" modal (search engine).
+ *  Obsidian-glass, reuses base.css tokens. Scoped under .cadd-*.
+ * ============================================================ */
+.cadd-overlay{
+  position:fixed; inset:0; z-index:120;
+  display:grid; place-items:center;
+  padding:24px;
+  background:rgba(3,3,5,.62);
+  backdrop-filter:blur(8px) saturate(1.1);
+  -webkit-backdrop-filter:blur(8px) saturate(1.1);
+  animation:cadd-fade .22s var(--ease-out);
+}
+.cadd-overlay[hidden]{ display:none; }
+
+.cadd-panel{
+  width:min(560px, 96vw); max-height:88vh; display:flex; flex-direction:column;
+  border-radius:var(--r-xl);
+  background:var(--glass-strong-bg);
+  box-shadow:var(--glass-hl),var(--glass-rim),var(--glass-drop);
+  backdrop-filter:blur(20px) brightness(1.06);
+  -webkit-backdrop-filter:blur(20px) brightness(1.06);
+  overflow:hidden;
+  animation:cadd-rise .32s var(--ease-out);
+}
+.cadd-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 20px 14px;
+}
+.cadd-head h3{ font:600 16px/1 var(--sans); letter-spacing:-.01em; }
+.cadd-close{
+  width:30px; height:30px; border-radius:var(--r-sm);
+  color:var(--text-mute); font-size:14px;
+  display:grid; place-items:center; transition:.2s var(--ease);
+}
+.cadd-close:hover{ color:var(--text); background:rgba(255,255,255,.06); }
+
+.cadd-tabs{ display:flex; gap:4px; padding:0 16px; }
+.cadd-tab{
+  flex:1; padding:9px 10px; border-radius:var(--r-sm) var(--r-sm) 0 0;
+  font:600 12px/1 var(--mono); letter-spacing:.04em; color:var(--text-mute);
+  border-bottom:2px solid transparent; transition:.25s var(--ease);
+}
+.cadd-tab:hover{ color:var(--text-dim); }
+.cadd-tab.on{ color:var(--text); border-bottom-color:var(--accent); }
+
+.cadd-body{
+  padding:18px 20px 22px; overflow-y:auto;
+  display:flex; flex-direction:column; gap:14px;
+  border-top:1px solid var(--hairline);
+}
+.cadd-field{
+  display:flex; align-items:center; gap:8px;
+  background:var(--glass-soft); border:1px solid var(--border);
+  border-radius:var(--r); padding:0 12px;
+  transition:border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.cadd-field:focus-within{ border-color:rgba(179,154,255,.5); box-shadow:var(--ring-accent); }
+.cadd-field input, .cadd-field select{
+  flex:1; background:transparent; border:0; outline:0;
+  padding:12px 0; font:500 14px/1 var(--sans); color:var(--text);
+}
+.cadd-field select{ color:var(--text); cursor:pointer; }
+.cadd-field input::placeholder{ color:var(--text-mute); }
+.cadd-prefix{ font:600 15px/1 var(--mono); color:var(--accent); }
+
+.cadd-hint{ font:500 12px/1.5 var(--sans); color:var(--text-mute); margin:0; }
+
+.cadd-results{ display:flex; flex-direction:column; gap:8px; max-height:46vh; overflow-y:auto; }
+.cadd-result{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:11px 13px; border-radius:var(--r);
+  background:var(--glass-soft); box-shadow:var(--glass-rim);
+}
+.cadd-result-meta{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+.cadd-result-meta b{ font:600 13px/1.2 var(--sans); color:var(--text); }
+.cadd-result-meta small{ font:500 11px/1.2 var(--mono); color:var(--text-mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cadd-add{ flex:none; }
+.cadd-submit{ align-self:flex-start; }
+
+/* ── rail affordances (Search&add button + per-item remove) ──── */
+.comm-add-btn{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  width:calc(100% - 24px); margin:2px 12px 10px; padding:10px 12px;
+  border-radius:var(--r); border:1px dashed var(--border-strong);
+  background:var(--glass-soft); color:var(--text-dim);
+  font:600 12.5px/1 var(--sans); transition:.25s var(--ease);
+}
+.comm-add-btn:hover{ color:var(--text); border-color:rgba(179,154,255,.5); background:var(--glass); }
+.comm-add-plus{ color:var(--accent); font-size:15px; line-height:1; }
+
+.comm-item{ position:relative; }
+.comm-item-x{
+  position:absolute; top:8px; right:8px;
+  width:22px; height:22px; border-radius:50%;
+  display:grid; place-items:center; font-size:10px;
+  color:var(--text-mute); background:rgba(255,255,255,.06);
+  opacity:0; transition:opacity .2s var(--ease), color .2s, background .2s;
+}
+.comm-item:hover .comm-item-x, .comm-item-x:focus-visible{ opacity:1; }
+.comm-item-x:hover{ color:var(--error); background:rgba(253,164,175,.16); }
+
+@keyframes cadd-fade{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes cadd-rise{ from{ opacity:0; transform:translateY(14px) scale(.985); } to{ opacity:1; transform:none; } }
+@media (prefers-reduced-motion:reduce){
+  .cadd-overlay, .cadd-panel{ animation:none; }
+}

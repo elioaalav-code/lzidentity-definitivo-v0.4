@@ -140,25 +140,36 @@ async function myPubkey() {
  * Render the community list into a target (default #commList).
  * Pass an explicit `communities` array to drive it in tests.
  */
+/* daos.js module ref (loaded lazily in init) — gives us allCommunities /
+   isUserCommunity / removeUserCommunity for the rail's add/remove affordances. */
+let _daos = null;
+
 export function renderList(communities, target) {
   const list = target || $("commList");
   if (!list) return;
   const items = communities || _state.communities || [];
-  if (!items.length) {
-    list.replaceChildren(
-      emptyState({ icon: ICN.relay, title: "No communities", body: "The registry is empty." })
-    );
-    return;
-  }
-  list.innerHTML = `
+  const headHTML = `
     <div class="comm-list-head">
       <span class="comm-list-title">Communities</span>
       <span class="comm-list-n">${items.length}</span>
     </div>
+    <button type="button" class="comm-add-btn" id="commAddBtn" data-motion="lift">
+      <span class="comm-add-plus">＋</span> Search &amp; add a DAO
+    </button>`;
+  if (!items.length) {
+    list.innerHTML = headHTML + `<div class="comm-list-scroll"></div>`;
+    list.querySelector(".comm-list-scroll").appendChild(
+      emptyState({ icon: ICN.relay, title: "No communities", body: "Add a DAO or Nostr group to get started." })
+    );
+    wireListHead(list);
+    return;
+  }
+  list.innerHTML = headHTML + `
     <div class="comm-list-scroll" role="list">
       ${items.map((c, i) => {
         const kind = c.kind === "dao" ? "DAO" : "Group";
         const active = _state.active && _state.active.id === c.id;
+        const removable = !!(_daos && _daos.isUserCommunity && _daos.isUserCommunity(c.id));
         return `
         <button type="button" role="listitem" class="comm-item${active ? " active" : ""}"
           data-id="${escapeHtml(c.id)}" style="--i:${i};--row-accent:${escapeHtml(c.accent || "var(--accent)")}">
@@ -170,12 +181,40 @@ export function renderList(communities, target) {
             </span>
             <span class="comm-item-handle">${escapeHtml(c.handle || "")}</span>
           </span>
+          ${removable ? `<span class="comm-item-x" role="button" tabindex="0" data-x="${escapeHtml(c.id)}" title="Remove community" aria-label="Remove community">✕</span>` : ""}
         </button>`;
       }).join("")}
     </div>`;
   list.querySelectorAll(".comm-item").forEach((el) => {
-    el.addEventListener("click", () => openCommunity(el.dataset.id));
+    el.addEventListener("click", (e) => {
+      const x = e.target.closest(".comm-item-x");
+      if (x) { e.stopPropagation(); removeCommunity(x.dataset.x); return; }
+      openCommunity(el.dataset.id);
+    });
   });
+  wireListHead(list);
+}
+
+/* wire the "Search & add" button (opens the discovery modal) */
+function wireListHead(list){
+  const btn = list.querySelector("#commAddBtn");
+  if (btn) btn.addEventListener("click", () => {
+    if (window.LZ && window.LZ.communityAdd) window.LZ.communityAdd.open({ onAdded: onCommunityAdded });
+  });
+}
+function refreshList(){
+  if (_daos && _daos.allCommunities) _state.communities = _daos.allCommunities();
+  renderList(_state.communities);
+}
+function onCommunityAdded(c){
+  refreshList();
+  if (c && c.id) openCommunity(c.id);
+}
+function removeCommunity(id){
+  if (_daos && _daos.removeUserCommunity) _daos.removeUserCommunity(id);
+  const wasActive = _state.active && _state.active.id === id;
+  refreshList();
+  if (wasActive && _state.communities.length) openCommunity(_state.communities[0].id);
 }
 
 /* ── community header + tabs ──────────────────────────────────── */
@@ -675,15 +714,12 @@ export function openCommunity(id) {
 export async function init() {
   mountSkeleton();
   // Load the registry; tolerate it being absent during isolated tests.
-  if (!_state.communities.length) {
-    try {
-      const mod = await import("./daos.js");
-      _state.communities = (mod && mod.COMMUNITIES) || [];
-    } catch (e) {
-      console.warn("[communities] daos.js unavailable:", e);
-      _state.communities = [];
-    }
+  if (!_daos) {
+    try { _daos = await import("./daos.js"); }
+    catch (e) { console.warn("[communities] daos.js unavailable:", e); }
   }
+  if (_daos && _daos.allCommunities) _state.communities = _daos.allCommunities();
+  else if (_daos && _daos.COMMUNITIES) _state.communities = _daos.COMMUNITIES;
   renderList(_state.communities);
   if (_state.communities.length) openCommunity(_state.communities[0].id);
   else {

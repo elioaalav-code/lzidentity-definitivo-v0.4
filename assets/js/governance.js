@@ -82,6 +82,20 @@ export function proposalStateLabel(p){
   return map[s] || s;
 }
 
+/* ---- Snapshot state mapping ----
+   Snapshot proposals expose state 'pending' | 'active' | 'closed'.
+   We normalize to the canonical Title-case strings the rest of the engine
+   uses (so stateTone() / proposalStateLabel() colour + label them). Any
+   unrecognized value collapses to "Closed" (the safe, non-actionable state). */
+export function snapshotStateLabel(state){
+  switch (String(state || "").toLowerCase()){
+    case "pending": return "Pending";
+    case "active":  return "Active";
+    case "closed":  return "Closed";
+    default:        return "Closed";
+  }
+}
+
 /* state -> css modifier token (for colored pills) */
 export function stateTone(state){
   switch (String(state)){
@@ -549,6 +563,274 @@ async function layerzeroVote(cfg, proposalId, support){
 }
 
 /* =================================================================== *
+ *  ADAPTER: 'snapshot'  (off-chain Snapshot spaces — gasless signed vote)
+ *
+ *  Reads: Snapshot's keyless GraphQL index at https://hub.snapshot.org/graphql
+ *  (POST {query}). Proposals carry their OWN choice list (not just for/against)
+ *  plus a parallel `scores[]` weight array and `scores_total`. Scores arrive as
+ *  already-humanized floating-point voting power (NOT raw 18-decimal wei), so we
+ *  keep them as plain integer-ish vote strings (no 1e18 division on render).
+ *
+ *  Writes: a Snapshot "vote" is an EIP-712 typed message the user signs with
+ *  eth_signTypedData_v4, then we POST {address,sig,data} to the gasless
+ *  sequencer https://seq.snapshot.org . No gas, no chain switch.
+ * =================================================================== */
+
+const SNAPSHOT_GQL = "https://hub.snapshot.org/graphql";
+const SNAPSHOT_SEQ = "https://seq.snapshot.org";
+
+/* keyless GraphQL POST. Returns parsed JSON or throws (callers catch → []). */
+async function snapshotGql(query, variables){
+  const r = await fetch(SNAPSHOT_GQL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  if (!r.ok) throw new Error("snapshot " + r.status);
+  const j = await r.json();
+  if (j.errors && j.errors.length) throw new Error(j.errors[0].message || "snapshot gql error");
+  return j.data;
+}
+
+/* PURE: map a raw Snapshot proposal node → the engine's Proposal shape.
+   choices[]+scores[] zip into [{label,votes,pct}]; scores_total → totalVotes;
+   start/end (unix sec) → ms (0 → null); url is the canonical snapshot.org link. */
+export function mapSnapshotProposal(node, space){
+  const labels = Array.isArray(node?.choices) ? node.choices : [];
+  const scores = Array.isArray(node?.scores) ? node.scores : [];
+  // total: prefer scores_total, else sum of scores. Round to keep vote strings tidy.
+  let total = Number(node?.scores_total);
+  if (!Number.isFinite(total)){
+    total = scores.reduce((a, s) => a + (Number(s) || 0), 0);
+  }
+  const choices = labels.map((label, i) => {
+    const v = Number(scores[i]) || 0;
+    return {
+      label: String(label),
+      votes: String(Math.round(v)),
+      pct: total > 0 ? Math.round((v / total) * 10000) / 100 : 0,
+    };
+  });
+  const sp = node?.space?.id || space || "";
+  const id = String(node?.id ?? "");
+  const start = Number(node?.start);
+  const end = Number(node?.end);
+  return {
+    id,
+    title: String(node?.title || "Untitled proposal"),
+    body: String(node?.body || ""),
+    state: snapshotStateLabel(node?.state),
+    choices,
+    totalVotes: String(Math.round(Number.isFinite(total) ? total : 0)),
+    startsAt: Number.isFinite(start) && start > 0 ? start * 1000 : null,
+    endsAt: Number.isFinite(end) && end > 0 ? end * 1000 : null,
+    url: id ? `https://snapshot.org/#/${sp}/proposal/${id}` : (node?.link || null),
+    source: "snapshot",
+  };
+}
+
+const SNAPSHOT_PROPOSAL_FIELDS =
+  "id title body choices scores scores_total state start end link space{id name}";
+
+async function snapshotList(cfg){
+  const space = cfg?.space;
+  if (!space) return [];
+  try {
+    const data = await snapshotGql(
+      `query($space:String!){
+        proposals(first:20, where:{space:$space}, orderBy:"created", orderDirection:desc){
+          ${SNAPSHOT_PROPOSAL_FIELDS}
+        }
+      }`,
+      { space }
+    );
+    const arr = Array.isArray(data?.proposals) ? data.proposals : [];
+    return arr.map(n => mapSnapshotProposal(n, space));
+  } catch { return []; }
+}
+
+async function snapshotGet(cfg, id){
+  const space = cfg?.space;
+  if (!id) return null;
+  try {
+    const data = await snapshotGql(
+      `query($id:String!){
+        proposal(id:$id){ ${SNAPSHOT_PROPOSAL_FIELDS} }
+      }`,
+      { id: String(id) }
+    );
+    if (data?.proposal) return mapSnapshotProposal(data.proposal, space);
+  } catch { /* fall back to scanning the list */ }
+  try {
+    const all = await snapshotList(cfg);
+    return all.find(p => String(p.id) === String(id)) || null;
+  } catch { return null; }
+}
+
+/* PURE: build the exact EIP-712 typed-data JSON string for a Snapshot vote,
+   ready to hand to eth_signTypedData_v4.
+
+   Snapshot's "vote" envelope (hub.snapshot.org / @snapshot-labs/snapshot.js):
+     domain     = { name: "snapshot", version: "0.1.4" }
+     primaryType= "Vote"
+     Vote type fields (single-choice; choice is the 1-based index):
+       from      address
+       space     string
+       timestamp uint64    (unix seconds)
+       proposal  string    (the proposal id — hex string for offchain props)
+       choice    uint32    (1-based choice index)
+       reason    string
+       app       string
+       metadata  string    (JSON string, "{}" when none)
+   The signed `message` (minus domain/types) is what we POST as `data.message`
+   to the sequencer; `data.domain` and `data.types` ride along too. */
+export function buildSnapshotVoteMessage(opts){
+  const {
+    from, space, proposal, choice,
+    reason = "", app = "lzidentity", metadata = "{}",
+    timestamp = Math.floor(Date.now() / 1000),
+  } = opts || {};
+  const types = {
+    EIP712Domain: [
+      { name: "name", type: "string" },
+      { name: "version", type: "string" },
+    ],
+    Vote: [
+      { name: "from", type: "address" },
+      { name: "space", type: "string" },
+      { name: "timestamp", type: "uint64" },
+      { name: "proposal", type: "string" },
+      { name: "choice", type: "uint32" },
+      { name: "reason", type: "string" },
+      { name: "app", type: "string" },
+      { name: "metadata", type: "string" },
+    ],
+  };
+  const message = {
+    from: String(from),
+    space: String(space),
+    timestamp: Number(timestamp),
+    proposal: String(proposal),
+    choice: Number(choice),
+    reason: String(reason),
+    app: String(app),
+    metadata: String(metadata),
+  };
+  return JSON.stringify({
+    domain: { name: "snapshot", version: "0.1.4" },
+    types,
+    primaryType: "Vote",
+    message,
+  });
+}
+
+/* Snapshot gasless vote: sign the EIP-712 envelope with the wallet, then POST
+   { address, sig, data } to the sequencer. `choice` is the 1-based index. */
+async function snapshotVote(cfg, proposalId, choice){
+  const p = provider();
+  if (!p) return { error: "No wallet connected" };
+  const space = cfg?.space;
+  if (!space) return { error: "Snapshot space not configured" };
+  try {
+    const accounts = await p.request({ method: "eth_requestAccounts" }).catch(() => []);
+    const from = Array.isArray(accounts) ? accounts[0] : null;
+    if (!from) return { error: "No wallet account" };
+
+    const typedData = buildSnapshotVoteMessage({
+      from, space, proposal: String(proposalId), choice: Number(choice),
+    });
+
+    let sig;
+    try {
+      sig = await p.request({ method: "eth_signTypedData_v4", params: [from, typedData] });
+    } catch (e) {
+      if (e?.code === 4001) return { error: "Signature rejected" };
+      return { error: e?.message ? String(e.message).split("\n")[0] : "Could not sign vote" };
+    }
+    if (!sig) return { error: "No signature" };
+
+    const parsed = JSON.parse(typedData);
+    const r = await fetch(SNAPSHOT_SEQ, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        address: from,
+        sig,
+        data: {
+          domain: parsed.domain,
+          types: parsed.types,
+          message: parsed.message,
+        },
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j?.error){
+      const detail = j?.error_description || j?.error || ("sequencer " + r.status);
+      return { error: String(detail).split("\n")[0] };
+    }
+    // sequencer returns { id, ipfs, relayer } on success
+    return { txHash: j.id || j.ipfs || "submitted" };
+  } catch (e) {
+    return { error: e?.message ? String(e.message).split("\n")[0] : "Vote failed" };
+  }
+}
+
+/* =================================================================== *
+ *  SPACE SEARCH  (Snapshot DAO discovery, keyless)
+ *
+ *  Primary path: GraphQL `ranking(where:{search}){items{...}}` — Snapshot's
+ *  relevance-ranked space index (verified live, returns id/name/network/
+ *  followersCount). If `ranking` ever stops being supported we fall back to
+ *  `spaces(first, where:{id_in:[...]})` filtered client-side. Never throws → []. */
+export async function searchSpaces(query){
+  const q = String(query || "").trim();
+  if (!q) return [];
+  // --- primary: ranking ---
+  try {
+    const data = await snapshotGql(
+      `query($q:String){
+        ranking(first:18, where:{search:$q}){
+          items{ id name network followersCount }
+        }
+      }`,
+      { q }
+    );
+    const items = data?.ranking?.items;
+    if (Array.isArray(items) && items.length){
+      return items.map(s => ({
+        id: String(s.id),
+        name: String(s.name || s.id),
+        network: String(s.network || ""),
+        followers: Number(s.followersCount) || 0,
+      }));
+    }
+  } catch { /* fall through to spaces() */ }
+  // --- fallback: spaces() then client-side name/id filter ---
+  try {
+    const data = await snapshotGql(
+      `query{
+        spaces(first:1000, orderBy:"followers_count", orderDirection:desc){
+          id name network followersCount
+        }
+      }`
+    );
+    const all = Array.isArray(data?.spaces) ? data.spaces : [];
+    const needle = q.toLowerCase();
+    return all
+      .filter(s =>
+        String(s.id || "").toLowerCase().includes(needle) ||
+        String(s.name || "").toLowerCase().includes(needle))
+      .slice(0, 18)
+      .map(s => ({
+        id: String(s.id),
+        name: String(s.name || s.id),
+        network: String(s.network || ""),
+        followers: Number(s.followersCount) || 0,
+      }));
+  } catch { return []; }
+}
+
+/* =================================================================== *
  *  PUBLIC API — adapter dispatch
  * =================================================================== */
 
@@ -559,6 +841,7 @@ export async function listProposals(govCfg){
     switch (govCfg.adapter){
       case "governor":  return await governorList(cfg, { lookback: govCfg.lookback });
       case "layerzero": return await layerzeroList(cfg);
+      case "snapshot":  return await snapshotList(cfg);
       default:          return [];
     }
   } catch { return []; }
@@ -586,6 +869,7 @@ export async function getProposal(govCfg, id){
         const all = await layerzeroList(cfg);
         return all.find(p => String(p.id) === String(id)) || all[0] || null;
       }
+      case "snapshot":  return await snapshotGet(cfg, id);
       default: return null;
     }
   } catch { return null; }
@@ -598,6 +882,7 @@ export async function castVote(govCfg, proposalId, support){
     switch (govCfg.adapter){
       case "governor":  return await governorVote(cfg, proposalId, support);
       case "layerzero": return await layerzeroVote(cfg, proposalId, support);
+      case "snapshot":  return await snapshotVote(cfg, proposalId, support);
       default:          return { error: "Unsupported governance adapter" };
     }
   } catch (e) {
@@ -613,14 +898,18 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
   { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
 ));
 
-function shorten(num){
-  // num is a decimal string of raw on-chain weight (often 18-decimals).
-  // We present a compact, decimals-agnostic magnitude.
+function shorten(num, raw18 = true){
+  // Governor/LayerZero votes are raw on-chain weight (≈18 decimals) → collapse.
+  // Snapshot scores arrive already humanized (whole voting power) → raw18=false.
   let n;
   try { n = BigInt(num); } catch { return "0"; }
-  // assume 18-decimal token weight; collapse to whole tokens for display
-  const whole = n / (10n ** 18n);
-  let v = Number(whole);
+  let v;
+  if (raw18){
+    const whole = n / (10n ** 18n);
+    v = Number(whole);
+  } else {
+    v = Number(n);
+  }
   if (!Number.isFinite(v)) v = 0;
   if (v >= 1e9) return (v / 1e9).toFixed(2) + "B";
   if (v >= 1e6) return (v / 1e6).toFixed(2) + "M";
@@ -649,19 +938,25 @@ function choiceBar(choices){
   return `<div class="gov-bar">${segs || '<span class="gov-bar-seg gov-tone-empty" style="flex-grow:1"></span>'}</div>`;
 }
 
-function choiceLegend(choices){
+function choiceLegend(choices, raw18 = true){
   const tones = ["for", "against", "abstain", "alt"];
   return `<div class="gov-legend">` + (choices || []).map((c, i) =>
     `<span class="gov-legend-key">
        <i class="gov-tone-${tones[i] || "alt"}"></i>${esc(c.label)}
        <b>${(Number(c.pct) || 0).toFixed(1)}%</b>
-       <em>${shorten(c.votes)}</em>
+       <em>${shorten(c.votes, raw18)}</em>
      </span>`).join("") + `</div>`;
 }
 
 function voteButtons(p){
   // governor: For/Against/Abstain → support 1/0/2
-  // layerzero: choice index per choices order
+  // layerzero: choice index per choices order (0-based)
+  // snapshot: the proposal's OWN choices → 1-based choice index
+  if (p.source === "snapshot"){
+    return (p.choices || []).map((c, i) =>
+      `<button class="gov-vote-btn gov-vote-snap" data-vote="${i + 1}" data-id="${esc(p.id)}">${esc(c.label)}</button>`
+    ).join("");
+  }
   if (p.source === "layerzero"){
     return p.choices.map((c, i) =>
       `<button class="gov-vote-btn" data-vote="${i}" data-id="${esc(p.id)}">${esc(c.label)}</button>`
@@ -688,7 +983,7 @@ function proposalCard(p){
       </header>
       <h3 class="gov-title">${esc(p.title)}</h3>
       ${choiceBar(p.choices)}
-      ${choiceLegend(p.choices)}
+      ${choiceLegend(p.choices, p.source !== "snapshot")}
       <footer class="gov-card-foot">
         <button class="gov-expand" data-id="${esc(p.id)}" aria-expanded="false">Details</button>
         ${p.url ? `<a class="gov-link" href="${esc(p.url)}" target="_blank" rel="noopener">View on explorer ↗</a>` : ""}
@@ -736,7 +1031,8 @@ export function renderGovernance(el, govCfg){
   if (reduced) el.setAttribute("data-reduced", "1");
 
   // no adapter at all → tidy "no governance connected"
-  if (!govCfg || !govCfg.adapter || (govCfg.adapter !== "governor" && govCfg.adapter !== "layerzero")){
+  const KNOWN_ADAPTERS = ["governor", "layerzero", "snapshot"];
+  if (!govCfg || !govCfg.adapter || !KNOWN_ADAPTERS.includes(govCfg.adapter)){
     el.innerHTML = shell(emptyState("none"));
     return;
   }
@@ -819,6 +1115,6 @@ if (typeof window !== "undefined"){
   window.LZ = window.LZ || {};
   window.LZ.gov = {
     listProposals, getProposal, castVote, proposalStateLabel, renderGovernance,
-    listProposalsOlder,
+    listProposalsOlder, searchSpaces,
   };
 }
