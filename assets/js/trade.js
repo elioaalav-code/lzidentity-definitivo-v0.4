@@ -8,7 +8,9 @@
  * ============================================================ */
 
 import * as HL from "./hyperliquid.js";
-import { state, onChange, connectWallet, toast, fmt, shortAddr } from "./shared.js";
+import { state, onChange, connectWallet, toast, shortAddr } from "./shared.js";
+import * as fmt from "./fmt-num.js";
+import { withTimeout } from "./net.js";
 import { CustomSelect, coinAvatarHTML, skeleton, emptyState } from "./ui.js";
 
 /* ─── module state ─────────────────────────────────────────── */
@@ -88,18 +90,12 @@ function toggleFav(sym){
 const $ = (id) => document.getElementById(id);
 const on = (el, ev, fn) => el && el.addEventListener(ev, fn);
 
-/* ─── number formatting ────────────────────────────────────── */
-function pxStr(n){
-  n = Number(n);
-  if (!isFinite(n)) return "—";
-  if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 1 });
-  if (n >= 1)    return n.toLocaleString("en-US", { maximumFractionDigits: 3 });
-  return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
-}
+/* ─── number formatting (all via the shared fmt-num.js module) ── */
+const pxStr = (n) => fmt.price(n, { coin });
 const usd = (n) => fmt.usd(Number(n));
 const compact = (n) => fmt.compact(Number(n));
 const TAKER_FEE = 0.00035;          // ≈ HL taker fee, for the ticket fee estimate
-const pct = (n) => (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(2) + "%";
+const pct = (n) => fmt.pct(n);
 
 /* ─── boot (first time the tab is shown) ───────────────────── */
 async function boot(){
@@ -116,6 +112,7 @@ async function boot(){
   try {
     const m = await HL.meta();
     universe = m.universe;
+    fmt.setUniverse(universe);
     const sel = $("hlCoin");
     if (sel){
       sel.innerHTML = universe.map(u => `<option${u.name===coin?" selected":""}>${u.name}</option>`).join("");
@@ -123,8 +120,9 @@ async function boot(){
     applyCoinMeta();
     await refreshCtxs();
     initMarketSelect();      // build the rich switcher (after ctxs so volume/price are present)
-    await loadCandles();
-    await loadBook();
+    // load chart + book independently so one failing doesn't kill the other;
+    // each renders its own inline retry panel on failure (showRegionError).
+    await Promise.allSettled([loadCandles(), loadBook()]);
   } catch (e){
     console.error("[HL] boot failed", e);
     toast("hyperliquid data unavailable — check connection", "err");
@@ -364,6 +362,7 @@ async function refreshCtxs(){
   try {
     const [m, ctxs] = await HL.metaAndCtxs();
     universe = m.universe;
+    fmt.setUniverse(universe);
     ctxByCoin = {};
     m.universe.forEach((u, i) => { ctxByCoin[u.name] = ctxs[i]; });
     renderStats();
@@ -371,20 +370,43 @@ async function refreshCtxs(){
     refreshMarketItems();           // groups/volume/price reflect the fresh ctx
   } catch (e){ /* keep last */ }
 }
+// Inline "couldn't load — retry" panel in a market region (chart / book),
+// instead of a silently dead pane on a failed/timed-out load.
+function showRegionError(host, label, onRetry){
+  if (!host) return;
+  let p = host.querySelector(":scope > .hl-region-err");
+  if (!p){ p = document.createElement("div"); p.className = "hl-region-err"; host.appendChild(p); }
+  p.innerHTML = `<span class="hre-txt">Couldn’t load ${label}.</span><button type="button" class="btn ghost xs hre-act">Retry</button>`;
+  p.querySelector(".hre-act").onclick = () => { p.remove(); onRetry(); };
+}
+function clearRegionError(host){ host?.querySelector(":scope > .hl-region-err")?.remove(); }
+
 async function loadCandles(){
+  const host = $("hlChart");
   const ld = $("hlChartLoading"); if (ld) ld.classList.remove("hidden");
   const end = Date.now();
   const start = end - 200 * (INTERVAL_MS[interval] || 9e5);
-  const data = await HL.candleSnapshot(coin, interval, start, end);
-  candles = (data || []).map(c => ({ t:c.t, o:+c.o, h:+c.h, l:+c.l, c:+c.c, v:+c.v }));
-  setChartData();
+  try {
+    const data = await withTimeout(HL.candleSnapshot(coin, interval, start, end), 9000);
+    candles = (data || []).map(c => ({ t:c.t, o:+c.o, h:+c.h, l:+c.l, c:+c.c, v:+c.v }));
+    clearRegionError(host);
+    setChartData();
+  } catch (e){
+    if (ld) ld.classList.add("hidden");
+    if (!candles.length) showRegionError(host, "the chart", loadCandles);
+    throw e;
+  }
 }
 async function loadBook(){
+  const host = document.querySelector('[data-view="trade"] .mid-pane[data-pane="book"]') || $("hlBids")?.parentElement;
   try {
-    const data = await HL.l2Book(coin);
+    const data = await withTimeout(HL.l2Book(coin), 9000);
     if (data && data.levels) book = { bids: data.levels[0] || [], asks: data.levels[1] || [] };
+    clearRegionError(host);
     if (active) renderBook();
-  } catch {}
+  } catch {
+    if (!book.bids.length && !book.asks.length) showRegionError(host, "the order book", loadBook);
+  }
 }
 
 /* ─── render: symbol header + stats ────────────────────────── */
@@ -899,24 +921,76 @@ async function applyLeverage(){
 /* ─── user data (positions / orders / balance) ─────────────── */
 function startUserPolling(){
   stopUserPolling();
-  if (!state.account) { firstUserPoll = true; renderPositions(); return; }
+  userLoadError = false;
+  userData = null;
+  if (!state.account) { firstUserPoll = true; renderPositions(); renderAccountBanner(); return; }
   firstUserPoll = true;
   renderPositions();          // paints a skeleton while the first poll is in flight
+  renderAccountBanner();
   pollUser();
   userPollTimer = setInterval(pollUser, 4500);
 }
 function stopUserPolling(){ clearInterval(userPollTimer); userPollTimer = null; }
 async function pollUser(){
-  if (!state.account){ userData = null; userOrders = []; renderPositions(); return; }
+  if (!state.account){ userData = null; userOrders = []; renderPositions(); renderAccountBanner(); return; }
   try {
     const [ch, oo] = await Promise.all([HL.clearinghouse(state.account), HL.openOrders(state.account)]);
     userData = ch; userOrders = oo || [];
     firstUserPoll = false;
+    userLoadError = false;
     renderPositions();
     updateSizeChipState();
     renderNotional();
     syncPositionLines();
-  } catch (e){ firstUserPoll = false; renderPositions(); }
+  } catch (e){ firstUserPoll = false; userLoadError = true; renderPositions(); }
+  renderAccountBanner();
+}
+
+/* ── Connected-but-empty / load-error banner ──────────────────
+ * The historical "testnet-zero" bug class: a wallet is connected but the
+ * clearinghouse on the *current* HL network has no account value, so the
+ * positions/account tables silently show all zeros and the user thinks
+ * the app is broken. Surface an explicit, actionable banner instead.
+ * Injected into the existing .trade-positions container (no app.html edit). */
+let userLoadError = false;
+function accountIsEmpty(){
+  if (!userData) return false;
+  const av = Number(userData?.marginSummary?.accountValue);
+  const wd = Number(userData?.withdrawable);
+  const hasPos = (userData.assetPositions || []).some(p => Number(p.position.szi) !== 0);
+  return (!av && !wd && !hasPos);
+}
+function renderAccountBanner(){
+  const host = document.querySelector('[data-view="trade"] .trade-positions');
+  if (!host) return;
+  let el = document.getElementById("hlAcctBanner");
+  let kind = null;                 // "error" | "empty" | null
+  if (state.account){
+    if (userLoadError) kind = "error";
+    else if (accountIsEmpty()) kind = "empty";
+  }
+  if (!kind){ if (el) el.remove(); return; }
+  const net = (() => { try { return HL.getNetwork(); } catch { return "mainnet"; } })();
+  if (!el){
+    el = document.createElement("div");
+    el.id = "hlAcctBanner";
+    el.className = "hl-acct-banner";
+    el.setAttribute("role", "status");
+    host.insertBefore(el, host.firstChild);
+  }
+  el.dataset.kind = kind;
+  if (kind === "error"){
+    el.innerHTML =
+      `<span class="hab-ic" aria-hidden="true">!</span>
+       <span class="hab-txt"><b>Couldn’t load your Hyperliquid account.</b> Network or rate-limit issue on ${net}.</span>
+       <button type="button" class="btn ghost xs hab-act">Retry</button>`;
+    el.querySelector(".hab-act").onclick = () => { userLoadError = false; renderAccountBanner(); pollUser(); };
+  } else {
+    el.innerHTML =
+      `<span class="hab-ic" aria-hidden="true">○</span>
+       <span class="hab-txt"><b>No Hyperliquid account on ${net}.</b> Market data is live, but you have no balance here — deposit on app.hyperliquid.xyz${net === "testnet" ? " (testnet)" : ""} or switch network.</span>
+       <a class="btn ghost xs hab-act" href="https://app.hyperliquid.xyz/${net === "testnet" ? "?testnet" : ""}" target="_blank" rel="noopener">Open Hyperliquid ↗</a>`;
+  }
 }
 const ICON_WALLET = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 14h2"/></svg>`;
 const ICON_POS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-8M21 8v4h-4"/></svg>`;
@@ -1113,6 +1187,7 @@ function switchNetwork(net){
   emitNet();
   // reset + reload all data on the new host
   ctxByCoin = {}; mids = {}; lastPx = null; candles = []; book = { bids:[], asks:[] };
+  userData = null; userLoadError = false; renderAccountBanner();
   booted = false;
   (async () => {
     await boot();

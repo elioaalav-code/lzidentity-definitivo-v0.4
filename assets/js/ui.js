@@ -533,15 +533,85 @@ export function skeleton({ rows = 3, height = 44, gap = 8, radius = 12 } = {}){
   for (let i = 0; i < rows; i++) h += `<div class="lz-skel" style="height:${height}px;border-radius:${radius}px"></div>`;
   return `<div class="lz-skel-stack" style="gap:${gap}px" aria-busy="true" aria-label="Loading">${h}</div>`;
 }
-export function emptyState({ icon = "", title = "Nothing here yet", body = "", actionLabel = "", onAction = null } = {}){
+export function emptyState({ icon = "", title = "Nothing here yet", body = "", actionLabel = "", onAction = null, variant = "empty" } = {}){
   const el = document.createElement("div");
-  el.className = "lz-empty";
+  const isErr = variant === "error";
+  el.className = "lz-empty" + (isErr ? " lz-empty--error" : "");
+  el.setAttribute("role", isErr ? "alert" : "status");
+  if (isErr && !icon){
+    icon = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.2M12 16h.01" stroke-linecap="round"/></svg>`;
+  }
   el.innerHTML = `${icon ? `<div class="lz-empty-icn">${icon}</div>` : ``}
     <div class="lz-empty-title">${escapeHtml(title)}</div>
     ${body ? `<div class="lz-empty-body">${escapeHtml(body)}</div>` : ``}
-    ${actionLabel ? `<button type="button" class="btn ghost sm lz-empty-action">${escapeHtml(actionLabel)}</button>` : ``}`;
+    ${actionLabel ? `<button type="button" class="btn ${isErr ? "accent" : "ghost"} sm lz-empty-action">${escapeHtml(actionLabel)}</button>` : ``}`;
   if (actionLabel && onAction) el.querySelector(".lz-empty-action").addEventListener("click", onAction);
   return el;
+}
+
+/* ─── modal — shared accessible dialog (focus-trap + inert + restore) ───
+ * One modal primitive so the app stops shipping 3 different ad-hoc dialogs.
+ *   modal({ title, body, className, width, closeOnBackdrop, onClose })
+ *     body — an HTML string OR a DOM node
+ *   → { el, panel, body, close }
+ * Traps Tab inside the panel, marks the rest of <body> inert, restores
+ * focus to the opener on close, closes on Esc / backdrop / the ✕ button. */
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+export function modal({ title = "", body = "", className = "", width = "", closeOnBackdrop = true, onClose = null } = {}){
+  const prevFocus = document.activeElement;
+  const overlay = document.createElement("div");
+  overlay.className = "lz-modal-overlay" + (className ? " " + className : "");
+  const titleId = uid("modal-ttl");
+  const panel = document.createElement("div");
+  panel.className = "lz-modal-panel";
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-modal", "true");
+  panel.tabIndex = -1;
+  if (title) panel.setAttribute("aria-labelledby", titleId);
+  if (width) panel.style.width = width;
+  panel.innerHTML =
+    (title ? `<div class="lz-modal-head"><h3 id="${titleId}" class="lz-modal-title">${escapeHtml(title)}</h3>` +
+      `<button type="button" class="lz-modal-close" aria-label="Close">✕</button></div>` : "") +
+    `<div class="lz-modal-body"></div>`;
+  const bodyEl = panel.querySelector(".lz-modal-body");
+  if (body instanceof Node) bodyEl.appendChild(body); else bodyEl.innerHTML = body;
+  overlay.appendChild(panel);
+
+  // make the rest of the app inert (keyboard + AT) while open
+  const inerted = [];
+  for (const ch of Array.from(document.body.children)){
+    if (ch === overlay || ch.inert) continue;
+    ch.inert = true; inerted.push(ch);
+  }
+  document.body.appendChild(overlay);
+
+  let closed = false;
+  function close(){
+    if (closed) return; closed = true;
+    document.removeEventListener("keydown", onKey, true);
+    inerted.forEach(ch => { ch.inert = false; });
+    const fin = () => overlay.remove();
+    overlay.classList.add("closing");
+    if (reduce()) fin(); else setTimeout(fin, 180);
+    if (prevFocus && prevFocus.focus) { try { prevFocus.focus(); } catch (_) {} }
+    if (onClose) onClose();
+  }
+  function onKey(e){
+    if (e.key === "Escape"){ e.preventDefault(); close(); return; }
+    if (e.key !== "Tab") return;
+    const f = panel.querySelectorAll(FOCUSABLE);
+    if (!f.length){ e.preventDefault(); panel.focus(); return; }
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+  }
+  document.addEventListener("keydown", onKey, true);
+  const closeBtn = panel.querySelector(".lz-modal-close");
+  if (closeBtn) closeBtn.addEventListener("click", close);
+  if (closeOnBackdrop) overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  requestAnimationFrame(() => { (panel.querySelector(FOCUSABLE) || panel).focus(); });
+
+  return { el: overlay, panel, body: bodyEl, close };
 }
 
 /* ─── util ─────────────────────────────────────────────────────── */
@@ -549,6 +619,22 @@ export function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+/* html`` — tagged template that escapes every interpolation by default,
+ * so remote/relay/on-chain data can never inject markup. Wrap a value in
+ * raw() when you intentionally embed already-safe HTML.
+ *   html`<b>${userName}</b> ${raw(trustedFragment)}`  */
+const RAW = Symbol("lz-raw");
+export const raw = (s) => ({ [RAW]: String(s == null ? "" : s) });
+export function html(strings, ...values){
+  let out = strings[0];
+  for (let i = 0; i < values.length; i++){
+    const v = values[i];
+    out += (v && v[RAW] != null) ? v[RAW] : escapeHtml(v == null ? "" : v);
+    out += strings[i + 1];
+  }
+  return out;
+}
+
 /* auto-init press ripple, and expose a global for non-module callers */
 initButtonFX();
-window.LZUI = { CustomSelect, coinAvatar, coinAvatarHTML, magnetic, initButtonFX, skeleton, emptyState, fuzzyScore, escapeHtml };
+window.LZUI = { CustomSelect, coinAvatar, coinAvatarHTML, magnetic, initButtonFX, skeleton, emptyState, modal, fuzzyScore, escapeHtml, html, raw };

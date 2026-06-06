@@ -15,7 +15,7 @@
  *  The key lives only in localStorage and is sent only to Anthropic.
  * ============================================================ */
 
-import { CustomSelect } from "./ui.js";
+import { CustomSelect, escapeHtml } from "./ui.js";
 import * as HL from "./hyperliquid.js";
 import * as MD from "./marketdata.js";
 import { heatBand } from "./risk.js";
@@ -258,7 +258,7 @@ Call get_risk first, then ground every suggestion in those numbers. Think in ris
 Framing rules (strict): this is general risk education, NOT financial advice. Never promise returns, never state a price prediction as fact, never say "buy/sell X because it will go up/down". Use hedged language ("you could consider…", "one way to reduce risk…"). If the user has no API key the app already handles basic commands; strategy requires the connected assistant.`;
 
 /* ─── rendering ────────────────────────────────────────────── */
-function escapeHtml(s){ return s.replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+/* escapeHtml now imported from ui.js (single shared escaper) */
 function mdLite(s){
   let h = escapeHtml(s);
   h = h.replace(/`([^`]+)`/g, "<code>$1</code>");
@@ -1052,9 +1052,26 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !panel.hidden && !cmdOpen){ closePanel(); }
 });
 
+/* visible "bring-your-own-key" notice rendered right under the API-key
+ * field. The key itself is handled by the app/coordinator (storage); this is
+ * purely the UX warning so the user can see — not just read in source — that
+ * the key never leaves their browser. Idempotent. */
+function ensureKeyWarning(){
+  if (!keyInput || document.getElementById("copilotKeyNote")) return;
+  const field = keyInput.closest(".cs-field") || keyInput;
+  const note = document.createElement("p");
+  note.id = "copilotKeyNote";
+  note.className = "cs-keynote";
+  note.setAttribute("role", "note");
+  note.innerHTML =
+    `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>` +
+    `<span><b>BYO key — stored locally in this browser.</b> Your Anthropic key is kept on this device and sent only to Anthropic, never to us or any relay. Clearing site data or using <em>Remove key</em> deletes it.</span>`;
+  field.insertAdjacentElement("afterend", note);
+}
+
 settingsBtn?.addEventListener("click", () => {
   settingsEl.hidden = !settingsEl.hidden;
-  if (!settingsEl.hidden){ keyInput.value = getKey(); modelSelect?.setValue(getModel()); }
+  if (!settingsEl.hidden){ ensureKeyWarning(); keyInput.value = getKey(); modelSelect?.setValue(getModel()); }
 });
 $("copilotKeySave")?.addEventListener("click", () => {
   const k = keyInput.value.trim();

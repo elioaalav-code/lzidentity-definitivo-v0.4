@@ -3,10 +3,8 @@
  * ============================================================ */
 
 :root{
-  --long:#3fb98a;
-  --long-soft:rgba(63,185,138,.14);
-  --short:#e0556b;
-  --short-soft:rgba(224,85,107,.14);
+  /* --long/--short/--long-soft/--short-soft moved to base.css (single source of
+   * truth, shared by every lane). Provenance kept here as a comment. */
   /* refined onyx terminal — premium card treatment.
    * v0.3: cards get a solid #0c0c10 base so they lift clearly off the
    * near-black #050505 canvas (defined panels = pro terminal look). */
@@ -433,3 +431,26 @@
   .trade-view.lz-revealed > *{animation:none}
   .chart-loading .ring,.au-bar i,.book-imb .ib-bar i{animation:none;transition:none}
 }
+
+/* ─── Connected-but-empty / wrong-network account banner ──────────
+ * Injected by trade.js into .trade-positions (the testnet-zero bug
+ * class): explicit, actionable copy instead of a silent zero table. */
+.hl-acct-banner{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:11px 14px;
+  border-radius:var(--r);font-size:13px;line-height:1.4;animation:tvIn .4s var(--ease-out) both}
+.hl-acct-banner .hab-txt{flex:1;min-width:0}
+.hl-acct-banner .hab-txt b{font-weight:600}
+.hl-acct-banner .hab-ic{flex-shrink:0;display:grid;place-items:center;width:22px;height:22px;
+  border-radius:999px;font-family:var(--mono);font-weight:700;font-size:13px}
+.hl-acct-banner .hab-act{flex-shrink:0;white-space:nowrap;text-decoration:none}
+.hl-acct-banner[data-kind="empty"]{border:1px solid rgba(255,122,89,.30);background:rgba(255,122,89,.07);color:#ffd2c2}
+.hl-acct-banner[data-kind="empty"] .hab-ic{background:rgba(255,122,89,.16);color:var(--accent-3)}
+.hl-acct-banner[data-kind="error"]{border:1px solid var(--short);background:var(--short-soft);color:#ffd0d8}
+.hl-acct-banner[data-kind="error"] .hab-ic{background:var(--short-soft);color:var(--short)}
+
+/* ─── Inline region retry panel (chart / order book load failure) ── */
+.hl-region-err{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;padding:16px;text-align:center;
+  background:var(--card-bg);border-radius:inherit;color:var(--text-mute);font-size:13px}
+.mid-pane[data-pane="book"]{position:relative}
+.hl-region-err .hre-txt{max-width:240px}
+@media (prefers-reduced-motion: reduce){ .hl-acct-banner{animation:none} }

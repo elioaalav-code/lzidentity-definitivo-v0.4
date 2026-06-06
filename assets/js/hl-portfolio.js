@@ -16,6 +16,7 @@
  * ===================================================================== */
 
 import * as HL from "./hyperliquid.js";
+import * as fmt from "./fmt-num.js";
 import { state, onChange, toast, shortAddr } from "./shared.js";
 
 /* ─── module state ─────────────────────────────────────────── */
@@ -25,6 +26,7 @@ let pollTimer = null;
 let booted   = false;
 let ch       = null;      // last clearinghouse snapshot
 let fills    = [];        // userFills (newest first)
+let loadError = false;    // last clearinghouse load failed
 let loadSeq  = 0;         // guards out-of-order async loads
 let eqPeriod = "all";     // "all" | "7d" | "30d" | "24h"
 
@@ -42,40 +44,12 @@ function esc(s){
 }
 const num = (v) => { const n = Number(v); return isFinite(n) ? n : null; };
 
-function usd(v){
-  const n = num(v);
-  if (n == null) return "—";
-  const abs = Math.abs(n);
-  const opt = abs >= 10000 ? { maximumFractionDigits: 0 }
-            : abs >= 1     ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-            :                { maximumFractionDigits: 4 };
-  return (n < 0 ? "−$" : "$") + abs.toLocaleString("en-US", opt);
-}
-function signedUsd(v){
-  const n = num(v);
-  if (n == null) return "—";
-  const abs = Math.abs(n);
-  const str = abs.toLocaleString("en-US",
-    { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return (n >= 0 ? "+" : "−") + "$" + str;
-}
-function pxStr(v){
-  const n = num(v);
-  if (n == null) return "—";
-  if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 1 });
-  if (n >= 1)    return n.toLocaleString("en-US", { maximumFractionDigits: 3 });
-  return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
-}
-function szStr(v){
-  const n = num(v);
-  if (n == null) return "—";
-  return Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 6 });
-}
-function pctStr(v){
-  const n = num(v);
-  if (n == null) return "—";
-  return (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(2) + "%";
-}
+/* Number formatting delegates to the shared fmt-num.js module. */
+const usd       = (v) => fmt.usd(v);
+const signedUsd = (v) => fmt.signedUsd(v);
+const pxStr     = (v) => fmt.price(v);
+const szStr     = (v) => fmt.size(v, { decimals: 6 });
+const pctStr    = (v) => fmt.pct(v);
 function net(){
   try { return HL.getNetwork(); } catch { return "testnet"; }
 }
@@ -397,6 +371,33 @@ function onMountClick(e){
 }
 
 /* ─── render ───────────────────────────────────────────────── */
+/* Connected-but-empty / load-error banner — same testnet-zero bug class
+ * as the trade view. Shown above the KPIs when a wallet is connected but
+ * the clearinghouse on the current HL network has no balance, or failed
+ * to load. Returns an HTML string (render() concatenates it). */
+function acctIsEmpty(){
+  if (!ch) return false;
+  const av = num(ch?.marginSummary?.accountValue);
+  const hasPos = (ch.assetPositions || []).some(p => Number(p.position?.szi) !== 0);
+  return (!av && !hasPos);
+}
+function renderAcctBanner(){
+  const n = net();
+  if (loadError){
+    return `<div class="pf-acct-banner" data-kind="error" role="status">
+      <span class="pfb-ic" aria-hidden="true">!</span>
+      <span class="pfb-txt"><b>Couldn’t load your Hyperliquid account.</b> Network or rate-limit issue on ${esc(n)}.</span>
+      <button type="button" class="btn ghost xs pfb-act">Retry</button></div>`;
+  }
+  if (acctIsEmpty()){
+    return `<div class="pf-acct-banner" data-kind="empty" role="status">
+      <span class="pfb-ic" aria-hidden="true">○</span>
+      <span class="pfb-txt"><b>No Hyperliquid account on ${esc(n)}.</b> Deposit on app.hyperliquid.xyz${n === "testnet" ? " (testnet)" : ""} or switch network to see your portfolio.</span>
+      <a class="btn ghost xs pfb-act-link" href="https://app.hyperliquid.xyz/${n === "testnet" ? "?testnet" : ""}" target="_blank" rel="noopener">Open Hyperliquid ↗</a></div>`;
+  }
+  return "";
+}
+
 function render(){
   if (!mount) return;
   ensureScaffold();
@@ -422,6 +423,7 @@ function render(){
   }
 
   body.innerHTML =
+    renderAcctBanner() +
     renderKpis() +
     renderCoinPnl() +
     renderTradingStats() +
@@ -429,6 +431,8 @@ function render(){
     renderFills();
 
   wireEquityHover();
+  const rb = body.querySelector(".pf-acct-banner .pfb-act");
+  if (rb) rb.onclick = () => load();
 }
 
 /* Re-render only the equity panel (period switch) without touching KPIs/fills */
@@ -898,12 +902,16 @@ async function load(){
     if (account !== state.account) return;
     if (c){
       ch = c;
+      loadError = false;
       const av = c.marginSummary && c.marginSummary.accountValue;
       sampleEquity(account, av);
+    } else {
+      loadError = true;          // clearinghouse fetch failed (caught → null)
     }
     fills = Array.isArray(f) ? f : [];
     render();
   } catch {
+    loadError = true;
     if (seq === loadSeq) render();
   }
 }

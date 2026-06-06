@@ -16,23 +16,19 @@
  *  briefly to stay friendly with the free rate limits.
  * ============================================================ */
 
+import { fetchJSON } from "./net.js";
+
 const CG = "https://api.coingecko.com/api/v3";
 const DL = "https://api.llama.fi";
 
-/* tiny TTL cache + timeout-guarded fetch */
-const _cache = new Map();
+/* Routed through net.js: AbortController timeout + retry-with-backoff on
+ * transient 5xx/network errors + a short by-URL cache. Same signature as
+ * before (callers unchanged); `ttl` maps to net.js's `cache` window. */
 async function getJSON(url, { ttl = 45_000, timeout = 9_000 } = {}){
-  const hit = _cache.get(url);
-  if (hit && Date.now() - hit.t < ttl) return hit.v;
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), timeout);
-  try {
-    const r = await fetch(url, { signal: ctl.signal, headers: { accept: "application/json" } });
-    if (!r.ok) throw new Error(`HTTP ${r.status} from ${new URL(url).host}`);
-    const v = await r.json();
-    _cache.set(url, { t: Date.now(), v });
-    return v;
-  } finally { clearTimeout(timer); }
+  return fetchJSON(url, {
+    timeout, retries: 1, cache: ttl,
+    headers: { accept: "application/json" },
+  });
 }
 
 const num = (n) => (n == null || isNaN(n) ? null : Number(n));

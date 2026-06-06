@@ -736,3 +736,16 @@
   .pf-fills-table tbody tr { transition: none; }
   .pf-eq-sampling { animation: none; opacity: .6; }
 }
+
+/* ─── Connected-but-empty / load-error banner (testnet-zero class) ── */
+.pf-acct-banner{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:11px 14px;
+  border-radius:var(--r);font-size:13px;line-height:1.4}
+.pf-acct-banner .pfb-txt{flex:1;min-width:0}
+.pf-acct-banner .pfb-txt b{font-weight:600}
+.pf-acct-banner .pfb-ic{flex-shrink:0;display:grid;place-items:center;width:22px;height:22px;
+  border-radius:999px;font-family:var(--mono);font-weight:700;font-size:13px}
+.pf-acct-banner .pfb-act,.pf-acct-banner .pfb-act-link{flex-shrink:0;white-space:nowrap;text-decoration:none}
+.pf-acct-banner[data-kind="empty"]{border:1px solid rgba(255,122,89,.30);background:rgba(255,122,89,.07);color:#ffd2c2}
+.pf-acct-banner[data-kind="empty"] .pfb-ic{background:rgba(255,122,89,.16);color:var(--accent-3)}
+.pf-acct-banner[data-kind="error"]{border:1px solid var(--short);background:var(--short-soft);color:#ffd0d8}
+.pf-acct-banner[data-kind="error"] .pfb-ic{background:var(--short-soft);color:var(--short)}

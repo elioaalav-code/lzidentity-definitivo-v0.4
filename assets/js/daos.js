@@ -113,6 +113,44 @@ export function getCommunity(id){
 }
 
 /* ============================================================ *
+ *  NIP-28 channel roots (kind-40 event ids).
+ *  Seed/builder channels ship with root:"" — a real kind-40
+ *  channel-create event must be published once to mint the root
+ *  that kind-42 messages tag. We persist minted roots in
+ *  localStorage keyed by `${communityId}:${channelId}` and merge
+ *  them in via applyChannelRoots() so channels survive reloads
+ *  without committing per-user ids into the registry.
+ * ============================================================ */
+const ROOTS_KEY = "lz:channelRoots";
+function loadChannelRoots(){
+  try { const v = JSON.parse(localStorage.getItem(ROOTS_KEY) || "{}"); return (v && typeof v === "object") ? v : {}; }
+  catch (_) { return {}; }
+}
+/** Persist a minted kind-40 root id for a channel. Idempotent. */
+export function setChannelRoot(communityId, channelId, rootId){
+  if (!communityId || !channelId || !rootId) return false;
+  const map = loadChannelRoots();
+  const k = communityId + ":" + channelId;
+  if (map[k] === rootId) return true;
+  map[k] = String(rootId);
+  try { localStorage.setItem(ROOTS_KEY, JSON.stringify(map)); } catch (_) {}
+  return true;
+}
+/** Lookup a persisted root for a channel, or "" if none minted yet. */
+export function getChannelRoot(communityId, channelId){
+  return loadChannelRoots()[communityId + ":" + channelId] || "";
+}
+/** Merge persisted roots onto a community's channels (mutates+returns the community). */
+function applyChannelRoots(c){
+  if (!c || !c.nostr || !Array.isArray(c.nostr.channels)) return c;
+  const map = loadChannelRoots();
+  for (const ch of c.nostr.channels){
+    if (!ch.root){ const r = map[c.id + ":" + ch.id]; if (r) ch.root = r; }
+  }
+  return c;
+}
+
+/* ============================================================ *
  *  Adding your own communities (search engine + manual add).
  *  User-added communities persist in localStorage and merge with
  *  the seed registry. Governance resolves hybrid: a known on-chain
@@ -207,12 +245,14 @@ export function isUserCommunity(id){
   return loadUserCommunities().some((u) => u.id === id);
 }
 
-/** Seed + user communities, deduped by id (seed wins). */
+/** Seed + user communities, deduped by id (seed wins). Persisted NIP-28
+   channel roots are merged in so minted channels survive reloads. */
 export function allCommunities(){
   const out = COMMUNITIES.slice();
   const seen = new Set(out.map((c) => c.id));
   for (const u of loadUserCommunities()){
     if (u && u.id && !seen.has(u.id)){ out.push(u); seen.add(u.id); }
   }
+  out.forEach(applyChannelRoots);
   return out;
 }

@@ -158,10 +158,42 @@
 .lz-empty-title{font-size:14px;font-weight:500;color:var(--text)}
 .lz-empty-body{font-size:12.5px;color:var(--text-mute);max-width:34ch;line-height:1.5}
 .lz-empty-action{margin-top:4px}
+/* error variant — same skeleton, warmer signal */
+.lz-empty--error .lz-empty-icn{border-color:rgba(253,164,175,.32);color:var(--error);background:rgba(253,164,175,.07)}
+.lz-empty--error .lz-empty-title{color:var(--text)}
+
+/* ── modal — shared accessible dialog (window.LZUI.modal) ─────── */
+.lz-modal-overlay{
+  position:fixed; inset:0; z-index:140;
+  display:grid; place-items:center; padding:24px;
+  background:rgba(3,3,5,.62);
+  backdrop-filter:blur(8px) saturate(1.1); -webkit-backdrop-filter:blur(8px) saturate(1.1);
+  animation:lzFade .2s var(--ease-out);
+}
+.lz-modal-overlay.closing{animation:lzFade .16s var(--ease-out) reverse}
+.lz-modal-panel{
+  width:min(560px,96vw); max-height:88vh; display:flex; flex-direction:column;
+  border-radius:var(--r-xl); outline:none;
+  background:var(--glass-strong-bg);
+  box-shadow:var(--glass-hl),var(--glass-rim),var(--glass-drop);
+  backdrop-filter:blur(20px) brightness(1.06); -webkit-backdrop-filter:blur(20px) brightness(1.06);
+  overflow:hidden; animation:lzModalRise .3s var(--ease-out);
+}
+.lz-modal-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:18px 20px 14px}
+.lz-modal-title{font:600 16px/1 var(--sans); letter-spacing:-.01em}
+.lz-modal-close{
+  width:30px; height:30px; border-radius:var(--r-sm); color:var(--text-mute);
+  display:grid; place-items:center; font-size:14px; transition:.2s var(--ease); flex:none;
+}
+.lz-modal-close:hover{color:var(--text); background:rgba(255,255,255,.06)}
+.lz-modal-body{padding:4px 20px 22px; overflow-y:auto; border-top:1px solid var(--hairline)}
+.lz-modal-head + .lz-modal-body{padding-top:16px}
+@keyframes lzModalRise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
 
 /* ── reduced motion ───────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce){
   .lz-select-pop,.lz-select.as-sheet .lz-select-pop,.lz-select-row,.lz-skel{animation:none !important}
+  .lz-modal-overlay,.lz-modal-panel{animation:none !important}
   .btn::after{display:none}
   .lz-ripple{display:none}
   .lz-magnetic{transition:none}

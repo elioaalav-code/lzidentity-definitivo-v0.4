@@ -16,6 +16,7 @@
  * =================================================================== */
 
 import * as MD from "./marketdata.js";
+import * as fmt from "./fmt-num.js";
 
 /* ─── Colour palette (resolved once from CSS vars) ─────────────── */
 const COL = (() => {
@@ -35,34 +36,11 @@ const COL = (() => {
   };
 })();
 
-/* ─── Number formatters ─────────────────────────────────────────── */
-const fmtUSD = (n) => {
-  if (n == null || isNaN(n)) return "—";
-  if (Math.abs(n) >= 1e12) return "$" + (n / 1e12).toFixed(2) + "T";
-  if (Math.abs(n) >= 1e9)  return "$" + (n / 1e9).toFixed(2) + "B";
-  if (Math.abs(n) >= 1e6)  return "$" + (n / 1e6).toFixed(2) + "M";
-  if (Math.abs(n) >= 1e3)  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (Math.abs(n) >= 1)    return "$" + n.toFixed(4);
-  return "$" + n.toPrecision(4);
-};
-const fmtPct = (n) => {
-  if (n == null || isNaN(n)) return "—";
-  return (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
-};
-const fmtSupply = (n) => {
-  if (n == null || isNaN(n)) return "—";
-  if (n >= 1e9)  return (n / 1e9).toFixed(2) + "B";
-  if (n >= 1e6)  return (n / 1e6).toFixed(2) + "M";
-  if (n >= 1e3)  return (n / 1e3).toFixed(2) + "K";
-  return n.toLocaleString("en-US");
-};
-const fmtPx = (n) => {
-  if (n == null || isNaN(n)) return "—";
-  if (n >= 1e4)  return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (n >= 1)    return "$" + n.toFixed(2);
-  if (n >= 0.01) return "$" + n.toFixed(4);
-  return "$" + n.toPrecision(4);
-};
+/* ─── Number formatters (all via the shared fmt-num.js module) ──── */
+const fmtUSD    = (n) => fmt.usdCompact(n);   // market cap / volume / TVL
+const fmtPct    = (n) => fmt.pct(n);
+const fmtSupply = (n) => fmt.compact(n);
+const fmtPx     = (n) => fmt.usd(n);          // $-prefixed price
 
 /* ─── Chart range config ────────────────────────────────────────── */
 const RANGES = [
@@ -393,9 +371,9 @@ function buildPage(root, md) {
           ${iconHTML}
           <div class="cp-title-info">
             <div class="cp-name-row">
-              <h1 class="cp-name">${md.name || md.id}</h1>
-              <span class="cp-sym">${md.symbol || ""}</span>
-              ${md.market_cap_rank ? `<span class="cp-rank">#${md.market_cap_rank}</span>` : ""}
+              <h1 class="cp-name">${esc(md.name || md.id)}</h1>
+              <span class="cp-sym">${esc(md.symbol || "")}</span>
+              ${md.market_cap_rank ? `<span class="cp-rank">#${esc(md.market_cap_rank)}</span>` : ""}
             </div>
             <div class="cp-price-row">
               <span class="cp-price">${fmtPx(md.price_usd)}</span>
@@ -405,7 +383,7 @@ function buildPage(root, md) {
           </div>
         </div>
         <button class="cp-trade-btn" id="cpTradeBtn">
-          Trade ${md.symbol || ""} on Hyperliquid
+          Trade ${esc(md.symbol || "")} on Hyperliquid
           <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13 13 3M6 3h7v7"/></svg>
         </button>
       </div>

@@ -267,3 +267,24 @@
   animation:none !important;
   transition:none !important;
 }
+
+/* ── "you voted" persistent badge ─────────────────────────────── */
+.gov-root .gov-voted{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:var(--r-full,999px);
+  font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.03em;
+  color:var(--success,#86efac);
+  border:1px solid rgba(134,239,172,.32);background:rgba(134,239,172,.08);
+}
+.gov-root .gov-voted-icn{flex:0 0 auto}
+.gov-root .gov-vote-msg.gov-msg-ok{display:inline-flex;align-items:center;gap:5px}
+
+/* ── voting context line (countdown / quorum / total) ─────────── */
+.gov-root .gov-ctx{
+  display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;
+  font-size:11.5px;color:var(--text-mute);
+}
+.gov-root .gov-ctx > span{display:inline-flex;align-items:center;gap:5px}
+.gov-root .gov-ctx-time{color:var(--text-dim);font-weight:600}
+.gov-root .gov-ctx-time::before{content:"⏳";font-size:11px}
+.gov-root .gov-ctx-quorum::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent-2,#5eead4);opacity:.7}

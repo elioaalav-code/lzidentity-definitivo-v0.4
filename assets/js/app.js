@@ -2,8 +2,8 @@ import {
   awaitCrypto, bootstrapWallet, connectWallet, disconnectWallet, deriveNostr,
   onChange, state, shortAddr, shortNpub, toast, fmt, copyToClipboard,
 } from "./shared.js";
-import { CustomSelect, coinAvatarHTML, skeleton, emptyState } from "./ui.js";
-import { mountSigil, sigilDataURL } from "./sigil.js";
+import { CustomSelect, coinAvatarHTML, skeleton, emptyState, escapeHtml } from "./ui.js";
+import { mountSigil, sigilDataURL, exportSigil, shareSigil, fingerprint } from "./sigil.js";
 import { withViewTransition } from "./motion.js";
 
 const prefersReduced = () =>
@@ -162,136 +162,11 @@ onChange(() => { if (state.account !== lastWalletAddr){ lastWalletAddr = state.a
 /* =================================================================== *
  *  CHAT VIEW
  * =================================================================== */
-const CONVS = [
-  { id:"maya",   name:"Maya Chen",       addr:"0x7A2d…91F0",  pres:"Mesh nearby · -54 dBm", layer:"mesh",  last:"Routing via Optimism. Cost under budget.", time:"2m",  unread:2, av:"MC",  cls:"" },
-  { id:"atlas",  name:"Atlas DAO",       addr:"npub1…k9v",    pres:"Online via Nostr",       layer:"nostr", last:"New NIP-28 channel checkpoint published.",   time:"18m", unread:0, av:"AD",  cls:"b" },
-  { id:"river",  name:"River Ops",       addr:"0x38Cd…A117",  pres:"Last seen 1h ago",       layer:"lz",    last:"LayerZero receipt finalized on Arbitrum.",   time:"1h",  unread:1, av:"RO",  cls:"c" },
-  { id:"deck",   name:"Deck Crew",       addr:"0xF1A4…0237",  pres:"Mesh nearby",            layer:"mesh",  last:"Mesh test passed at -54 dBm.",               time:"3h",  unread:0, av:"DK",  cls:"d" },
-  { id:"star",   name:"Stargate Relay",  addr:"npub1…q4m",    pres:"Relay · damus.io",       layer:"nostr", last:"Encrypted payload archived to relay.",       time:"5h",  unread:0, av:"SG",  cls:"e" },
-  { id:"helix",  name:"Helix Bridge",    addr:"0x9Cf2…3a01",  pres:"Bridge online · arb⇄op", layer:"lz",    last:"OFTv2 quote: 0.018 ETH for 0.5 ETH bridge.",  time:"yest",unread:0, av:"HX",  cls:"" },
-];
-
-const THREADS = {
-  maya: [
-    { from:"them", text:"Hey — are you on the venue floor? My signal is rough.", meta:"10:36 · via Mesh · 2 hops", layer:"mesh" },
-    { from:"you",  text:"Yes. Three peers within 80m. Falling back to Nostr if RSSI drops.", meta:"10:38 · via Auto", layer:"auto" },
-    { from:"them", text:"Send the treasury settlement note cross-chain so finance can audit it.", meta:"10:39 · via Mesh", layer:"mesh" },
-    { from:"you",  text:"Encrypted payload is inflight from Arbitrum to Optimism. 14s ETA.", meta:"10:42 · ARB → OP", layer:"lz", inflight:true },
-  ],
-  atlas: [
-    { from:"them", text:"New NIP-28 channel checkpoint just published. Subscribe to atlas-ops.", meta:"09:24 · relay.damus.io", layer:"nostr" },
-    { from:"you",  text:"Subscribed. Will mirror to my home relay.", meta:"09:30 · via Nostr", layer:"nostr" },
-  ],
-  river: [
-    { from:"them", text:"LayerZero receipt finalized on Arbitrum. tx 0x9f12…a88c", meta:"08:14 · LZ v2", layer:"lz" },
-    { from:"you",  text:"Got it. Confirming on Optimism side now.", meta:"08:14 · via Auto", layer:"auto" },
-  ],
-  deck:  [{ from:"them", text:"Mesh test passed at -54 dBm.", meta:"07:50 · mesh", layer:"mesh" }],
-  star:  [{ from:"them", text:"Encrypted payload archived to relay.damus.io.", meta:"06:22 · nostr", layer:"nostr" }],
-  helix: [{ from:"them", text:"OFTv2 quote: 0.018 ETH for a 0.5 ETH bridge.", meta:"yesterday · lz", layer:"lz" }],
-};
-
-let activeConv = "maya";
-let composeLayer = "auto";
-
-function renderChatList(filter=""){
-  const items = document.getElementById("chatItems");
-  const q = filter.toLowerCase();
-  const matched = CONVS.filter(c => !q || c.name.toLowerCase().includes(q) || c.last.toLowerCase().includes(q));
-  if (!matched.length){
-    items.replaceChildren(emptyState({
-      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>`,
-      title: "No conversations",
-      body: q ? `Nothing matches “${filter}”.` : "Your inbox is empty.",
-    }));
-    return;
-  }
-  items.innerHTML = matched.map((c, i) => `
-    <div class="chat-item stagger-in ${c.id===activeConv?"active":""}" data-id="${c.id}" style="--i:${i}">
-      <div class="av ${c.cls}">${c.av}</div>
-      <div class="col">
-        <div class="top"><span class="name">${c.name}</span><span class="time">${c.time}</span></div>
-        <span class="msg">${c.last}</span>
-        <div class="meta-row"><span class="tag ${c.layer}">${c.layer.toUpperCase()}</span></div>
-      </div>
-      ${c.unread ? `<span class="unread">${c.unread}</span>` : ""}
-    </div>
-  `).join("");
-  items.querySelectorAll(".chat-item").forEach(el => {
-    el.addEventListener("click", () => { activeConv = el.dataset.id; renderChatList(filter); renderThread(); });
-  });
-}
-
-function renderThread(){
-  const c = CONVS.find(x => x.id === activeConv);
-  const root = document.getElementById("chatThread");
-  if (!c){ root.innerHTML = ""; return; }
-  const msgs = THREADS[c.id] || [];
-  root.innerHTML = `
-    <div class="thread-head">
-      <div class="who">
-        <div class="av">${c.av}</div>
-        <div class="info"><span class="nm">${c.name}</span><span class="sub">${c.addr} · ${c.pres}</span></div>
-      </div>
-      <div class="meta">
-        <span class="tag ${c.layer}">${c.layer.toUpperCase()}</span>
-      </div>
-    </div>
-    <div class="thread-body" id="threadBody">
-      ${msgs.map(m => `
-        <div class="msg-bubble ${m.from} ${m.inflight?"inflight":""}">
-          <div>${m.text}</div>
-          <div class="meta"><span>${m.meta}</span></div>
-        </div>
-      `).join("")}
-    </div>
-    <div class="thread-compose">
-      <div class="layer-picker" id="layerPicker">
-        ${["auto","mesh","nostr","layerzero"].map(l => `<button data-l="${l}" class="${l===composeLayer?"on":""}">${l}</button>`).join("")}
-      </div>
-      <input type="text" id="composeInput" placeholder="Encrypted message via ${composeLayer}…" />
-      <button class="btn accent sm" id="sendChatBtn">Send →</button>
-    </div>
-  `;
-  document.getElementById("layerPicker").querySelectorAll("button").forEach(b => {
-    b.addEventListener("click", () => { composeLayer = b.dataset.l; renderThread(); });
-  });
-  document.getElementById("sendChatBtn").addEventListener("click", sendChatMsg);
-  document.getElementById("composeInput").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChatMsg(); });
-  const body = document.getElementById("threadBody"); body.scrollTop = body.scrollHeight;
-}
-
-function sendChatMsg(){
-  const inp = document.getElementById("composeInput");
-  const txt = inp.value.trim(); if (!txt) return;
-  inp.value = "";
-  const c = CONVS.find(x => x.id === activeConv);
-  const layerKey = composeLayer === "layerzero" ? "lz" : composeLayer;
-  const layerLabel = { mesh:"Mesh", nostr:"Nostr", lz:"LayerZero", auto:"Auto" }[layerKey] || "Auto";
-  const now = new Date();
-  const time = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
-  THREADS[c.id] = (THREADS[c.id] || []).concat({
-    from:"you", text:txt, meta:`${time} · via ${layerLabel}`, layer:layerKey, inflight: composeLayer === "layerzero"
-  });
-  renderThread();
-  toast(`sent via ${layerLabel.toLowerCase()}`, "ok");
-  // simulate a reply
-  if (Math.random() < 0.5){
-    setTimeout(() => {
-      const replies = [
-        "Got it. Routing back through the mesh.",
-        "Confirmed. Receipt landed on Arbitrum.",
-        "Stored on relay.damus.io · NIP-44 wrapped.",
-        "Acknowledged. -54 dBm, clean signal.",
-        "Ack. Will sync when next relay comes online.",
-      ];
-      THREADS[c.id].push({ from:"them", text:replies[Math.floor(Math.random()*replies.length)], meta:`${time} · via ${layerLabel}`, layer:layerKey });
-      renderThread();
-    }, 1400 + Math.random()*1200);
-  }
-}
-
-document.getElementById("chatSearch")?.addEventListener("input", (e) => renderChatList(e.target.value));
+/* Chat is now a REAL Nostr engine — see assets/js/chat-nostr.js
+ * (kind-4 NIP-04 DMs, profiles, derive-gated). It renders into the
+ * existing #chatItems / #chatThread / #chatSearch and is driven by
+ * ONROUTE.chat → window.LZ.chatNostr.init(). The old mock block lived
+ * here and was removed in v0.5 (also closed its unescaped-innerHTML XSS). */
 
 /* =================================================================== *
  *  WALLET VIEW
@@ -490,15 +365,36 @@ if (sendViaSel){
 }
 
 document.getElementById("walletRefresh")?.addEventListener("click", () => { loadWallet(); toast(state.account ? "reading balances…" : "connect a wallet first", state.account ? "ok" : "err"); });
-document.getElementById("sendBtn")?.addEventListener("click", () => {
-  const to = document.getElementById("sendTo").value.trim();
-  const amt = document.getElementById("sendAmt").value.trim();
+document.getElementById("sendBtn")?.addEventListener("click", async () => {
+  const to    = document.getElementById("sendTo").value.trim();
+  const amt   = document.getElementById("sendAmt").value.trim();
   const asset = document.getElementById("sendAsset").value;
-  const via = document.getElementById("sendVia").value;
+  const via   = document.getElementById("sendVia").value;
+  if (!state.account){ toast("connect a wallet first", "err"); return; }
   if (!to || !amt){ toast("destination and amount required", "err"); return; }
-  toast(`signed · ${amt} ${asset} → ${to.slice(0,10)}… via ${via}`, "ok");
-  document.getElementById("sendTo").value = "";
-  document.getElementById("sendAmt").value = "";
+  // Only native ETH on the default EVM route is actually sendable keylessly.
+  if (asset !== "ETH" || (via !== "auto" && via !== "mesh")){
+    toast(`${asset} via ${via} isn’t wired in this build — only native ETH transfers are live.`, "info", 4600);
+    return;
+  }
+  if (!/^0x[0-9a-fA-F]{40}$/.test(to)){ toast("enter a valid 0x address for ETH", "err"); return; }
+  const n = Number(amt);
+  if (!(n > 0)){ toast("enter a valid amount", "err"); return; }
+  const eth = window.ethereum;
+  if (!eth){ toast("no injected wallet found", "err"); return; }
+  const btn = document.getElementById("sendBtn");
+  btn.disabled = true; const old = btn.textContent; btn.textContent = "Confirm in wallet…";
+  try {
+    const wei = "0x" + Math.floor(n * 1e18).toString(16);
+    const hash = await eth.request({ method: "eth_sendTransaction",
+      params: [{ from: state.account, to, value: wei }] });
+    toast(`sent · tx ${String(hash).slice(0,10)}…`, "ok", 4200);
+    document.getElementById("sendTo").value = "";
+    document.getElementById("sendAmt").value = "";
+    setTimeout(() => { try { loadWallet(); } catch {} }, 4000);
+  } catch (e){
+    toast(e?.code === 4001 ? "transfer rejected" : "send failed · " + (e?.message || e), "err", 4200);
+  } finally { btn.disabled = false; btn.textContent = old; }
 });
 
 /* =================================================================== *
@@ -618,9 +514,12 @@ function renderMarkets(){
   root.innerHTML = rows.map((c, i) => {
     const up = (c.price_change_percentage_24h || 0) >= 0;
     const sparkUp = (c.sparkline_in_7d?.price?.[0] || 0) <= (c.sparkline_in_7d?.price?.at(-1) || 0);
-    return `<div class="row stagger-in" data-id="${c.id ?? ""}" data-sym="${c.symbol}" data-name="${c.name}" role="button" tabindex="0" aria-haspopup="menu" style="--i:${i}">
-      <span class="rk">#${c.market_cap_rank}</span>
-      <div class="coin">${c.image ? `<img src="${c.image}" alt="" loading="lazy"/>` : `<span class="coin-badge">${c.symbol.slice(0,1).toUpperCase()}</span>`}<div class="nm"><span class="s">${c.symbol.toUpperCase()}</span><span class="n">${c.name}</span></div></div>
+    const sym = escapeHtml(String(c.symbol || "").toUpperCase());
+    const nm = escapeHtml(c.name || "");
+    const img = c.image ? escapeHtml(c.image) : "";
+    return `<div class="row stagger-in" data-id="${escapeHtml(c.id ?? "")}" data-sym="${sym}" data-name="${nm}" role="button" tabindex="0" aria-haspopup="menu" style="--i:${i}">
+      <span class="rk">#${escapeHtml(c.market_cap_rank ?? "")}</span>
+      <div class="coin">${img ? `<img src="${img}" alt="" loading="lazy"/>` : `<span class="coin-badge">${sym.slice(0,1)}</span>`}<div class="nm"><span class="s">${sym}</span><span class="n">${nm}</span></div></div>
       <span class="pr">${fmt.usd(c.current_price)}</span>
       <span class="ch ${up?"up":"dn"}">${fmt.pct(c.price_change_percentage_24h)}</span>
       <span class="sk">${sparkSVG(c.sparkline_in_7d?.price, sparkUp)}</span>
@@ -660,15 +559,16 @@ function openCoinMenu(row){
   const name = row.dataset.name || sym;
   const id   = row.dataset.id && row.dataset.id !== "undefined" ? row.dataset.id : "";
   const coinRef = id || sym.toLowerCase();
+  const symE = escapeHtml(sym), nameE = escapeHtml(name);
   const m = document.createElement("div");
   m.className = "cmenu";
   m.setAttribute("role", "menu");
   m.setAttribute("aria-label", `${sym} actions`);
   m.innerHTML = `
-    <div class="cmenu-head">${coinAvatarHTML(sym, 28)}<div class="cmenu-id"><span class="s">${sym}</span><span class="n">${name}</span></div></div>
-    <button class="cmenu-item primary" data-act="trade" role="menuitem"><span>Trade ${sym} on Hyperliquid</span><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 13 13 3M6 3h7v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="cmenu-head">${coinAvatarHTML(sym, 28)}<div class="cmenu-id"><span class="s">${symE}</span><span class="n">${nameE}</span></div></div>
+    <button class="cmenu-item primary" data-act="trade" role="menuitem"><span>Trade ${symE} on Hyperliquid</span><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 13 13 3M6 3h7v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <div class="cmenu-sep">Open full data</div>
-    <button class="cmenu-item" data-act="open" role="menuitem"><span>${sym} overview · price, charts &amp; stats</span><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
+    <button class="cmenu-item" data-act="open" role="menuitem"><span>${symE} overview · price, charts &amp; stats</span><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
   document.body.appendChild(m);
   // anchor under the row, clamped to the viewport
   const r = row.getBoundingClientRect();
@@ -747,7 +647,8 @@ let stream = [...initialStream];
 renderStream(stream);
 
 setInterval(() => {
-  if (streamPaused) return;
+  // gate: skip work when manually paused, tab hidden, or off the network route
+  if (streamPaused || document.hidden || !views.network?.classList.contains("active")) return;
   // age existing
   stream = stream.map((s,i) => i === 0 ? { ...s, age: s.age === "now" ? "2s" : ageNext(s.age) } : { ...s, age: ageNext(s.age) });
   // add new
@@ -863,32 +764,66 @@ const navSigil     = document.getElementById("navSigil");
 const navSigilImg  = document.getElementById("navSigilImg");
 const navSigilName = document.getElementById("navSigilName");
 const navSigilSub  = document.getElementById("navSigilSub");
+const sigilOrb     = document.getElementById("sigilOrb");
+const sigilCap     = document.getElementById("sigilCap");
+const sigilFp      = document.getElementById("sigilFp");
+const sigilFpWords = document.getElementById("sigilFpWords");
+const sigilFpCode  = document.getElementById("sigilFpCode");
 let sigilHandle = null;
+let sigilForming = false;
+let igniteTimer = 0;
 function reflectSigil(){
   if (state.derived){
     if (sigilCanvas && sigilHero){
-      // (re)mount at the canvas' current visible size so the npub's sigil is live
-      sigilHandle?.stop();
-      sigilHandle = mountSigil(sigilCanvas, state.derived.npub);
+      const npub = state.derived.npub;
+      // If a forming handle is already live (mounted at derive-start from the
+      // EVM address), resolve it in place instead of remounting — smooth.
+      if (sigilHandle && sigilForming){
+        sigilHandle.reseed(npub);
+        sigilHandle.resolve(700);
+        sigilForming = false;
+      } else {
+        sigilHandle?.stop();
+        sigilHandle = mountSigil(sigilCanvas, npub);
+      }
+      // Ignite the "born" crescendo (one-shot; reduced-motion is CSS-guarded).
+      const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      if (!sigilHero.classList.contains("born")){
+        sigilHero.classList.add("igniting");
+        if (!reduce){ try { navigator.vibrate?.(12); } catch {} }
+        clearTimeout(igniteTimer);
+        igniteTimer = setTimeout(() => sigilHero.classList.remove("igniting"), 950);
+      }
       sigilHero.classList.add("born");
+      // Fingerprint + aria (determinism made visible).
+      const fp = fingerprint(npub);
+      if (sigilFpWords) sigilFpWords.textContent = fp.label;
+      if (sigilFpCode)  sigilFpCode.textContent  = fp.code;
+      if (sigilFp)      sigilFp.setAttribute("aria-hidden", "false");
+      if (sigilOrb)     sigilOrb.setAttribute("aria-label", `Your generative sigil — ${fp.short}`);
+      if (sigilCap)     sigilCap.textContent = `Your sigil — ${fp.short}.`;
     }
     // side-nav avatar emblem (static sigil)
     if (navSigil){
       navSigil.dataset.derived = "true";
-      if (navSigilImg) navSigilImg.src = sigilDataURL(state.derived.npub, 72);
+      if (navSigilImg){ navSigilImg.src = sigilDataURL(state.derived.npub, 72); navSigilImg.alt = `Your sigil — ${fingerprint(state.derived.npub).short}`; }
       if (navSigilName) navSigilName.textContent = "Your sigil";
       if (navSigilSub)  navSigilSub.textContent  = shortNpub(state.derived.npub);
     }
   } else {
-    sigilHandle?.stop(); sigilHandle = null;
-    sigilHero?.classList.remove("born");
+    sigilHandle?.stop(); sigilHandle = null; sigilForming = false;
+    sigilHero?.classList.remove("born", "igniting");
+    clearTimeout(igniteTimer);
     if (sigilCanvas){
       const c = sigilCanvas.getContext("2d");
       if (c) c.clearRect(0, 0, sigilCanvas.width || 1, sigilCanvas.height || 1);
     }
+    if (sigilFp)  sigilFp.setAttribute("aria-hidden", "true");
+    if (sigilOrb) sigilOrb.setAttribute("aria-label", "Your generative sigil — derive an identity to create it");
+    if (sigilCap) sigilCap.textContent = "One you — every chain.";
     if (navSigil){
       navSigil.dataset.derived = "false";
-      if (navSigilImg) navSigilImg.removeAttribute("src");
+      if (navSigilImg){ navSigilImg.removeAttribute("src"); navSigilImg.alt = ""; }
       if (navSigilName) navSigilName.textContent = "No identity yet";
       if (navSigilSub)  navSigilSub.textContent  = "tap to derive";
     }
@@ -899,6 +834,17 @@ const mbFlow = document.querySelector('[data-view="identity"] .mb-flow');
 function setDeriving(on){
   mbFlow?.classList.toggle("deriving", on);
   if (deriveBtn) deriveBtn.classList.toggle("is-deriving", on);
+  // Coalesce-from-noise: while signing, render a turbulent sigil seeded by the
+  // known EVM address so the scan sweep reveals forming art, not a blank disc.
+  if (on && !state.derived && sigilCanvas && state.account && !sigilForming){
+    sigilHandle?.stop();
+    sigilHandle = mountSigil(sigilCanvas, "evm:" + state.account, { form: 0.12 });
+    sigilForming = true;
+  } else if (!on && sigilForming && !state.derived){
+    // Signing aborted/failed before a derive — tear the interim render down.
+    sigilHandle?.stop(); sigilHandle = null; sigilForming = false;
+    if (sigilCanvas){ const c = sigilCanvas.getContext("2d"); c && c.clearRect(0,0,sigilCanvas.width||1,sigilCanvas.height||1); }
+  }
 }
 
 deriveBtn?.addEventListener("click", async () => {
@@ -920,6 +866,26 @@ deriveBtn?.addEventListener("click", async () => {
   } finally {
     setDeriving(false);
   }
+});
+
+/* Share / save the sigil — fires only once an identity exists. */
+document.getElementById("shareSigilBtn")?.addEventListener("click", async () => {
+  if (!state.derived){ toast("derive an identity first", "err"); return; }
+  try {
+    const { method } = await shareSigil(state.derived.npub, { size: 1024 });
+    if (method === "download+copy") toast("sigil saved + copied to clipboard", "ok");
+    else if (method === "download") toast("sigil saved", "ok");
+    else if (method === "share")    toast("shared", "ok");
+  } catch (e){ console.error(e); toast("could not share sigil", "err"); }
+});
+document.getElementById("saveSigilBtn")?.addEventListener("click", async () => {
+  if (!state.derived){ toast("derive an identity first", "err"); return; }
+  try {
+    const { dataURL, filename } = await exportSigil(state.derived.npub, { size: 2048 });
+    const a = document.createElement("a"); a.href = dataURL; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast("high-res sigil saved", "ok");
+  } catch (e){ console.error(e); toast("could not save sigil", "err"); }
 });
 
 resetBtn?.addEventListener("click", () => { disconnectWallet(); toast("identity cleared"); });
@@ -961,7 +927,7 @@ makeValueCopyable(idNpub, "npub");
  *  ROUTE HOOKS — onEnter
  * =================================================================== */
 const ONROUTE = {
-  chat: () => { renderChatList(""); renderThread(); },
+  chat: () => { window.LZ?.chatNostr?.init(); },
   communities: () => bootCommunities(),
   wallet: () => { loadWallet(); },
   markets: () => { if (!marketsLoaded) fetchMarkets(); else renderMarkets(); },
@@ -982,8 +948,7 @@ function bootCommunities(){
   if (window.LZ?.communities?.init){ commBooted = true; window.LZ.communities.init(); }
 }
 window.addEventListener("load", () => { if (getRoute() === "communities") bootCommunities(); });
-renderChatList("");
-renderThread();
+if (getRoute() === "chat") window.LZ?.chatNostr?.init();
 renderWallet();
 bootstrapWallet().then(() => { reflectWalletButton(); });
 

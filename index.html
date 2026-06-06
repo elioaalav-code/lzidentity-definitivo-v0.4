@@ -4,6 +4,31 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#050505" />
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' https://esm.sh;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' data: https:;
+  connect-src 'self'
+    https://esm.sh
+    https://api.coingecko.com https://api.alternative.me
+    https://api.anthropic.com https://li.quest
+    https://api.hyperliquid.xyz https://api.hyperliquid-testnet.xyz
+    https://app.hyperliquid.xyz https://hyperliquid.gitbook.io
+    https://api.llama.fi https://stablecoins.llama.fi https://yields.llama.fi
+    https://hub.snapshot.org https://seq.snapshot.org https://snapshot.org
+    https://layerzero.foundation
+    https://eth.blockscout.com https://arbitrum.blockscout.com https://base.blockscout.com https://optimism.blockscout.com
+    https://etherscan.io https://arbiscan.io https://basescan.org https://optimistic.etherscan.io https://polygonscan.com
+    https://ethereum-rpc.publicnode.com https://arbitrum-one-rpc.publicnode.com https://base-rpc.publicnode.com https://optimism-rpc.publicnode.com
+    wss://api.hyperliquid.xyz wss://api.hyperliquid-testnet.xyz
+    wss://relay.damus.io wss://nos.lol wss://relay.primal.net wss://relay.snort.social;
+  worker-src 'self' blob:;
+  object-src 'none';
+  base-uri 'self';
+  form-action 'none';
+" />
 <link rel="icon" type="image/png" href="/assets/img/logo.png" />
 <link rel="apple-touch-icon" href="/assets/img/logo.png" />
 <title>LZidentity — One you, every chain</title>
@@ -29,14 +54,7 @@
   <div class="ring"></div>
   <div class="pl-label">waking your identity · lz</div>
 </div>
-<script>
-  (function(){
-    var hide = function(){ var p = document.getElementById("preloader"); if (p) p.classList.add("gone"); };
-    if (document.readyState === "complete") setTimeout(hide, 400);
-    else window.addEventListener("load", function(){ setTimeout(hide, 400); });
-    setTimeout(hide, 2500);
-  })();
-</script>
+<script src="/assets/js/preloader.js"></script>
 
 <header class="nav" id="nav">
   <a class="brand" href="#top">

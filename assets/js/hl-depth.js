@@ -33,6 +33,7 @@
  * ===================================================================== */
 
 import * as HL from "./hyperliquid.js";
+import * as fmt from "./fmt-num.js";
 
 (function initHlDepth(){
   const depthMount = document.getElementById("hlDepthMount");
@@ -50,20 +51,13 @@ import * as HL from "./hyperliquid.js";
     catch { return "BTC"; }
   };
 
-  function pxStr(n){
-    n = Number(n);
-    if (!isFinite(n)) return "—";
-    if (n >= 1e6)  return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-    if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 1 });
-    if (n >= 1)    return n.toLocaleString("en-US", { maximumFractionDigits: 3 });
-    return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
-  }
+  // Display formatting via the shared fmt-num.js module (one source of truth).
+  const pxStr = (n) => fmt.price(n, { coin: coinNow() });
   function szStr(n){
     n = Number(n);
     if (!isFinite(n)) return "—";
     if (Math.abs(n) >= 1e6)  return (n / 1e6).toFixed(1) + "M";
-    if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 1 });
-    return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
+    return fmt.size(n);
   }
   const TIME_FMT = new Intl.DateTimeFormat("en-US", {
     hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false

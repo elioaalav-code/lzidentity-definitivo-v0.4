@@ -109,6 +109,9 @@ if (hasDoc){
   // signals CSS that JS-driven motion is active (so reveal hide-states only
   // apply when we can actually un-hide them — no-JS keeps content visible).
   document.documentElement.classList.add("motion-ready");
+  // when View Transitions drive route swaps, CSS suppresses the per-view
+  // fadeUp so the two don't double up (motion agent finding).
+  if (document.startViewTransition) document.documentElement.classList.add("lz-vt");
   const boot = () => { initMagnet(); initReveal(); };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

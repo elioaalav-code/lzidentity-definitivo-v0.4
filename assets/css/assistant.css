@@ -86,6 +86,17 @@
 .cs-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
 /* CustomSelect inside settings sits flush in the field */
 .cs-field .lz-select{width:100%}
+/* BYO-key notice (rendered by assistant.js under the API-key field) */
+.cs-keynote{
+  display:flex;gap:8px;align-items:flex-start;margin:-2px 0 12px;
+  padding:9px 11px;border-radius:var(--r-sm);
+  border:1px solid var(--accent-2-soft,rgba(94,234,212,.24));
+  background:rgba(94,234,212,.06);
+  font-size:var(--fs-xs);line-height:1.5;color:var(--text-dim);
+}
+.cs-keynote svg{flex:0 0 auto;margin-top:1px;color:var(--accent-2,#5eead4)}
+.cs-keynote b{color:var(--text);font-weight:600}
+.cs-keynote em{font-style:normal;color:var(--text)}
 
 /* ─── messages body ────────────────────────────────────────── */
 .copilot-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth;overscroll-behavior:contain}

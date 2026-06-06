@@ -244,6 +244,7 @@ export function parseProposalCreated(log){
 const SEL_STATE          = "0x3e4f49e6"; // state(uint256)
 const SEL_PROPOSAL_VOTES = "0x544ffc9c"; // OZ Governor: proposalVotes(uint256) -> (against,for,abstain)
 const SEL_PROPOSALS      = "0x013cf08b"; // GovernorBravo: proposals(uint256) -> struct
+const SEL_QUORUM         = "0xf8ce560a"; // quorum(uint256 blockNumber) -> uint256 (OZ + Bravo)
 /* GovernorBravo proposals(id) struct word offsets:
    0 id · 1 proposer · 2 eta · 3 startBlock · 4 endBlock
    5 forVotes · 6 againstVotes · 7 abstainVotes · 8 canceled · 9 executed */
@@ -280,15 +281,26 @@ async function getProposalLogs(rpc, governor, fromBlock, toBlock){
   return logs;
 }
 
-/* read live state + tallies for one proposalId */
-async function governorLiveState(rpc, governor, id){
+/* read live state + tallies for one proposalId.
+   startBlock is used to look up the quorum at that snapshot (best-effort). */
+async function governorLiveState(rpc, governor, id, startBlock){
   const idWord = encodeUint256(id);
-  let state = "Unknown", choicesObj = governorChoices(0, 0, 0);
+  let state = "Unknown", choicesObj = governorChoices(0, 0, 0), quorum = "0";
   try {
     const stateHex = await rpcCall(rpc, "eth_call",
       [{ to: governor, data: SEL_STATE + idWord }, "latest"]);
     state = governorStateName(Number(hexToBigInt(stateHex)));
   } catch { /* leave Unknown */ }
+  // quorum(blockNumber) — OZ Governor + GovernorBravo. Best-effort; some
+  // governors revert (no snapshot yet / unsupported) → leave 0 / omit.
+  if (startBlock != null){
+    try {
+      const qHex = await rpcCall(rpc, "eth_call",
+        [{ to: governor, data: SEL_QUORUM + encodeUint256(startBlock) }, "latest"]);
+      const q = hexToBigInt(qHex);
+      if (q > 0n) quorum = q.toString();
+    } catch { /* leave 0 */ }
+  }
   // OZ Governor exposes proposalVotes() -> (against, for, abstain).
   // GovernorBravo (e.g. Uniswap) does NOT — it reverts — and instead exposes
   // proposals() returning a struct with forVotes/againstVotes/abstainVotes at
@@ -318,7 +330,27 @@ async function governorLiveState(rpc, governor, id){
       }
     } catch { /* leave zeros */ }
   }
-  return { state, ...choicesObj };
+  return { state, quorum, ...choicesObj };
+}
+
+/* Map a block number → unix-ms timestamp (best-effort; null on failure).
+   Used to fill startsAt/endsAt for Governor proposals so the UI can show a
+   countdown. Only resolves blocks at/near head (past blocks have a timestamp;
+   future endBlock is estimated from a 12s slot time). */
+async function blockToTimeMs(rpc, blockNumber, latest){
+  if (blockNumber == null) return null;
+  try {
+    if (latest != null && blockNumber > latest){
+      // future block → estimate from head time + 12s * delta (mainnet slot)
+      const headHex = await rpcCall(rpc, "eth_getBlockByNumber", ["latest", false]);
+      const headTs = Number(BigInt(headHex?.timestamp || "0x0"));
+      if (!headTs) return null;
+      return (headTs + (blockNumber - latest) * 12) * 1000;
+    }
+    const blk = await rpcCall(rpc, "eth_getBlockByNumber", ["0x" + Number(blockNumber).toString(16), false]);
+    const ts = Number(BigInt(blk?.timestamp || "0x0"));
+    return ts ? ts * 1000 : null;
+  } catch { return null; }
 }
 
 function explorerBase(chain){
@@ -360,13 +392,16 @@ async function governorList(cfg, { lookback } = {}){
   const url = governorExplorerUrl(chain, governor);
   const out = [];
   for (const p of parsed){
-    const live = await governorLiveState(rpc, governor, p.id);
-    out.push(buildGovernorProposal(p, live, url));
+    const live = await governorLiveState(rpc, governor, p.id, p.startBlock);
+    // map start/end blocks → timestamps for a countdown (best-effort)
+    const startsAt = await blockToTimeMs(rpc, p.startBlock, latest);
+    const endsAt = await blockToTimeMs(rpc, p.endBlock, latest);
+    out.push(buildGovernorProposal(p, live, url, { startsAt, endsAt }));
   }
   return out;
 }
 
-function buildGovernorProposal(p, live, url){
+function buildGovernorProposal(p, live, url, times){
   return {
     id: p.id,
     title: titleFromDescription(p.description),
@@ -374,8 +409,9 @@ function buildGovernorProposal(p, live, url){
     state: live.state,
     choices: live.choices,
     totalVotes: live.totalVotes,
-    startsAt: null,        // block-based; coordinator may map block→time
-    endsAt: null,
+    quorum: live.quorum || "0",
+    startsAt: (times && times.startsAt) || null,
+    endsAt: (times && times.endsAt) || null,
     startBlock: p.startBlock,
     endBlock: p.endBlock,
     url: url || null,
@@ -397,8 +433,10 @@ async function governorGet(cfg, id){
     if (p && p.id === String(id)){ found = p; break; }
   }
   if (!found) found = { id: String(id), description: "", startBlock: null, endBlock: null };
-  const live = await governorLiveState(rpc, governor, found.id);
-  return buildGovernorProposal(found, live, governorExplorerUrl(chain, governor));
+  const live = await governorLiveState(rpc, governor, found.id, found.startBlock);
+  const startsAt = await blockToTimeMs(rpc, found.startBlock, latest);
+  const endsAt = await blockToTimeMs(rpc, found.endBlock, latest);
+  return buildGovernorProposal(found, live, governorExplorerUrl(chain, governor), { startsAt, endsAt });
 }
 
 async function governorVote(cfg, proposalId, support){
@@ -622,6 +660,7 @@ export function mapSnapshotProposal(node, space){
     state: snapshotStateLabel(node?.state),
     choices,
     totalVotes: String(Math.round(Number.isFinite(total) ? total : 0)),
+    quorum: Number.isFinite(Number(node?.quorum)) && Number(node?.quorum) > 0 ? String(Math.round(Number(node.quorum))) : "0",
     startsAt: Number.isFinite(start) && start > 0 ? start * 1000 : null,
     endsAt: Number.isFinite(end) && end > 0 ? end * 1000 : null,
     url: id ? `https://snapshot.org/#/${sp}/proposal/${id}` : (node?.link || null),
@@ -630,7 +669,7 @@ export function mapSnapshotProposal(node, space){
 }
 
 const SNAPSHOT_PROPOSAL_FIELDS =
-  "id title body choices scores scores_total state start end link space{id name}";
+  "id title body choices scores scores_total quorum state start end link space{id name}";
 
 async function snapshotList(cfg){
   const space = cfg?.space;
@@ -830,6 +869,65 @@ export async function searchSpaces(query){
   } catch { return []; }
 }
 
+/* ── Discover: famous DAOs + hottest live votes (keyless Snapshot) ──── */
+
+/* Curated set of well-known DAOs (Snapshot space ids). Scoping the Discover
+   queries to these keeps results recognizable and spam/demo-free (a global
+   `orderBy:"votes"` otherwise surfaces test/meme spaces with inflated tallies). */
+export const FAMOUS_DAOS = [
+  "stgdao.eth", "arbitrumfoundation.eth", "opcollective.eth", "gitcoindao.eth",
+  "ens.eth", "uniswapgovernance.eth", "aavedao.eth", "aave.eth", "lido-snapshot.eth",
+  "safe.eth", "balancer.eth", "apecoin.eth", "snapshot.dcl.eth", "starknet.eth",
+  "sushigov.eth", "aavegotchi.eth", "cvx.eth", "1inch.eth",
+];
+
+/* Famous DAOs, sorted by follower count (most-followed first). */
+export async function featuredSpaces(limit = 12){
+  try {
+    const data = await snapshotGql(
+      `query($spaces:[String]){
+        spaces(first:40, where:{id_in:$spaces}){ id name network followersCount proposalsCount }
+      }`,
+      { spaces: FAMOUS_DAOS }
+    );
+    const all = Array.isArray(data?.spaces) ? data.spaces : [];
+    all.sort((a, b) => (Number(b.followersCount) || 0) - (Number(a.followersCount) || 0));
+    return all.slice(0, limit).map(s => ({
+      id: String(s.id),
+      name: String(s.name || s.id),
+      network: String(s.network || ""),
+      followers: Number(s.followersCount) || 0,
+      proposals: Number(s.proposalsCount) || 0,
+    }));
+  } catch { return []; }
+}
+
+/* Hottest ACTIVE proposals among the famous DAOs, by voter count (desc).
+   → [{id,title,voters,endsAt,spaceId,spaceName,url}] */
+export async function hotProposals(limit = 10){
+  const n = Math.max(1, Math.min(20, limit));
+  try {
+    const data = await snapshotGql(
+      `query($n:Int!, $spaces:[String]){
+        proposals(first:$n, where:{state:"active", space_in:$spaces}, orderBy:"votes", orderDirection:desc){
+          id title votes end space{ id name }
+        }
+      }`,
+      { n, spaces: FAMOUS_DAOS }
+    );
+    const arr = Array.isArray(data?.proposals) ? data.proposals : [];
+    return arr.map(node => ({
+      id: String(node?.id || ""),
+      title: String(node?.title || "Untitled proposal"),
+      voters: Number(node?.votes) || 0,
+      endsAt: Number(node?.end) > 0 ? Number(node.end) * 1000 : null,
+      spaceId: node?.space?.id || "",
+      spaceName: node?.space?.name || node?.space?.id || "",
+      url: (node?.id && node?.space?.id) ? `https://snapshot.org/#/${node.space.id}/proposal/${node.id}` : null,
+    }));
+  } catch { return []; }
+}
+
 /* =================================================================== *
  *  PUBLIC API — adapter dispatch
  * =================================================================== */
@@ -897,6 +995,61 @@ export async function castVote(govCfg, proposalId, support){
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
   { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
 ));
+/* only allow http(s) links — blocks javascript:/data: from relay/Snapshot data */
+const safeUrl = (u) => /^https?:\/\//i.test(String(u ?? "")) ? String(u) : "";
+
+/* ── "you voted" persistence ─────────────────────────────────────────
+ * Keyed by adapter:scope:proposalId → { choice, label, at }. scope is the
+ * space (snapshot), governor address, or voteContract (layerzero). Survives
+ * reloads so a voted badge persists across the three adapters. */
+const VOTED_KEY = "lz:gov:voted";
+function votedStore(){
+  try { const v = JSON.parse(localStorage.getItem(VOTED_KEY) || "{}"); return (v && typeof v === "object") ? v : {}; }
+  catch { return {}; }
+}
+function govScope(govCfg){
+  const cfg = (govCfg && (govCfg.cfg || govCfg)) || {};
+  return String(cfg.space || cfg.governor || cfg.voteContract || "").toLowerCase();
+}
+function votedKey(govCfg, proposalId){
+  return `${govCfg?.adapter || "?"}:${govScope(govCfg)}:${proposalId}`;
+}
+function getVoted(govCfg, proposalId){
+  return votedStore()[votedKey(govCfg, proposalId)] || null;
+}
+function recordVoted(govCfg, proposalId, choice, label){
+  try {
+    const store = votedStore();
+    store[votedKey(govCfg, proposalId)] = { choice, label: String(label || ""), at: Date.now() };
+    localStorage.setItem(VOTED_KEY, JSON.stringify(store));
+  } catch (_) {}
+}
+
+/* choice index → human label for the persistent badge, per adapter. */
+function voteLabelFor(p, support){
+  if (p.source === "snapshot"){
+    const c = (p.choices || [])[Number(support) - 1];
+    return c ? c.label : "your choice";
+  }
+  if (p.source === "layerzero"){
+    const c = (p.choices || [])[Number(support)];
+    return c ? c.label : "your choice";
+  }
+  return { 0: "Against", 1: "For", 2: "Abstain" }[Number(support)] || "your choice";
+}
+
+/* countdown text from an end timestamp (ms). "" if past / unknown. */
+function countdownText(endMs){
+  if (!endMs) return "";
+  const d = endMs - Date.now();
+  if (d <= 0) return "";
+  const days = Math.floor(d / 86400000);
+  const hrs = Math.floor((d % 86400000) / 3600000);
+  const mins = Math.floor((d % 3600000) / 60000);
+  if (days > 0) return `${days}d ${hrs}h left`;
+  if (hrs > 0) return `${hrs}h ${mins}m left`;
+  return `${mins}m left`;
+}
 
 function shorten(num, raw18 = true){
   // Governor/LayerZero votes are raw on-chain weight (≈18 decimals) → collapse.
@@ -968,35 +1121,49 @@ function voteButtons(p){
     <button class="gov-vote-btn gov-vote-abstain" data-vote="2" data-id="${esc(p.id)}">Abstain</button>`;
 }
 
-function proposalCard(p){
+function proposalCard(p, govCfg){
   const tone = stateTone(p.state);
   const label = proposalStateLabel(p);
   const dates = [];
   const s = fmtDate(p.startsAt), e = fmtDate(p.endsAt);
   if (s) dates.push(`opened ${esc(s)}`);
   if (e) dates.push(`ends ${esc(e)}`);
+  const isLive = ["Active", "Open"].includes(String(p.state));
+  const countdown = isLive ? countdownText(p.endsAt) : "";
+  const voted = govCfg ? getVoted(govCfg, p.id) : null;
+  const votedBadge = voted
+    ? `<span class="gov-voted" title="You voted on this proposal">${VOTED_CHECK}Voted ${esc(voted.label)}</span>` : "";
+  // voting context line: quorum + total + countdown where available
+  const ctx = [];
+  if (countdown) ctx.push(`<span class="gov-ctx-time">${esc(countdown)}</span>`);
+  if (p.quorum) ctx.push(`<span class="gov-ctx-quorum">Quorum ${esc(shorten(p.quorum, p.source !== "snapshot"))}</span>`);
+  if (p.totalVotes && p.totalVotes !== "0") ctx.push(`<span class="gov-ctx-total">${esc(shorten(p.totalVotes, p.source !== "snapshot"))} votes cast</span>`);
   return `
     <article class="gov-card" data-id="${esc(p.id)}">
       <header class="gov-card-head">
         <span class="gov-state gov-state-${tone}">${esc(label)}</span>
+        ${votedBadge}
         ${dates.length ? `<span class="gov-dates">${dates.join(" · ")}</span>` : ""}
       </header>
       <h3 class="gov-title">${esc(p.title)}</h3>
       ${choiceBar(p.choices)}
       ${choiceLegend(p.choices, p.source !== "snapshot")}
+      ${ctx.length ? `<div class="gov-ctx">${ctx.join("")}</div>` : ""}
       <footer class="gov-card-foot">
         <button class="gov-expand" data-id="${esc(p.id)}" aria-expanded="false">Details</button>
-        ${p.url ? `<a class="gov-link" href="${esc(p.url)}" target="_blank" rel="noopener">View on explorer ↗</a>` : ""}
+        ${safeUrl(p.url) ? `<a class="gov-link" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener">View on explorer ↗</a>` : ""}
       </footer>
       <div class="gov-detail" hidden>
         <p class="gov-body">${esc((p.body || "").slice(0, 1400))}${(p.body || "").length > 1400 ? "…" : ""}</p>
-        <div class="gov-vote-row" ${["Active", "Open"].includes(String(p.state)) ? "" : "data-closed=\"1\""}>
-          ${["Active", "Open"].includes(String(p.state)) ? voteButtons(p) : `<span class="gov-vote-closed">Voting ${esc(label.toLowerCase())}</span>`}
+        <div class="gov-vote-row" ${isLive ? "" : "data-closed=\"1\""}>
+          ${isLive ? voteButtons(p) : `<span class="gov-vote-closed">Voting ${esc(label.toLowerCase())}</span>`}
         </div>
-        <p class="gov-vote-msg" aria-live="polite" hidden></p>
+        <p class="gov-vote-msg" aria-live="polite" ${voted ? "" : "hidden"}>${voted ? VOTED_CHECK + "You voted " + esc(voted.label) : ""}</p>
       </div>
     </article>`;
 }
+
+const VOTED_CHECK = `<svg class="gov-voted-icn" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`;
 
 function shell(inner, attrs = ""){
   return `<div class="gov-root" ${attrs}>${inner}</div>`;
@@ -1007,6 +1174,7 @@ function emptyState(kind){
     none:    { t: "No governance connected", d: "This community has no on-chain governance wired up yet." },
     empty:   { t: "No active proposals", d: "Nothing to vote on right now. New proposals will appear here." },
     referendum: { t: "No active referendum", d: "The LayerZero fee-switch referendum is not open. It recurs roughly every 6 months." },
+    "lz-readonly": { t: "Read-only · referendum address not wired", d: "The LayerZero fee-switch voting contract isn't published in a machine-readable form yet, so live tallies and voting are unavailable here. Referendum #3 closed Dec 2025 (no quorum → fee off); the next vote is expected ~June 2026. Follow it at layerzero.foundation/fee-switch." },
     error:   { t: "Couldn’t load governance", d: "The RPC didn’t respond. Check your connection and retry." },
   };
   const m = map[kind] || map.empty;
@@ -1039,6 +1207,10 @@ export function renderGovernance(el, govCfg){
 
   el.innerHTML = shell(loadingState());
 
+  // keep the most recent proposal list so the vote handler can derive the
+  // chosen-option label and refresh a single card in place.
+  let lastProposals = [];
+
   const wire = () => {
     // expand/collapse details
     el.querySelectorAll(".gov-expand").forEach(btn => {
@@ -1068,7 +1240,23 @@ export function renderGovernance(el, govCfg){
         if (msg){ msg.hidden = false; msg.className = "gov-vote-msg"; msg.textContent = "Confirm in your wallet…"; }
         const res = await castVote(govCfg, id, support);
         if (res?.txHash){
-          if (msg){ msg.className = "gov-vote-msg gov-msg-ok"; msg.textContent = "Vote submitted · " + res.txHash.slice(0, 10) + "…"; }
+          // persist the "you voted" state (label derived per-adapter) so the
+          // badge survives reloads, then re-fetch the proposal to refresh tallies.
+          const cur = lastProposals.find(p => String(p.id) === String(id));
+          const label = cur ? voteLabelFor(cur, support) : "your choice";
+          recordVoted(govCfg, id, support, label);
+          if (msg){ msg.className = "gov-vote-msg gov-msg-ok"; msg.innerHTML = VOTED_CHECK + "Vote submitted · refreshing…"; }
+          // refresh just this proposal's card (tallies may take a block to move)
+          try {
+            const fresh = await getProposal(govCfg, id);
+            if (fresh){
+              lastProposals = lastProposals.map(p => String(p.id) === String(id) ? fresh : p);
+              const tmp = document.createElement("div");
+              tmp.innerHTML = proposalCard(fresh, govCfg);
+              const newCard = tmp.firstElementChild;
+              if (newCard && card){ card.replaceWith(newCard); wire(); }
+            }
+          } catch (_) {}
         } else {
           if (msg){ msg.className = "gov-vote-msg gov-msg-err"; msg.textContent = res?.error || "Vote failed"; }
           row?.querySelectorAll("button").forEach(b => b.disabled = false);
@@ -1092,11 +1280,18 @@ export function renderGovernance(el, govCfg){
       return;
     }
     if (proposals.length === 0){
-      el.innerHTML = shell(emptyState(govCfg.adapter === "layerzero" ? "referendum" : "empty"));
+      // LayerZero with no real address → honest read-only note rather than a
+      // bare "no referendum" so the inert vote UI never misleads.
+      if (govCfg.adapter === "layerzero" && isUnsetAddress((govCfg.cfg || govCfg).voteContract)){
+        el.innerHTML = shell(emptyState("lz-readonly"));
+      } else {
+        el.innerHTML = shell(emptyState(govCfg.adapter === "layerzero" ? "referendum" : "empty"));
+      }
       wire();
       return;
     }
-    const cards = proposals.map(proposalCard).join("");
+    lastProposals = proposals.slice();
+    const cards = proposals.map(p => proposalCard(p, govCfg)).join("");
     const olderBtn = (govCfg.adapter === "governor" && !loadedOlder)
       ? `<div class="gov-more"><button class="gov-load-older">Load older proposals</button></div>` : "";
     el.innerHTML = shell(`<div class="gov-list">${cards}</div>${olderBtn}`);
@@ -1115,6 +1310,6 @@ if (typeof window !== "undefined"){
   window.LZ = window.LZ || {};
   window.LZ.gov = {
     listProposals, getProposal, castVote, proposalStateLabel, renderGovernance,
-    listProposalsOlder, searchSpaces,
+    listProposalsOlder, searchSpaces, featuredSpaces, hotProposals,
   };
 }

@@ -1,0 +1,37 @@
+/* ============================================================ *
+ *  chat-nostr.css — styles for the real Nostr DM chat.
+ *  Reuses the existing .chat-item / .msg-bubble / .thread-* styles
+ *  from app.css; this file only adds the new affordances.
+ * ============================================================ */
+
+/* "new message" button in the inbox head */
+.chat-list-head{display:flex;align-items:center;gap:8px}
+.chat-nostr-new{
+  margin-left:auto;display:inline-grid;place-items:center;
+  width:30px;height:30px;border-radius:var(--r-full,999px);
+  color:var(--accent);border:1px solid var(--hairline,rgba(255,255,255,.1));
+  background:color-mix(in srgb,var(--accent) 12%,transparent);
+  transition:background var(--t-fast,.16s) var(--ease,ease);
+}
+.chat-nostr-new:hover{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.chat-nostr-new svg{width:16px;height:16px}
+
+/* failed-send bubble */
+.msg-bubble.failed{opacity:.7;border:1px solid rgba(253,164,175,.4)}
+.msg-bubble.failed .meta{color:var(--error,#fda4af)}
+
+/* empty thread hint */
+.chat-nostr-empty{
+  margin:auto;max-width:320px;text-align:center;
+  font-size:13px;line-height:1.55;color:var(--text-mute);padding:var(--s5,24px);
+}
+
+/* new-conversation modal body */
+.chat-nostr-modal-hint{font-size:13px;color:var(--text-mute);margin-bottom:12px;line-height:1.5}
+.chat-nostr-modal-input{
+  width:100%;padding:10px 12px;margin-bottom:12px;
+  border-radius:var(--r-md,10px);border:1px solid var(--hairline,rgba(255,255,255,.1));
+  background:rgba(0,0,0,.25);color:var(--text);font-family:var(--mono);font-size:13px;
+}
+.chat-nostr-modal-input:focus{outline:none;border-color:var(--accent);box-shadow:var(--focus-ring)}
+.chat-nostr-modal-err{font-size:12px;color:var(--error,#fda4af);margin-top:8px}

@@ -8,26 +8,47 @@
   --border-strong:rgba(255,255,255,.16);
   --text:#f6f6f7;
   --text-dim:#a0a0a8;
-  --text-mute:#6b6b75;
+  /* text-mute lightened for WCAG AA: was #6b6b75 (~4.0:1 on --bg), now ~5.9:1 */
+  --text-mute:#8a8a94;
   --accent:#b39aff;
   --accent-2:#5eead4;
   --accent-3:#ff7a59;
+  /* foreground that sits ON an accent fill (was hardcoded #0a0a0c in ~6 places) */
+  --on-accent:#0a0a0c;
   --eth:#7c8ef8;
   --arb:#28a0f0;
   --op:#ff0420;
   --success:#86efac;
   --warn:#fde68a;
   --error:#fda4af;
+  /* market up/down — single source of truth (promoted from trade.css so every
+   * lane shares ONE green/red; consumers can drop their #3fb98a/#e0556b fallbacks) */
+  --long:#3fb98a;
+  --long-soft:rgba(63,185,138,.14);
+  --short:#e0556b;
+  --short-soft:rgba(224,85,107,.14);
   --maxw:1320px;
   --pad:clamp(20px,4vw,40px);
   --serif:"Instrument Serif",ui-serif,Georgia,serif;
   --sans:"Geist",ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",sans-serif;
   --mono:"Geist Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --r-xs:6px;
   --r-sm:8px;
   --r:14px;
   --r-lg:20px;
   --r-xl:28px;
   --r-full:999px;
+
+  /* ── fluid type scale (additive — opt-in; replaces ad-hoc px over time) ── */
+  --fs-xs:clamp(11px,.68rem + .10vw,12px);
+  --fs-sm:clamp(12px,.72rem + .15vw,13px);
+  --fs-base:clamp(14px,.82rem + .20vw,15px);
+  --fs-md:clamp(16px,.90rem + .30vw,18px);
+  --fs-lg:clamp(20px,1.10rem + .60vw,24px);
+  --fs-xl:clamp(28px,1.40rem + 1.40vw,40px);
+  --fs-2xl:clamp(40px,2.00rem + 3.00vw,72px);
+  /* contextual focus ring — override --focus-ring inside teal/warm regions */
+  --focus-ring:var(--accent);
 
   /* ── shared design language (v2.2 overhaul) — additive, do not remove ── */
   /* motion */
@@ -74,7 +95,7 @@
 [hidden]{display:none !important}
 html{scroll-behavior:smooth;scroll-padding-top:84px;color-scheme:dark;background:var(--bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
 body{font-family:var(--sans);color:var(--text);background:var(--bg);overflow-x:hidden;font-feature-settings:"ss01","ss02","cv11"}
-::selection{background:var(--accent);color:#0a0a0c}
+::selection{background:var(--accent);color:var(--on-accent)}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit;border:0;background:none;color:inherit;cursor:pointer}
 input,textarea,select{font-family:inherit;color:inherit;background:transparent;border:0;outline:none}
@@ -190,7 +211,7 @@ ul,ol{list-style:none}
 ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.16)}
 
 /* accessibility */
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;border-radius:6px}
 
 /* native form controls follow the dark theme (fixes invisible <select> options) */
 select option{background:var(--surface);color:var(--text)}

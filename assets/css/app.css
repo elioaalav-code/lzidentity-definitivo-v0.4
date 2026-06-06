@@ -40,6 +40,9 @@
 
 .view{display:none;flex-direction:column;gap:30px;animation:fadeUp .35s ease}
 .view.active{display:flex}
+/* when View Transitions drive the route swap, drop the per-view fadeUp so the
+ * crossfade and the entrance don't double up (set by motion.js). */
+html.lz-vt .view{animation:none}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 .view-header{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;padding-bottom:22px;border-bottom:1px solid rgba(255,255,255,.06)}
@@ -372,6 +375,7 @@
 
 /* ── reduced motion: cut the optional flourishes ──────────────── */
 @media (prefers-reduced-motion: reduce){
+  .view{animation:none}
   .side-nav-pill{transition:none}
   .side-nav a .icn,.side-nav a:hover .icn,.side-nav a.active .icn{transform:none}
   .side-nav a.active .badge,#connectBtn.accent .dot{animation:none}

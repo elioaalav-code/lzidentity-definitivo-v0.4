@@ -258,8 +258,120 @@
 #commPanel .lz-skel-stack{padding:var(--s4) var(--s5)}
 
 /* ── motion ───────────────────────────────────────────────────── */
+/* ── profiles: NIP-05 verified tick + avatar images ───────────── */
+.comm-av-img{object-fit:cover;border:1px solid var(--hairline)}
+.comm-nip05{display:inline-flex;vertical-align:middle;color:var(--accent-2);margin-left:3px}
+.comm-nip05 svg{width:12px;height:12px}
+
+/* ── richer reactions (NIP-25) ────────────────────────────────── */
+.comm-react-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:var(--s2)}
+.comm-react-row:empty{display:none}
+.comm-react-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:12px;color:var(--text);line-height:1;
+  padding:4px 8px;border-radius:var(--r-full);
+  border:1px solid var(--hairline);background:rgba(255,255,255,.03);
+  transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease);
+}
+.comm-react-chip:not(:disabled):hover{background:rgba(255,255,255,.07)}
+.comm-react-chip.mine{border-color:color-mix(in srgb,var(--comm-accent) 50%,transparent);background:color-mix(in srgb,var(--comm-accent) 14%,transparent)}
+.comm-react-chip:disabled{opacity:.6;cursor:default}
+
+.comm-react-wrap{position:relative;display:inline-flex}
+.comm-react-pick{
+  position:absolute;bottom:calc(100% + 6px);left:0;z-index:5;
+  display:none;gap:2px;padding:5px;
+  border-radius:var(--r-md);border:1px solid var(--hairline);
+  background:var(--glass-sheen),rgba(12,12,16,.96);box-shadow:var(--glass-stack);
+}
+.comm-react-pick.open{display:flex}
+.comm-react-opt{font-size:17px;line-height:1;padding:4px 6px;border-radius:var(--r-xs);transition:background var(--t-fast) var(--ease)}
+.comm-react-opt:hover{background:rgba(255,255,255,.08)}
+.comm-post-reply{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;color:var(--text-mute);
+  padding:5px 10px;border-radius:var(--r-full);
+  transition:color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+.comm-post-reply svg{width:15px;height:15px}
+.comm-post-reply:not(:disabled):hover{color:var(--accent);background:color-mix(in srgb,var(--comm-accent) 10%,transparent)}
+.comm-post-reply:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── NIP-10 reply threading ───────────────────────────────────── */
+.comm-thread-kids{
+  margin-left:18px;padding-left:14px;
+  border-left:2px solid color-mix(in srgb,var(--comm-accent) 28%,transparent);
+  display:flex;flex-direction:column;gap:var(--s2);margin-top:var(--s2);
+}
+.comm-post.is-reply{padding:var(--s3);background:rgba(255,255,255,.02)}
+.comm-reply-slot:empty{display:none}
+.comm-reply-slot{margin-top:var(--s2)}
+
+/* ── NIP-28 channel mint prompt ───────────────────────────────── */
+.comm-chan-mint{
+  display:flex;flex-direction:column;align-items:center;gap:var(--s3);
+  text-align:center;padding:var(--s6) var(--s4);max-width:380px;margin:auto;
+}
+.comm-chan-mint-icn{
+  width:48px;height:48px;display:grid;place-items:center;border-radius:var(--r-md);
+  color:var(--comm-accent);background:color-mix(in srgb,var(--comm-accent) 12%,transparent);
+}
+.comm-chan-mint-icn svg{width:24px;height:24px}
+.comm-chan-mint h3{font-size:var(--fs-lg);color:var(--text)}
+.comm-chan-mint p{font-size:13px;line-height:1.55;color:var(--text-mute)}
+
 @keyframes commIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){
   #commLayout *{animation:none !important;transition:none !important}
   .comm-item:hover{transform:none}
 }
+
+/* ── Discover: rail button + home (famous DAOs + hot votes) ──────── */
+.comm-discover-btn{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  width:calc(100% - 24px); margin:2px 12px 6px; padding:10px 12px;
+  border-radius:var(--r); border:1px solid rgba(179,154,255,.28);
+  background:linear-gradient(180deg,rgba(179,154,255,.10),rgba(179,154,255,.03));
+  color:var(--text); font:600 12.5px/1 var(--sans); transition:.25s var(--ease);
+}
+.comm-discover-btn:hover{ border-color:rgba(179,154,255,.5); background:rgba(179,154,255,.12); }
+.comm-discover-btn.active{ border-color:rgba(179,154,255,.6); box-shadow:var(--ring-accent); }
+.comm-disc-icn{ color:var(--accent); font-size:13px; line-height:1; }
+
+.cd-hero{ padding:6px 2px 2px; }
+.cd-hero-title{ font:300 clamp(26px,3vw,34px)/1 var(--sans); letter-spacing:-.02em; }
+.cd-hero-sub{ margin-top:8px; font:500 13px/1.5 var(--sans); color:var(--text-mute); max-width:60ch; }
+
+.cd-wrap{ display:flex; flex-direction:column; gap:28px; padding-top:6px; }
+.cd-sec-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.cd-sec-title{ font:600 15px/1 var(--sans); letter-spacing:-.01em; display:inline-flex; align-items:center; gap:8px; }
+.cd-fire{ font-size:15px; }
+.cd-sec-sub{ font:600 11px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--text-mute); }
+
+/* hot votes */
+.cd-hot{ display:flex; flex-direction:column; gap:8px; }
+.cd-hot-item{
+  display:flex; align-items:center; gap:14px; padding:12px 14px;
+  border-radius:var(--r); background:var(--glass-soft); box-shadow:var(--glass-rim);
+  transition:.2s var(--ease);
+}
+.cd-hot-item:hover{ box-shadow:var(--glass-rim),var(--lift-sh-sm); transform:translateY(-1px); }
+.cd-hot-main{ display:flex; flex-direction:column; gap:4px; min-width:0; flex:1; }
+.cd-hot-space{ font:600 11px/1 var(--mono); letter-spacing:.04em; color:var(--accent); text-transform:uppercase; }
+.cd-hot-title{ font:600 13.5px/1.35 var(--sans); color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cd-hot-meta{ font:500 11.5px/1 var(--mono); color:var(--text-mute); }
+.cd-vote{ flex:none; }
+
+/* famous DAOs */
+.cd-daos{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+.cd-dao{
+  display:flex; align-items:center; gap:11px; padding:11px 13px; text-align:left;
+  border-radius:var(--r); background:var(--glass-soft); box-shadow:var(--glass-rim);
+  transition:.2s var(--ease);
+}
+.cd-dao:hover{ box-shadow:var(--glass-rim),var(--lift-sh-sm); transform:translateY(-1px); }
+.cd-dao-col{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
+.cd-dao-name{ font:600 13px/1.2 var(--sans); color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cd-dao-meta{ font:500 11px/1 var(--mono); color:var(--text-mute); }
+.cd-dao-open{ flex:none; font:600 11px/1 var(--mono); letter-spacing:.04em; text-transform:uppercase; color:var(--text-mute); opacity:0; transition:opacity .2s var(--ease); }
+.cd-dao:hover .cd-dao-open{ opacity:1; color:var(--accent); }

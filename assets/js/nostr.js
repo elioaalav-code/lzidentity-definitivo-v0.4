@@ -14,14 +14,18 @@
 
 /* ─── lazy crypto (mirror shared.js; tolerate import failure) ─── */
 let schnorr = null;
+let _secp = null;         // full @noble/secp256k1 module (for ECDH getSharedSecret)
+let _bech32 = null;       // @scure/base bech32 (npub/nsec encoding — NIP-19)
 let _sha256 = null;       // (Uint8Array) -> Uint8Array, synchronous once set
 let cryptoReady = false;
 
 const cryptoReadyPromise = (async () => {
   try {
-    ({ schnorr } = await import("https://esm.sh/@noble/secp256k1@2.1.0"));
+    _secp = await import("https://esm.sh/@noble/secp256k1@2.1.0");
+    schnorr = _secp.schnorr;
     const { sha256 } = await import("https://esm.sh/@noble/hashes@1.4.0/sha256");
     _sha256 = sha256;
+    try { ({ bech32: _bech32 } = await import("https://esm.sh/@scure/base@1.1.6")); } catch (_) {}
     cryptoReady = true;
   } catch (e) {
     // Browser: esm.sh unavailable -> degrade. Node (tests): fall back to
@@ -122,6 +126,122 @@ export async function signEvent(unsigned, privHex) {
   const id = eventId(evt);
   const sig = bytesToHex(await schnorr.sign(hexToBytes(id), priv));
   return { ...evt, id, sig };
+}
+
+/* ─── NIP-19: npub bech32 encoding ─────────────────────────────────
+ * x-only hex pubkey (32 bytes) -> npub1… . Degrades to "" if @scure/base
+ * isn't loaded. Pure once crypto is ready; callers should await awaitCrypto()
+ * (or just fall back to a short hex). */
+export function npubEncode(pubHex) {
+  try {
+    if (!_bech32 || !pubHex) return "";
+    const bytes = hexToBytes(pubHex);
+    if (bytes.length !== 32) return "";
+    return _bech32.encode("npub", _bech32.toWords(bytes), 1000);
+  } catch (_) { return ""; }
+}
+
+/** "npub1abc…wxyz" short form (12 + 6) from a hex pubkey, or hex fallback. */
+export function shortNpubFromHex(pubHex) {
+  const n = npubEncode(pubHex);
+  if (n) return `${n.slice(0, 12)}…${n.slice(-6)}`;
+  if (!pubHex) return "anon";
+  return `${pubHex.slice(0, 8)}…${pubHex.slice(-4)}`;
+}
+
+/* ─── NIP-04: encrypted direct messages (first-cut DM crypto) ───────
+ * Shared secret = ECDH(my priv, their pubkey).x  (32 bytes).
+ * Plaintext is AES-256-CBC with a random 16-byte IV; the kind-4 `content`
+ * is `${base64(ciphertext)}?iv=${base64(iv)}`. Nostr stores x-only pubkeys,
+ * so we prepend the even-Y prefix (0x02) before ECDH. NIP-04 is metadata-
+ * leaky (the `p` tag reveals the counterparty); NIP-17/44 gift-wrap is the
+ * modern follow-up — see docs/superpowers/integration/dao-social.md. */
+
+function _b64encode(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  if (typeof btoa === "function") return btoa(bin);
+  return Buffer.from(bytes).toString("base64"); // Node fallback
+}
+function _b64decode(str) {
+  if (typeof atob === "function") {
+    const bin = atob(str);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  return new Uint8Array(Buffer.from(str, "base64")); // Node fallback
+}
+
+/** ECDH shared X coordinate (32 raw bytes) between my priv and their x-only pub. */
+async function nip04SharedKey(myPrivHex, theirPubHex) {
+  await awaitCrypto();
+  if (!_secp || !_secp.getSharedSecret) throw new Error("crypto_unavailable");
+  // their pubkey is x-only (32 bytes) → prefix with 0x02 to make a compressed point
+  const theirPub = theirPubHex.length === 64 ? "02" + theirPubHex : theirPubHex;
+  const shared = _secp.getSharedSecret(hexToBytes(myPrivHex), hexToBytes(theirPub)); // 33 bytes
+  return shared.slice(1, 33); // drop the parity byte → X coordinate
+}
+
+/** NIP-04 encrypt: returns the kind-4 content string, or null on failure. */
+export async function nip04Encrypt(myPrivHex, theirPubHex, plaintext) {
+  try {
+    if (typeof crypto === "undefined" || !crypto.subtle) return null;
+    const keyBytes = await nip04SharedKey(myPrivHex, theirPubHex);
+    const iv = crypto.getRandomValues(new Uint8Array(16));
+    const key = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-CBC" }, false, ["encrypt"]);
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-CBC", iv }, key, utf8Bytes(plaintext)));
+    return `${_b64encode(ct)}?iv=${_b64encode(iv)}`;
+  } catch (_) { return null; }
+}
+
+/** NIP-04 decrypt: returns plaintext, or null on failure. */
+export async function nip04Decrypt(myPrivHex, theirPubHex, content) {
+  try {
+    if (typeof crypto === "undefined" || !crypto.subtle) return null;
+    const m = String(content || "").split("?iv=");
+    if (m.length !== 2) return null;
+    const ct = _b64decode(m[0]);
+    const iv = _b64decode(m[1]);
+    const keyBytes = await nip04SharedKey(myPrivHex, theirPubHex);
+    const key = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-CBC" }, false, ["decrypt"]);
+    const pt = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-CBC", iv }, key, ct));
+    const dec = typeof TextDecoder !== "undefined" ? new TextDecoder() : null;
+    return dec ? dec.decode(pt) : Buffer.from(pt).toString("utf8");
+  } catch (_) { return null; }
+}
+
+/* ─── kind-0 profile metadata (NIP-01) ──────────────────────────────
+ * Batch-fetch profiles for a set of authors over a relay pool. Resolves
+ * pubkey(hex) → { name, display_name, picture, nip05, about } from the
+ * newest kind-0 seen. Always resolves (degrades to {} on any failure). */
+export function fetchProfiles(pool, pubkeys, { timeout = 4000 } = {}) {
+  return new Promise((resolve) => {
+    const want = Array.from(new Set((pubkeys || []).filter(Boolean)));
+    const out = new Map();
+    if (!pool || !pool.sub || !want.length) { resolve(out); return; }
+    const newest = new Map(); // pubkey -> created_at
+    let done = false, subId = null;
+    const finish = () => {
+      if (done) return; done = true;
+      try { subId != null && pool.unsub && pool.unsub(subId); } catch (_) {}
+      resolve(out);
+    };
+    try {
+      subId = pool.sub([{ kinds: [0], authors: want }], {
+        onEvent: (evt) => {
+          if (!evt || evt.kind !== 0 || !evt.pubkey) return;
+          if ((newest.get(evt.pubkey) || 0) >= (evt.created_at || 0)) return;
+          newest.set(evt.pubkey, evt.created_at || 0);
+          let meta = {};
+          try { meta = JSON.parse(evt.content || "{}") || {}; } catch (_) {}
+          out.set(evt.pubkey, meta);
+        },
+        onEose: finish,
+      });
+    } catch (_) { resolve(out); return; }
+    setTimeout(finish, timeout);
+  });
 }
 
 /* ─── relay pool ─── *
@@ -321,5 +441,8 @@ export function openPool(relays) {
 /* ─── self-mount ─── */
 if (typeof window !== "undefined") {
   window.LZ = window.LZ || {};
-  window.LZ.nostr = { openPool, signEvent, getPubkey, eventId, serializeEvent };
+  window.LZ.nostr = {
+    openPool, signEvent, getPubkey, eventId, serializeEvent,
+    npubEncode, shortNpubFromHex, nip04Encrypt, nip04Decrypt, fetchProfiles, awaitCrypto,
+  };
 }

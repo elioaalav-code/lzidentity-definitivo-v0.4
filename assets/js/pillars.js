@@ -474,7 +474,13 @@ function addFeedEvent(whatHtml, badge = "ok", timeTxt = "now"){
   while (elFeed.children.length > 10) elFeed.lastElementChild.remove();
 }
 
+/* only churn the recovery feed when the tab is visible and the recovery
+ * route is actually on-screen (was running forever in the background). */
+function recoveryActive(){
+  return !document.hidden && !!document.querySelector('.view[data-view="recovery"].active');
+}
 function tickFeed(){
+  if (!recoveryActive()) return;
   const s = feedSamples[Math.floor(Math.random() * feedSamples.length)];
   addFeedEvent(s.what, s.badge);
 }
@@ -486,7 +492,7 @@ startFeed();
 
 let lastTestDays = 7;
 setInterval(() => {
-  if (!elLastTest || !elLastTest.firstChild) return;
+  if (!elLastTest || !elLastTest.firstChild || !recoveryActive()) return;
   lastTestDays += 1 / 86400;
   elLastTest.firstChild.nodeValue = lastTestDays < 0.5 ? "now" : `${Math.floor(lastTestDays)} d`;
 }, 5000);

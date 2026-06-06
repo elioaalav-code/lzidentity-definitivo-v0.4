@@ -26,6 +26,8 @@
  *    is explicit and user-signed.
  * =================================================================== */
 
+import { escapeHtml, modal as lzModal, CustomSelect, coinAvatar, skeleton, emptyState } from "./ui.js";
+
 const LIFI = "https://li.quest/v1";
 const NATIVE = "0x0000000000000000000000000000000000000000";
 
@@ -58,9 +60,8 @@ function walletChains(){
 const provider = () => (typeof window !== "undefined") ? window.ethereum : null;
 
 const shortAddr = (a) => a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—";
-const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => (
-  { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
-));
+/* local `esc` collapsed onto the shared escapeHtml from ui.js (single source) */
+const esc = escapeHtml;
 
 async function ensureAccount(){
   let a = account();
@@ -521,42 +522,44 @@ async function waitReceipt(hash, timeoutMs = 90_000){
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
 /* =================================================================== *
- *  Modal framework — mirrors the app's .hl-modal visual language but
- *  scoped with .wa- classes (styled in wallet-actions.css). Appends to
- *  <body>, dismissible by backdrop click, Esc, and a close button.
+ *  Modal framework — now routed through the shared LZUI.modal primitive
+ *  (focus-trap + inert background + focus-restore + Esc + backdrop), so
+ *  the wallet dialogs get the same a11y as the rest of the app. We keep
+ *  the .wa-card / .wa-head / .wa-body markup + skins (.wa-stargate etc.)
+ *  by mounting them as the modal body and reusing the .wa-x close glyph;
+ *  LZUI renders no head of its own (title:"") to avoid a double header.
  * =================================================================== */
-let _openModal = null;
+let _openModal = null; // { handle, card }
 
 function closeModal(){
   if (!_openModal) return;
-  const { el, onKey } = _openModal;
-  document.removeEventListener("keydown", onKey);
-  el.classList.remove("show");
-  setTimeout(() => { try { el.remove(); } catch {} }, 180);
+  const h = _openModal.handle;
   _openModal = null;
+  try { h.close(); } catch {}
 }
 
 function openModal({ title, bodyHtml, onMount, cardClass = "" }){
   closeModal();
-  const el = document.createElement("div");
-  el.className = "wa-modal";
-  el.innerHTML = `
-    <div class="wa-card ${esc(cardClass)}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
-      <div class="wa-head">
-        <h3>${esc(title)}</h3>
-        <button class="wa-x" type="button" aria-label="Close">✕</button>
-      </div>
-      <div class="wa-body">${bodyHtml}</div>
-    </div>`;
-  document.body.appendChild(el);
-  const card = el.querySelector(".wa-card");
-  el.addEventListener("mousedown", (e) => { if (e.target === el) closeModal(); });
-  el.querySelector(".wa-x").addEventListener("click", closeModal);
-  const onKey = (e) => { if (e.key === "Escape") closeModal(); };
-  document.addEventListener("keydown", onKey);
-  _openModal = { el, onKey };
-  // animate in
-  requestAnimationFrame(() => el.classList.add("show"));
+  const card = document.createElement("div");
+  card.className = "wa-card " + cardClass;
+  card.innerHTML = `
+    <div class="wa-head">
+      <h3>${esc(title)}</h3>
+      <button class="wa-x" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="wa-body">${bodyHtml}</div>`;
+
+  const handle = lzModal({
+    title: "",                 // wa-card carries its own head
+    body: card,
+    className: "wa-modal-shell",
+    onClose: () => { if (_openModal && _openModal.handle === handle) _openModal = null; },
+  });
+  // expose the title on the dialog for screen readers (no visible LZUI head)
+  handle.panel.setAttribute("aria-label", title || "Dialog");
+
+  card.querySelector(".wa-x").addEventListener("click", () => handle.close());
+  _openModal = { handle, card };
   if (onMount) onMount(card);
   return card;
 }
@@ -638,13 +641,22 @@ async function openExchange(mode){
   const card = openModal({
     title: mode === "bridge" ? "Bridge" : "Swap",
     cardClass: mode === "bridge" ? "wa-stargate" : "wa-swapmodal",
-    bodyHtml: `<div class="wa-loading"><span class="wa-spin"></span> Loading tokens…</div>`,
+    bodyHtml: `<div class="wa-loading-skel">${skeleton({ rows: 4, height: 52, gap: 10 })}</div>`,
   });
 
   try { tokens = await getTokens(); }
   catch (e) {
-    if (card.querySelector(".wa-body"))
-      card.querySelector(".wa-body").innerHTML = `<div class="wa-error">${esc(e.message || "Could not load tokens")}</div>`;
+    const bodyEl = card.querySelector(".wa-body");
+    if (bodyEl){
+      bodyEl.innerHTML = "";
+      bodyEl.appendChild(emptyState({
+        variant: "error",
+        title: "Couldn't load tokens",
+        body: e?.message || "Network error reaching LI.FI.",
+        actionLabel: "Retry",
+        onAction: () => { closeModal(); openExchange(mode); },
+      }));
+    }
     return;
   }
   if (!_openModal) return; // user closed it while loading
@@ -701,6 +713,17 @@ function renderExchangeForm({ mode, chains, fromChainKey, toChainKey, fromList, 
 
 function selectedChainKey(el){ return el ? (el.tagName === "SELECT" ? el.value : el.getAttribute("data-key")) : null; }
 
+/* items for a token CustomSelect: value = token address, label = symbol,
+ * sub = name. Rendered with a coinAvatar so the picker matches markets/trade. */
+function tokenItems(list){
+  return list.map((t) => ({ value: t.address, label: t.symbol, sub: t.name || "" }));
+}
+const renderTokenRow = (it) =>
+  `${coinAvatar(it.label, 22).outerHTML}<span class="wa-tok-sym">${escapeHtml(it.label)}</span>` +
+  (it.sub ? `<span class="wa-tok-name">${escapeHtml(it.sub)}</span>` : "");
+const renderTokenTrigger = (it) =>
+  `${coinAvatar(it.label, 20).outerHTML}<span class="wa-tok-sym">${escapeHtml(it.label)}</span>`;
+
 function wireExchangeForm(card, { mode, addr, chains, tokens }){
   const $ = (sel) => card.querySelector(sel);
   const fromChainEl = $("#waFromChain");
@@ -714,7 +737,25 @@ function wireExchangeForm(card, { mode, addr, chains, tokens }){
 
   let lastQuote = null;
 
-  const repopulate = (chainEl, tokenEl, preferUsdc) => {
+  /* ── upgrade the raw <select>s to CustomSelect (the hidden native select
+   *    stays the source of truth + still fires `change`, so the handlers
+   *    below are untouched). Chain selects only exist as <select> in bridge
+   *    mode; swap mode keeps the readonly fixed-chain <input>. ───────────── */
+  const mkChain = (el) => el && el.tagName === "SELECT"
+    ? new CustomSelect({ select: el, bottomSheet: true, title: "Select network" })
+    : null;
+  const mkToken = (el) => new CustomSelect({
+    select: el, searchable: true, searchKeys: ["label", "value"], bottomSheet: true,
+    title: "Select token", placeholder: "Token",
+    items: tokenItems(Array.from(el.options).map((o) => ({ address: o.value, symbol: o.textContent.trim(), name: "" }))),
+    renderRow: renderTokenRow, renderTrigger: renderTokenTrigger,
+  });
+  const csFromChain = mkChain(fromChainEl);
+  const csToChain = mkChain(toChainEl);
+  const csFromToken = mkToken(fromTokenEl);
+  const csToToken = mkToken(toTokenEl);
+
+  const repopulate = (chainEl, tokenEl, tokenCS, preferUsdc) => {
     const key = selectedChainKey(chainEl);
     const list = tokens[key] || [];
     let pref;
@@ -725,6 +766,8 @@ function wireExchangeForm(card, { mode, addr, chains, tokens }){
       pref = (list.find((t) => isNative(t.address)) || list[0])?.address;
     }
     tokenEl.innerHTML = tokenOptions(list, pref);
+    // resync the CustomSelect to the freshly rebuilt native <select>
+    if (tokenCS){ tokenCS.setItems(tokenItems(list)); tokenCS.setValue(pref); }
   };
 
   const resetQuote = () => {
@@ -735,8 +778,8 @@ function wireExchangeForm(card, { mode, addr, chains, tokens }){
     ctaEl.classList.remove("wa-ready");
   };
 
-  if (fromChainEl?.tagName === "SELECT") fromChainEl.addEventListener("change", () => { repopulate(fromChainEl, fromTokenEl, false); resetQuote(); });
-  if (toChainEl?.tagName === "SELECT") toChainEl.addEventListener("change", () => { repopulate(toChainEl, toTokenEl, true); resetQuote(); });
+  if (fromChainEl?.tagName === "SELECT") fromChainEl.addEventListener("change", () => { repopulate(fromChainEl, fromTokenEl, csFromToken, false); resetQuote(); });
+  if (toChainEl?.tagName === "SELECT") toChainEl.addEventListener("change", () => { repopulate(toChainEl, toTokenEl, csToToken, true); resetQuote(); });
   [fromTokenEl, toTokenEl].forEach((el) => el.addEventListener("change", resetQuote));
   amountEl.addEventListener("input", resetQuote);
 

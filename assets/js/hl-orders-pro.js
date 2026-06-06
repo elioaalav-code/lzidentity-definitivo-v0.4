@@ -18,6 +18,7 @@
  * ===================================================================== */
 
 import * as HL from "./hyperliquid.js";
+import * as fmt from "./fmt-num.js";
 import { state, toast } from "./shared.js";
 
 (function initHlOrdersPro(){
@@ -32,31 +33,18 @@ import { state, toast } from "./shared.js";
   const account = () => { try { return window.LZ?.hl?.account?.() || state.account || null; } catch { return state.account || null; } };
   const isMainnet = () => { try { return HL.isMainnet(); } catch { return false; } };
   const refreshUser = () => { try { window.LZ?.hl?.refreshUser?.(); } catch {} };
+  // Number formatting delegates to the shared fmt-num.js module.
   const fmtPx = (n, decimals) => {
-    const v = num(n);
-    if (v == null) return "—";
-    if (decimals != null) return v.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-    if (v >= 10000) return v.toLocaleString("en-US", { maximumFractionDigits: 1 });
-    if (v >= 1000)  return v.toLocaleString("en-US", { maximumFractionDigits: 2 });
-    if (v >= 1)     return v.toLocaleString("en-US", { maximumFractionDigits: 3 });
-                    return v.toLocaleString("en-US", { maximumFractionDigits: 6 });
+    const coin = (() => { try { return window.LZ?.hl?.coin?.() || undefined; } catch { return undefined; } })();
+    return fmt.price(n, decimals != null ? { decimals } : { coin });
   };
-  const fmtSz = (n) => {
-    const v = num(n);
-    if (v == null) return "—";
-    return v.toLocaleString("en-US", { maximumFractionDigits: 6, minimumFractionDigits: 0 });
-  };
+  const fmtSz = (n) => fmt.size(n, { decimals: 6 });
   const fmtNotional = (sz, px) => {
     const v = num(sz), p = num(px);
     if (v == null || p == null) return "—";
-    const total = v * p;
-    return "$" + total.toLocaleString("en-US", { maximumFractionDigits: 2 });
+    return fmt.usd(v * p);
   };
-  const fmtPct = (pct) => {
-    if (pct == null) return "";
-    const sign = pct >= 0 ? "+" : "";
-    return sign + pct.toFixed(2) + "%";
-  };
+  const fmtPct = (pct) => (pct == null ? "" : fmt.pct(pct));
 
   // localStorage persistence
   const LS_OPEN = "lz.pro.open";

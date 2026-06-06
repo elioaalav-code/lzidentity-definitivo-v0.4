@@ -4,6 +4,31 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#050505" />
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' https://esm.sh;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' data: https:;
+  connect-src 'self'
+    https://esm.sh
+    https://api.coingecko.com https://api.alternative.me
+    https://api.anthropic.com https://li.quest
+    https://api.hyperliquid.xyz https://api.hyperliquid-testnet.xyz
+    https://app.hyperliquid.xyz https://hyperliquid.gitbook.io
+    https://api.llama.fi https://stablecoins.llama.fi https://yields.llama.fi
+    https://hub.snapshot.org https://seq.snapshot.org https://snapshot.org
+    https://layerzero.foundation
+    https://eth.blockscout.com https://arbitrum.blockscout.com https://base.blockscout.com https://optimism.blockscout.com
+    https://etherscan.io https://arbiscan.io https://basescan.org https://optimistic.etherscan.io https://polygonscan.com
+    https://ethereum-rpc.publicnode.com https://arbitrum-one-rpc.publicnode.com https://base-rpc.publicnode.com https://optimism-rpc.publicnode.com
+    wss://api.hyperliquid.xyz wss://api.hyperliquid-testnet.xyz
+    wss://relay.damus.io wss://nos.lol wss://relay.primal.net wss://relay.snort.social;
+  worker-src 'self' blob:;
+  object-src 'none';
+  base-uri 'self';
+  form-action 'none';
+" />
 <link rel="icon" type="image/png" href="/assets/img/logo.png" />
 <link rel="apple-touch-icon" href="/assets/img/logo.png" />
 <title>LZidentity — your app</title>
@@ -12,31 +37,33 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@1&display=swap" />
 
-<link rel="stylesheet" href="/assets/css/base.css?v=3" />
-<link rel="stylesheet" href="/assets/css/ui.css?v=3" />
-<link rel="stylesheet" href="/assets/css/app.css?v=3" />
-<link rel="stylesheet" href="/assets/css/anima.css?v=3" />
-<link rel="stylesheet" href="/assets/css/trade.css?v=3" />
-<link rel="stylesheet" href="/assets/css/assistant.css?v=3" />
-<link rel="stylesheet" href="/assets/css/risk.css?v=3" />
-<link rel="stylesheet" href="/assets/css/recovery.css?v=3" />
-<link rel="stylesheet" href="/assets/css/wallet-actions.css?v=3" />
-<link rel="stylesheet" href="/assets/css/wallet-pro.css?v=3" />
-<link rel="stylesheet" href="/assets/css/coin-page.css?v=3" />
-<link rel="stylesheet" href="/assets/css/coin-page-pro.css?v=3" />
-<link rel="stylesheet" href="/assets/css/chat-charts.css?v=3" />
-<link rel="stylesheet" href="/assets/css/hl-markets.css?v=3" />
-<link rel="stylesheet" href="/assets/css/markets-pro.css?v=3" />
-<link rel="stylesheet" href="/assets/css/hl-depth.css?v=3" />
-<link rel="stylesheet" href="/assets/css/hl-portfolio.css?v=3" />
-<link rel="stylesheet" href="/assets/css/hl-orders-pro.css?v=3" />
-<link rel="stylesheet" href="/assets/css/glass.css?v=3" />
-<link rel="stylesheet" href="/assets/css/sigil.css?v=3" />
-<link rel="stylesheet" href="/assets/css/motion.css?v=3" />
-<link rel="stylesheet" href="/assets/css/communities.css?v=3" />
-<link rel="stylesheet" href="/assets/css/governance.css?v=3" />
-<link rel="stylesheet" href="/assets/css/community-add.css?v=3" />
-<script type="module" src="/assets/js/ui.js?v=3"></script>
+<link rel="stylesheet" href="/assets/css/base.css?v=7" />
+<link rel="stylesheet" href="/assets/css/ui.css?v=7" />
+<link rel="stylesheet" href="/assets/css/app.css?v=7" />
+<link rel="stylesheet" href="/assets/css/anima.css?v=7" />
+<link rel="stylesheet" href="/assets/css/trade.css?v=7" />
+<link rel="stylesheet" href="/assets/css/assistant.css?v=7" />
+<link rel="stylesheet" href="/assets/css/risk.css?v=7" />
+<link rel="stylesheet" href="/assets/css/recovery.css?v=7" />
+<link rel="stylesheet" href="/assets/css/wallet-actions.css?v=7" />
+<link rel="stylesheet" href="/assets/css/wallet-pro.css?v=7" />
+<link rel="stylesheet" href="/assets/css/coin-page.css?v=7" />
+<link rel="stylesheet" href="/assets/css/coin-page-pro.css?v=7" />
+<link rel="stylesheet" href="/assets/css/chat-charts.css?v=7" />
+<link rel="stylesheet" href="/assets/css/hl-markets.css?v=7" />
+<link rel="stylesheet" href="/assets/css/markets-pro.css?v=7" />
+<link rel="stylesheet" href="/assets/css/hl-depth.css?v=7" />
+<link rel="stylesheet" href="/assets/css/hl-portfolio.css?v=7" />
+<link rel="stylesheet" href="/assets/css/hl-orders-pro.css?v=7" />
+<link rel="stylesheet" href="/assets/css/glass.css?v=7" />
+<link rel="stylesheet" href="/assets/css/sigil.css?v=7" />
+<link rel="stylesheet" href="/assets/css/motion.css?v=7" />
+<link rel="stylesheet" href="/assets/css/communities.css?v=7" />
+<link rel="stylesheet" href="/assets/css/governance.css?v=7" />
+<link rel="stylesheet" href="/assets/css/community-add.css?v=7" />
+<link rel="stylesheet" href="/assets/css/chat-nostr.css?v=7" />
+<script type="module" src="/assets/js/net.js?v=7"></script>
+<script type="module" src="/assets/js/ui.js?v=7"></script>
 </head>
 <body>
 
@@ -48,14 +75,7 @@
   <div class="ring"></div>
   <div class="pl-label">waking your identity · lz</div>
 </div>
-<script>
-  (function(){
-    var hide = function(){ var p = document.getElementById("preloader"); if (p) p.classList.add("gone"); };
-    if (document.readyState === "complete") setTimeout(hide, 400);
-    else window.addEventListener("load", function(){ setTimeout(hide, 400); });
-    setTimeout(hide, 2500);
-  })();
-</script>
+<script src="/assets/js/preloader.js"></script>
 
 <div class="app">
 
@@ -319,8 +339,10 @@
       <div class="id-stage mb-flow">
         <!-- HERO · the generative sigil -->
         <div class="sigil-hero" id="sigilHero">
-          <div class="sigil-orb">
+          <div class="sigil-orb" id="sigilOrb" role="img"
+               aria-label="Your generative sigil — derive an identity to create it">
             <canvas id="sigilCanvas" aria-hidden="true"></canvas>
+            <div class="sigil-bloom" aria-hidden="true"></div>
             <div class="sigil-idle" id="sigilIdle">
               <span class="sigil-ring"></span>
               <span class="sigil-idle-cap">your sigil<br><b>awaits</b></span>
@@ -328,6 +350,14 @@
             <div class="sigil-scan"></div>
           </div>
           <div class="sigil-cap" id="sigilCap">One you — every chain.</div>
+          <div class="sigil-fp" id="sigilFp" aria-hidden="true">
+            <span class="fp-words" id="sigilFpWords"></span>
+            <span class="fp-code" id="sigilFpCode"></span>
+          </div>
+          <div class="sigil-share" id="sigilShare">
+            <button class="btn ghost sm" id="shareSigilBtn" data-motion="magnet">Share sigil</button>
+            <button class="btn ghost sm" id="saveSigilBtn">Save PNG</button>
+          </div>
         </div>
 
         <!-- ACTS · the 3-step becoming -->
@@ -703,24 +733,25 @@
 </aside>
 
 <!-- TradingView lightweight-charts (vendored locally, no build, offline at runtime) -->
-<script src="/assets/vendor/lightweight-charts.standalone.production.js?v=3"></script>
-<script type="module" src="/assets/js/app.js?v=3"></script>
-<script type="module" src="/assets/js/trade.js?v=3"></script>
-<script type="module" src="/assets/js/risk.js?v=3"></script>
-<script type="module" src="/assets/js/risk-watch.js?v=3"></script>
-<script type="module" src="/assets/js/assistant.js?v=3"></script>
-<script type="module" src="/assets/js/pillars.js?v=3"></script>
-<script type="module" src="/assets/js/wallet-actions.js?v=3"></script>
-<script type="module" src="/assets/js/coin-page.js?v=3"></script>
+<script src="/assets/vendor/lightweight-charts.standalone.production.js?v=7"></script>
+<script type="module" src="/assets/js/app.js?v=7"></script>
+<script type="module" src="/assets/js/trade.js?v=7"></script>
+<script type="module" src="/assets/js/risk.js?v=7"></script>
+<script type="module" src="/assets/js/risk-watch.js?v=7"></script>
+<script type="module" src="/assets/js/assistant.js?v=7"></script>
+<script type="module" src="/assets/js/pillars.js?v=7"></script>
+<script type="module" src="/assets/js/wallet-actions.js?v=7"></script>
+<script type="module" src="/assets/js/coin-page.js?v=7"></script>
 <!-- Hyperliquid parity add-ons (each module owns its own mount + files) -->
-<script type="module" src="/assets/js/hl-markets.js?v=3"></script>
-<script type="module" src="/assets/js/hl-depth.js?v=3"></script>
-<script type="module" src="/assets/js/hl-portfolio.js?v=3"></script>
-<script type="module" src="/assets/js/hl-orders-pro.js?v=3"></script>
+<script type="module" src="/assets/js/hl-markets.js?v=7"></script>
+<script type="module" src="/assets/js/hl-depth.js?v=7"></script>
+<script type="module" src="/assets/js/hl-portfolio.js?v=7"></script>
+<script type="module" src="/assets/js/hl-orders-pro.js?v=7"></script>
 <!-- Communities (DAO social): Nostr engine + governance adapters + UI -->
-<script type="module" src="/assets/js/nostr.js?v=3"></script>
-<script type="module" src="/assets/js/governance.js?v=3"></script>
-<script type="module" src="/assets/js/communities.js?v=3"></script>
-<script type="module" src="/assets/js/community-add.js?v=3"></script>
+<script type="module" src="/assets/js/nostr.js?v=7"></script>
+<script type="module" src="/assets/js/governance.js?v=7"></script>
+<script type="module" src="/assets/js/communities.js?v=7"></script>
+<script type="module" src="/assets/js/community-add.js?v=7"></script>
+<script type="module" src="/assets/js/chat-nostr.js?v=7"></script>
 </body>
 </html>

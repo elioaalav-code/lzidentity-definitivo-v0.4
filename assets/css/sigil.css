@@ -49,6 +49,36 @@
 }
 .sigil-hero.born #sigilCanvas{ opacity:1; transform:scale(1); }
 
+/* ---- the "born" ignite moment (transient .igniting, ~900ms) ---- */
+/* A one-shot crescendo: bright radial bloom + spring overshoot beyond
+   scale(1), then settle into the calm .born resting state. */
+.sigil-bloom{
+  position:absolute; inset:-30%;
+  border-radius:50%;
+  pointer-events:none; opacity:0; z-index:2;
+  background:radial-gradient(circle at 50% 48%,
+    rgba(255,255,255,.9), rgba(179,154,255,.55) 22%, rgba(94,234,212,.18) 46%, transparent 68%);
+}
+.sigil-hero.igniting .sigil-bloom{ animation:sigil-ignite-bloom .9s var(--ease-out) forwards; }
+.sigil-hero.igniting #sigilCanvas{ animation:sigil-ignite-pop 1s var(--spring) forwards; }
+.sigil-hero.igniting .sigil-orb::before{ animation:sigil-ignite-halo .9s var(--ease-out) forwards; }
+
+@keyframes sigil-ignite-bloom{
+  0%{ opacity:0; transform:scale(.5); }
+  18%{ opacity:1; }
+  100%{ opacity:0; transform:scale(1.25); }
+}
+@keyframes sigil-ignite-pop{
+  0%{ opacity:0; transform:scale(.86); }
+  45%{ opacity:1; transform:scale(1.08); }
+  100%{ opacity:1; transform:scale(1); }
+}
+@keyframes sigil-ignite-halo{
+  0%{ opacity:0; }
+  30%{ opacity:1; }
+  100%{ opacity:1; }
+}
+
 /* idle placeholder — before an identity is derived */
 .sigil-idle{
   position:absolute; inset:0;
@@ -94,6 +124,36 @@
   opacity:.55; transition:opacity .6s var(--ease-out), color .6s;
 }
 .sigil-hero.born .sigil-cap{ opacity:1; color:var(--text); }
+.sigil-hero.igniting .sigil-cap{ animation:sigil-cap-beat .9s var(--ease-out); }
+@keyframes sigil-cap-beat{
+  0%{ opacity:.4; transform:translateY(4px); }
+  40%{ opacity:1; transform:translateY(0) scale(1.04); color:var(--accent); }
+  100%{ opacity:1; transform:none; }
+}
+
+/* ---- fingerprint readout (determinism made visible) ---- */
+.sigil-fp{
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  opacity:0; transition:opacity .6s var(--ease-out) .15s;
+}
+.sigil-hero.born .sigil-fp{ opacity:1; }
+.sigil-fp .fp-words{
+  font:600 12px/1.4 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--accent-2);
+}
+.sigil-fp .fp-code{
+  font:500 10px/1.4 var(--mono); letter-spacing:.22em; color:var(--text-mute);
+}
+
+/* ---- share / save actions on the hero ---- */
+.sigil-share{
+  display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap;
+  justify-content:center;
+  opacity:0; transform:translateY(6px); pointer-events:none;
+  transition:opacity .5s var(--ease-out) .2s, transform .5s var(--ease-out) .2s;
+}
+.sigil-hero.born .sigil-share{ opacity:1; transform:none; pointer-events:auto; }
+.sigil-share .btn{ font-size:var(--fs-xs); }
 
 @keyframes sigil-spin{ to{ transform:rotate(360deg); } }
 @keyframes sigil-scan{ from{ top:-45%; } to{ top:120%; } }
@@ -217,6 +277,12 @@
   .sigil-ring,
   .id-stage.deriving .sigil-scan::before,
   .id-stage.deriving .sigil-orb,
-  .id-act.live .val:not(.dim){ animation:none; }
-  #sigilCanvas,.sigil-idle{ transition:opacity .2s; transform:none; }
+  .id-act.live .val:not(.dim),
+  .sigil-hero.igniting .sigil-bloom,
+  .sigil-hero.igniting #sigilCanvas,
+  .sigil-hero.igniting .sigil-orb::before,
+  .sigil-hero.igniting .sigil-cap{ animation:none; }
+  /* the bloom must never flash for reduced-motion users */
+  .sigil-bloom{ display:none; }
+  #sigilCanvas,.sigil-idle,.sigil-fp,.sigil-share{ transition:opacity .2s; transform:none; }
 }

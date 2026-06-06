@@ -13,6 +13,7 @@
  * ===================================================================== */
 
 import * as HL from "./hyperliquid.js";
+import * as fmt from "./fmt-num.js";
 import { coinAvatarHTML } from "./ui.js";
 
 /* ── constants ──────────────────────────────────────────────────────── */
@@ -104,35 +105,14 @@ function esc(s){
     .replace(/'/g,"&#39;");
 }
 
-function fmtUsd(n){
-  if (!isFinite(n)) return "—";
-  if (n >= 1e9)  return "$" + (n/1e9).toFixed(2)  + "B";
-  if (n >= 1e6)  return "$" + (n/1e6).toFixed(1)  + "M";
-  if (n >= 1e3)  return "$" + (n/1e3).toFixed(1)  + "K";
-  return "$" + n.toFixed(2);
-}
-
-function fmtPx(n){
-  if (!isFinite(n) || n <= 0) return "—";
-  if (n >= 10000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (n >= 1)     return n.toPrecision(6).replace(/\.?0+$/,"");
-  return n.toPrecision(4).replace(/\.?0+$/,"");
-}
-
-function fmtPct(n, decimals = 2){
-  if (!isFinite(n)) return "—";
-  return (n >= 0 ? "+" : "") + n.toFixed(decimals) + "%";
-}
-
-function fmtFund(n){
-  if (!isFinite(n)) return "—";
-  return (n >= 0 ? "+" : "") + n.toFixed(4) + "%";
-}
-
+/* Number formatting delegates to the shared fmt-num.js module so every
+ * pane renders the same coin identically. (fmtPx returns no $ prefix.) */
+const fmtUsd  = (n) => fmt.usdCompact(n);
+const fmtPx   = (n) => fmt.price(n);
+const fmtPct  = (n, decimals = 2) => fmt.pct(n, { decimals });
+const fmtFund = (n) => fmt.pct(n, { decimals: 4 });
 /** Compact OI label: shows $ value */
-function fmtOI(n){
-  return fmtUsd(n);
-}
+const fmtOI   = (n) => fmt.usdCompact(n);
 
 function activeCoin(){
   try { return window.LZ?.hl?.coin?.() || ""; } catch { return ""; }
