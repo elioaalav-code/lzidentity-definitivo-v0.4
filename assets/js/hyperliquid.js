@@ -10,8 +10,8 @@
  *        → EIP-712 "Agent" typed-data → eth_signTypedData_v4.
  *
  *  Signing matches the official Python/TS SDKs byte-for-byte, so
- *  orders signed here settle on the real exchange. REAL FUNDS when
- *  the network toggle is on mainnet — default is testnet.
+ *  orders signed here settle on the real exchange. Default is MAINNET
+ *  (REAL FUNDS) — toggle to testnet in the trade header to practice.
  *
  *  Docs: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api
  * ============================================================ */
@@ -19,10 +19,10 @@
 import { encode as msgpackEncode } from "https://esm.sh/@msgpack/msgpack@2.8.0";
 import { keccak_256 } from "https://esm.sh/@noble/hashes@1.4.0/sha3";
 
-/* ─── network (testnet default, persisted) ─────────────────── */
+/* ─── network (mainnet default, persisted) ─────────────────── */
 
 const NET_KEY = "hl:net";
-let network = localStorage.getItem(NET_KEY) || "testnet";
+let network = localStorage.getItem(NET_KEY) || "mainnet";
 
 const ENDPOINTS = {
   mainnet: { api: "https://api.hyperliquid.xyz",          ws: "wss://api.hyperliquid.xyz/ws" },
