@@ -121,6 +121,19 @@ function canPost() {
   return !!(state && state.derived && state.derived.priv && window.LZ && window.LZ.nostr && window.LZ.nostr.signEvent);
 }
 
+/* getPubkey is async (awaits crypto load); cache the hex once so render/reaction
+   code can use it synchronously. Self-warms; ready on the next redraw. */
+let _myPubkey = null;
+async function myPubkey() {
+  if (_myPubkey) return _myPubkey;
+  try {
+    if (state && state.derived && state.derived.priv && window.LZ && window.LZ.nostr && window.LZ.nostr.getPubkey) {
+      _myPubkey = await window.LZ.nostr.getPubkey(state.derived.priv);
+    }
+  } catch (_) {}
+  return _myPubkey;
+}
+
 /* ── list (left rail) ─────────────────────────────────────────── */
 
 /**
@@ -342,11 +355,8 @@ function drawFeed(stream) {
 function postCardHTML(p) {
   const likes = _state.reactions.get(p.id);
   const likeN = likes ? likes.size : 0;
-  const mine = likes && state && state.derived && window.LZ && window.LZ.nostr && window.LZ.nostr.getPubkey;
-  let liked = false;
-  if (mine) {
-    try { liked = likes.has(window.LZ.nostr.getPubkey(state.derived.priv)); } catch (_) {}
-  }
+  if (!_myPubkey && state && state.derived && state.derived.priv) myPubkey(); // warm (async); ready next redraw
+  const liked = !!(likes && _myPubkey && likes.has(_myPubkey));
   return `
     <article class="comm-post" style="--i:0">
       <div class="comm-post-head">
@@ -387,10 +397,12 @@ async function reactToPost(c, postId, stream) {
   if (ok) {
     // optimistic local reflect
     try {
-      const me = window.LZ.nostr.getPubkey(state.derived.priv);
-      const set = _state.reactions.get(postId) || new Set();
-      set.add(me); _state.reactions.set(postId, set);
-      drawFeed(stream);
+      const me = await myPubkey();
+      if (me) {
+        const set = _state.reactions.get(postId) || new Set();
+        set.add(me); _state.reactions.set(postId, set);
+        drawFeed(stream);
+      }
     } catch (_) {}
   }
 }
@@ -534,13 +546,17 @@ function mountComposer(slot, { placeholder, onSend, compact } = {}) {
   if (!slot) return;
   if (!canPost()) {
     slot.innerHTML = `
-      <div class="comm-derive-cta">
+      <button type="button" class="comm-derive-cta" id="commDeriveCta">
         <div class="comm-derive-icn">${ICN.relay}</div>
         <div class="comm-derive-txt">
-          <strong>Derive your identity to post</strong>
+          <strong>Derive your identity to post →</strong>
           <span>${state && state.account ? "Sign once to create your Nostr name." : "Connect your wallet, then derive your Nostr name."}</span>
         </div>
-      </div>`;
+      </button>`;
+    slot.querySelector("#commDeriveCta")?.addEventListener("click", () => {
+      if (window.LZ && window.LZ.navigate) window.LZ.navigate("identity");
+      else location.hash = "#/identity";
+    });
     return;
   }
   slot.innerHTML = `
@@ -586,7 +602,9 @@ async function signAndPublish(unsigned, okMsg, silent) {
   }
   let signed;
   try {
-    signed = nostr.signEvent(
+    // signEvent is async (it awaits the lazy @noble crypto load) — MUST await,
+    // otherwise publish() receives a Promise and the send silently fails.
+    signed = await nostr.signEvent(
       Object.assign({ created_at: Math.floor(Date.now() / 1000), tags: [] }, unsigned),
       state.derived.priv
     );
