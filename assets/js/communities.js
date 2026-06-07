@@ -1035,6 +1035,11 @@ export async function renderDiscover(){
       <div class="cd-hero">
         <h2 class="cd-hero-title">Discover</h2>
         <p class="cd-hero-sub">The most-followed DAOs and the hottest live votes on Snapshot — keyless, real-time.</p>
+        <div class="cd-stats" id="cdStats">
+          <span class="cd-stat"><b id="cdStatDaos">—</b> famous DAOs</span>
+          <span class="cd-stat"><b id="cdStatVotes">—</b> live votes</span>
+          <span class="cd-stat"><b id="cdStatFollowers">—</b> followers</span>
+        </div>
       </div>`;
   }
   if (!panel) return;
@@ -1057,16 +1062,25 @@ export async function renderDiscover(){
     const hot = gov && gov.hotProposals ? await gov.hotProposals(10).catch(() => []) : [];
     const el = $("cdHot");
     if (!el || _state.view !== "discover") return;
-    if (!hot.length){ el.replaceChildren(emptyState({ title: "No live votes right now", body: "Active proposals across Snapshot will show up here." })); return; }
-    el.innerHTML = hot.map((p) => `
-      <div class="cd-hot-item">
+    if (!hot.length){ el.replaceChildren(emptyState({ title: "No live votes right now", body: "Active proposals across the top DAOs will show up here." })); return; }
+    el.innerHTML = hot.map((p) => {
+      const soon = p.endsAt && (p.endsAt - Date.now()) < 24 * 3.6e6 && (p.endsAt - Date.now()) > 0;
+      const lead = p.lead && p.lead.label
+        ? `<div class="cd-hot-bar"><span class="cd-hot-bar-fill" style="width:${Math.max(2, p.lead.pct)}%"></span></div>
+           <span class="cd-hot-lead"><b>${escapeHtml(p.lead.label)}</b> leading · ${p.lead.pct}%</span>`
+        : "";
+      return `
+      <div class="cd-hot-item${soon ? " is-soon" : ""}">
+        ${avatarHTML(p.spaceName || p.spaceId, null, 30)}
         <div class="cd-hot-main">
-          <span class="cd-hot-space">${escapeHtml(p.spaceName || p.spaceId)}</span>
+          <span class="cd-hot-space">${escapeHtml(p.spaceName || p.spaceId)}${soon ? ` <span class="cd-soon">ending soon</span>` : ""}</span>
           <span class="cd-hot-title">${escapeHtml(p.title)}</span>
+          ${lead}
           <span class="cd-hot-meta">${escapeHtml(fmtNum(p.voters))} votes${p.endsAt ? " · " + escapeHtml(fmtCountdown(p.endsAt)) : ""}</span>
         </div>
         <button type="button" class="btn accent sm cd-vote" data-space="${escapeHtml(p.spaceId)}" data-name="${escapeHtml(p.spaceName || p.spaceId)}">Vote →</button>
-      </div>`).join("");
+      </div>`;
+    }).join("");
     el.querySelectorAll(".cd-vote").forEach((b) =>
       b.addEventListener("click", () => openSnapshotDao(b.dataset.space, b.dataset.name, "governance")));
   })();
@@ -1080,13 +1094,18 @@ export async function renderDiscover(){
       <button type="button" class="cd-dao" data-space="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name)}" data-network="${escapeHtml(s.network || "")}">
         ${avatarHTML(s.name, null, 38)}
         <span class="cd-dao-col">
-          <span class="cd-dao-name">${escapeHtml(s.name)}</span>
+          <span class="cd-dao-name">${escapeHtml(s.name)}${s.active ? ` <span class="cd-dao-active">${s.active} live</span>` : ""}</span>
           <span class="cd-dao-meta">${escapeHtml(fmtNum(s.followers))} followers${s.proposals ? " · " + escapeHtml(fmtNum(s.proposals)) + " proposals" : ""}</span>
         </span>
         <span class="cd-dao-open">Open</span>
       </button>`).join("");
     el.querySelectorAll(".cd-dao").forEach((b) =>
       b.addEventListener("click", () => openSnapshotDao(b.dataset.space, b.dataset.name, "governance")));
+    // live stats in the hero
+    const tDaos = $("cdStatDaos"), tVotes = $("cdStatVotes"), tFoll = $("cdStatFollowers");
+    if (tDaos) tDaos.textContent = String(spaces.length);
+    if (tVotes) tVotes.textContent = String(spaces.reduce((a, s) => a + (s.active || 0), 0));
+    if (tFoll) tFoll.textContent = fmtNum(spaces.reduce((a, s) => a + (s.followers || 0), 0));
   })();
 }
 

@@ -361,6 +361,23 @@
 .cd-hot-title{ font:600 13.5px/1.35 var(--sans); color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cd-hot-meta{ font:500 11.5px/1 var(--mono); color:var(--text-mute); }
 .cd-vote{ flex:none; }
+.cd-hot-item .lz-avatar{ flex:none; }
+/* leading-result bar */
+.cd-hot-bar{ height:4px; border-radius:999px; background:rgba(255,255,255,.07); overflow:hidden; margin:2px 0 1px; }
+.cd-hot-bar-fill{ display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent),var(--accent-2)); }
+.cd-hot-lead{ font:500 11px/1.3 var(--sans); color:var(--text-dim); }
+.cd-hot-lead b{ color:var(--text); font-weight:600; }
+/* ending-soon pill */
+.cd-soon{ font:600 9px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--accent-3); background:rgba(255,122,89,.12); border:1px solid rgba(255,122,89,.3); padding:3px 6px; border-radius:999px; vertical-align:middle; }
+.cd-hot-item.is-soon{ box-shadow:var(--glass-rim), inset 0 0 0 1px rgba(255,122,89,.18); }
+
+/* hero stats strip */
+.cd-stats{ display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+.cd-stat{ font:500 12px/1 var(--sans); color:var(--text-mute); padding:8px 12px; border-radius:var(--r); background:var(--glass-soft); box-shadow:var(--glass-rim); }
+.cd-stat b{ font:600 14px/1 var(--mono); color:var(--text); margin-right:5px; font-variant-numeric:tabular-nums; }
+
+/* "N live" active-proposals pill on a DAO card */
+.cd-dao-active{ font:600 9px/1 var(--mono); letter-spacing:.04em; text-transform:uppercase; color:var(--accent-2); background:rgba(94,234,212,.12); border:1px solid rgba(94,234,212,.28); padding:2px 6px; border-radius:999px; margin-left:6px; vertical-align:middle; }
 
 /* famous DAOs */
 .cd-daos{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }

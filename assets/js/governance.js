@@ -886,7 +886,7 @@ export async function featuredSpaces(limit = 12){
   try {
     const data = await snapshotGql(
       `query($spaces:[String]){
-        spaces(first:40, where:{id_in:$spaces}){ id name network followersCount proposalsCount }
+        spaces(first:40, where:{id_in:$spaces}){ id name network followersCount proposalsCount activeProposals }
       }`,
       { spaces: FAMOUS_DAOS }
     );
@@ -898,6 +898,7 @@ export async function featuredSpaces(limit = 12){
       network: String(s.network || ""),
       followers: Number(s.followersCount) || 0,
       proposals: Number(s.proposalsCount) || 0,
+      active: Number(s.activeProposals) || 0,
     }));
   } catch { return []; }
 }
@@ -910,21 +911,34 @@ export async function hotProposals(limit = 10){
     const data = await snapshotGql(
       `query($n:Int!, $spaces:[String]){
         proposals(first:$n, where:{state:"active", space_in:$spaces}, orderBy:"votes", orderDirection:desc){
-          id title votes end space{ id name }
+          id title votes choices scores scores_total end space{ id name }
         }
       }`,
       { n, spaces: FAMOUS_DAOS }
     );
     const arr = Array.isArray(data?.proposals) ? data.proposals : [];
-    return arr.map(node => ({
-      id: String(node?.id || ""),
-      title: String(node?.title || "Untitled proposal"),
-      voters: Number(node?.votes) || 0,
-      endsAt: Number(node?.end) > 0 ? Number(node.end) * 1000 : null,
-      spaceId: node?.space?.id || "",
-      spaceName: node?.space?.name || node?.space?.id || "",
-      url: (node?.id && node?.space?.id) ? `https://snapshot.org/#/${node.space.id}/proposal/${node.id}` : null,
-    }));
+    return arr.map(node => {
+      // leading choice (highest score) → {label, pct of total}
+      const choices = Array.isArray(node?.choices) ? node.choices : [];
+      const scores = Array.isArray(node?.scores) ? node.scores : [];
+      const total = Number(node?.scores_total) || scores.reduce((a, s) => a + (Number(s) || 0), 0);
+      let lead = null;
+      if (choices.length && scores.length){
+        let bi = 0;
+        for (let i = 1; i < scores.length; i++) if ((Number(scores[i]) || 0) > (Number(scores[bi]) || 0)) bi = i;
+        lead = { label: String(choices[bi] ?? ""), pct: total > 0 ? Math.round((Number(scores[bi]) || 0) / total * 100) : 0 };
+      }
+      return {
+        id: String(node?.id || ""),
+        title: String(node?.title || "Untitled proposal"),
+        voters: Number(node?.votes) || 0,
+        endsAt: Number(node?.end) > 0 ? Number(node.end) * 1000 : null,
+        lead,
+        spaceId: node?.space?.id || "",
+        spaceName: node?.space?.name || node?.space?.id || "",
+        url: (node?.id && node?.space?.id) ? `https://snapshot.org/#/${node.space.id}/proposal/${node.id}` : null,
+      };
+    });
   } catch { return []; }
 }
 
