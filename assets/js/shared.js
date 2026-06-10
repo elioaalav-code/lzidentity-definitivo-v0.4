@@ -19,6 +19,7 @@ const LS = {
   ADDR: "cm:addr",
   NPUB: "cm:npub",
   PRIV: "cm:priv",   // never sent off-device; treat as a session key
+  KEYSTORE: "cm:keystore", // encrypted-at-rest variant (keystore.js owns it)
 };
 
 export const state = {
@@ -29,6 +30,8 @@ export const state = {
 
 export function onChange(cb){ state.listeners.add(cb); return () => state.listeners.delete(cb); }
 function emit(){ state.listeners.forEach(cb => cb(state)); }
+/* let satellite modules (keystore.js) trigger a reflect after they mutate state */
+export function pokeListeners(){ emit(); }
 
 export const shortAddr = (a) => a ? `${a.slice(0,6)}…${a.slice(-4)}` : "—";
 export const shortNpub = (n) => n ? `${n.slice(0,12)}…${n.slice(-6)}` : "—";
@@ -61,6 +64,7 @@ export function disconnectWallet(){
   localStorage.removeItem(LS.ADDR);
   localStorage.removeItem(LS.NPUB);
   localStorage.removeItem(LS.PRIV);
+  localStorage.removeItem(LS.KEYSTORE);
   emit();
 }
 
@@ -83,7 +87,10 @@ export async function deriveNostr(){
 
   state.derived = { addr: state.account, sig, priv: bytesToHex(priv), npub };
   localStorage.setItem(LS.NPUB, npub);
-  localStorage.setItem(LS.PRIV, state.derived.priv);
+  // protected setups never see plaintext at rest — keystore.js re-encrypts
+  // the new key on "lz:derived" (and falls back to plaintext if that fails)
+  if (!localStorage.getItem(LS.KEYSTORE)) localStorage.setItem(LS.PRIV, state.derived.priv);
+  window.dispatchEvent(new CustomEvent("lz:derived"));
   emit();
   return state.derived;
 }
@@ -92,10 +99,13 @@ export async function bootstrapWallet(){
   const savedAddr = localStorage.getItem(LS.ADDR);
   const savedNpub = localStorage.getItem(LS.NPUB);
   const savedPriv = localStorage.getItem(LS.PRIV);
+  const savedKS = localStorage.getItem(LS.KEYSTORE);
   if (savedAddr){
     state.account = savedAddr;
-    if (savedNpub && savedPriv){
-      state.derived = { addr: savedAddr, sig: null, priv: savedPriv, npub: savedNpub };
+    if (savedNpub && (savedPriv || savedKS)){
+      // keystore present + no plaintext → identity restored LOCKED (priv null);
+      // keystore.js unlock() puts the key back in memory on demand
+      state.derived = { addr: savedAddr, sig: null, priv: savedPriv || null, npub: savedNpub };
     }
     emit();
   }
@@ -111,6 +121,7 @@ export async function bootstrapWallet(){
         state.derived = null;
         localStorage.removeItem(LS.NPUB);
         localStorage.removeItem(LS.PRIV);
+        localStorage.removeItem(LS.KEYSTORE);
         emit();
       }
     });
@@ -131,6 +142,7 @@ export async function bootstrapWallet(){
         state.derived = null;
         localStorage.removeItem(LS.NPUB);
         localStorage.removeItem(LS.PRIV);
+        localStorage.removeItem(LS.KEYSTORE);
         emit();
       }
     } catch(_){}

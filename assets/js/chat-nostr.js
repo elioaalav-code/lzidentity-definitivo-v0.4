@@ -24,6 +24,7 @@ import { state, toast } from "./shared.js";
 import { skeleton, emptyState, escapeHtml } from "./ui.js";
 import { sigilDataURL } from "./sigil.js";
 import { npubEncode } from "./nostr.js";
+import { status as keyStatus, unlock as keyUnlock } from "./keystore.js";
 
 /* default DM relays (same reliable public set as daos.js) */
 const DM_RELAYS = [
@@ -266,12 +267,18 @@ function renderList() {
   relayStatus();
   if (!canPost()) {
     // ONE underived state (was two lock cards): ghost rows behind frosted
-    // glass — the promise, visibly skeletons — plus a single derive CTA.
+    // glass — the promise, visibly skeletons — plus a single CTA. When the
+    // key exists but is encrypted at rest, the CTA unlocks instead.
+    const locked = keyStatus() === "locked";
     items.replaceChildren(emptyState({
-      icon: ICN.lock, title: "Your inbox is waiting",
-      body: "Direct messages travel encrypted over Nostr. Derive your identity once and they appear here — on every device, forever.",
+      icon: ICN.lock,
+      title: locked ? "Inbox locked" : "Your inbox is waiting",
+      body: locked
+        ? "Your key is protected at rest. Unlock it to read and send encrypted messages."
+        : "Direct messages travel encrypted over Nostr. Derive your identity once and they appear here — on every device, forever.",
       hero: true, ring: true, ghost: "chat",
-      actionLabel: "Derive your identity →", ctaHref: "#/identity",
+      actionLabel: locked ? "Unlock →" : "Derive your identity →",
+      ...(locked ? { onAction: () => keyUnlock() } : { ctaHref: "#/identity" }),
     }));
     return;
   }
@@ -464,6 +471,11 @@ export async function init() {
     const search = $("chatSearch");
     if (search) search.addEventListener("input", (e) => { S.filter = e.target.value || ""; renderList(); });
     wireNewButton();
+    // key unlocked → boot the real inbox (only if the chat view is on screen)
+    window.addEventListener("lz:keys-unlocked", () => {
+      const items = $("chatItems");
+      if (items && items.offsetParent !== null) init();
+    });
     S.booted = true;
   }
   startStatusTicker();

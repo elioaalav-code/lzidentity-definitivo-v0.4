@@ -225,6 +225,16 @@ html.lz-vt .view{animation:none}
    (it was shredding the demo-mode note: "loca|torage", "si|gn") */
 .id-row .v.prose{word-break:normal;overflow-wrap:break-word}
 
+/* key-protection card (keystore.js) + its modal fields */
+.id-protection .lab{display:flex;align-items:center;gap:6px}
+.id-protection .lab svg{flex:0 0 auto}
+.id-protection .v.prose{font-family:var(--sans);font-size:13px;color:var(--text-dim);line-height:1.5}
+.id-protection .ks-row{display:flex;gap:8px;margin-top:4px}
+.ks-hint{font-size:13px;color:var(--text-mute);margin-bottom:12px;line-height:1.5}
+.ks-input{width:100%;padding:10px 12px;margin-bottom:10px;border-radius:10px;border:1px solid var(--hairline);background:rgba(0,0,0,.25);color:var(--text);font-family:var(--mono);font-size:13px}
+.ks-input:focus{outline:none;border-color:var(--accent)}
+.ks-err{font-size:12px;color:var(--error);margin:2px 0 10px}
+
 /* common: empty state */
 .empty{padding:60px 24px;text-align:center;border:1px dashed var(--border);border-radius:var(--r-lg);color:var(--text-mute)}
 .empty .em-ic{width:48px;height:48px;border-radius:12px;background:rgba(179,154,255,.08);color:var(--accent);display:grid;place-items:center;margin:0 auto 14px}

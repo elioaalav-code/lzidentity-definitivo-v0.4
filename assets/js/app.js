@@ -752,7 +752,8 @@ function reflectIdentityDetails(){
   idAddr.classList.toggle("dim", !state.account);
   if (state.derived){
     idNpub.textContent = state.derived.npub; idNpub.classList.remove("dim");
-    idPriv.textContent = "0x" + state.derived.priv; idPriv.classList.remove("dim");
+    if (state.derived.priv){ idPriv.textContent = "0x" + state.derived.priv; idPriv.classList.remove("dim"); }
+    else { idPriv.textContent = "•••• locked — protected at rest"; idPriv.classList.add("dim"); }
   } else {
     idNpub.textContent = "npub1··· (derive first)"; idNpub.classList.add("dim");
     idPriv.textContent = "— (derive first)"; idPriv.classList.add("dim");

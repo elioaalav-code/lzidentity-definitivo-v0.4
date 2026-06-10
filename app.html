@@ -410,12 +410,8 @@
             <div class="lab"><span>PRIVATE KEY · LOCAL ONLY</span><button data-copy="priv">copy</button></div>
             <div class="v dim" id="idPriv">— (derive first)</div>
           </div>
-          <div class="id-row" style="background:rgba(253,230,138,.04);border-color:rgba(253,230,138,.2)">
-            <div class="lab" style="color:var(--warn)">SECURITY · DEMO MODE</div>
-            <div class="v prose" style="font-family:var(--sans);font-size:13px;color:var(--text-dim);line-height:1.5">
-              The derived private key is held in localStorage for this demo so the dApp can sign Nostr events without re-prompting MetaMask. Production builds should wrap it with a WebAuthn PRF passkey or NIP-49 encryption.
-            </div>
-          </div>
+          <!-- key-protection status card — rendered by keystore.js -->
+          <div class="id-row id-protection" id="idProtection"></div>
       </div>
     </section>
 
@@ -735,6 +731,7 @@
 
 <!-- TradingView lightweight-charts (vendored locally, no build, offline at runtime) -->
 <script src="/assets/vendor/lightweight-charts.standalone.production.js?v=9"></script>
+<script type="module" src="/assets/js/keystore.js?v=9"></script>
 <script type="module" src="/assets/js/app.js?v=9"></script>
 <script type="module" src="/assets/js/trade.js?v=9"></script>
 <script type="module" src="/assets/js/risk.js?v=9"></script>
