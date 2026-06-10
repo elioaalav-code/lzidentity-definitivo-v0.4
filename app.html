@@ -410,6 +410,8 @@
             <div class="lab"><span>PRIVATE KEY · LOCAL ONLY</span><button data-copy="priv">copy</button></div>
             <div class="v dim" id="idPriv">— (derive first)</div>
           </div>
+          <!-- identity link (npub ↔ EVM attestation) — rendered by idlink.js -->
+          <div class="id-row id-protection" id="idLink"></div>
           <!-- key-protection status card — rendered by keystore.js -->
           <div class="id-row id-protection" id="idProtection"></div>
       </div>
@@ -731,7 +733,10 @@
 
 <!-- TradingView lightweight-charts (vendored locally, no build, offline at runtime) -->
 <script src="/assets/vendor/lightweight-charts.standalone.production.js?v=9"></script>
-<script type="module" src="/assets/js/keystore.js?v=9"></script>
+<!-- NOTE: query-less on purpose — these are imported by other modules
+     ("./keystore.js"); a ?v= here would create a SECOND module instance -->
+<script type="module" src="/assets/js/keystore.js"></script>
+<script type="module" src="/assets/js/idlink.js"></script>
 <script type="module" src="/assets/js/app.js?v=9"></script>
 <script type="module" src="/assets/js/trade.js?v=9"></script>
 <script type="module" src="/assets/js/risk.js?v=9"></script>

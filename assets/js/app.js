@@ -368,12 +368,23 @@ if (sendViaSel){
 
 document.getElementById("walletRefresh")?.addEventListener("click", () => { loadWallet(); toast(state.account ? "reading balances…" : "connect a wallet first", state.account ? "ok" : "err"); });
 document.getElementById("sendBtn")?.addEventListener("click", async () => {
-  const to    = document.getElementById("sendTo").value.trim();
+  let to      = document.getElementById("sendTo").value.trim();
   const amt   = document.getElementById("sendAmt").value.trim();
   const asset = document.getElementById("sendAsset").value;
   const via   = document.getElementById("sendVia").value;
   if (!state.account){ toast("connect a wallet first", "err"); return; }
   if (!to || !amt){ toast("destination and amount required", "err"); return; }
+  // npub destination → resolve through the verified Identity Link attestation
+  if (/^npub1[a-z0-9]+$/i.test(to)){
+    toast("resolving npub → linked address…");
+    try {
+      const { resolveNpubAddress } = await import("./idlink.js");
+      const link = await resolveNpubAddress(to);
+      if (!link){ toast("this npub hasn't linked an EVM address (Identity Link)", "err", 4600); return; }
+      to = link.addr;
+      toast(`verified link → ${to.slice(0,6)}…${to.slice(-4)}`, "ok");
+    } catch (_){ toast("could not resolve the npub link", "err"); return; }
+  }
   // Only native ETH on the default EVM route is actually sendable keylessly.
   if (asset !== "ETH" || (via !== "auto" && via !== "mesh")){
     toast(`${asset} via ${via} isn’t wired in this build — only native ETH transfers are live.`, "info", 4600);

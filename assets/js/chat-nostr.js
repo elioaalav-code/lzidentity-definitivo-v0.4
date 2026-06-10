@@ -451,6 +451,7 @@ function renderThread() {
         <div class="info"><span class="nm">${escapeHtml(displayName(S.active))}</span><span class="sub">${escapeHtml(shortNpub(S.active))} · encrypted · NIP-04</span></div>
       </div>
       <div class="meta">
+        <span class="idlink-slot" id="chatIdLink"></span>
         <button type="button" class="chat-contact-btn" id="chatContactBtn" aria-label="${S.contacts[S.active] ? "Edit contact" : "Save contact"}" title="${S.contacts[S.active] ? "Edit contact" : "Save contact"}">${ICN.pen}</button>
         <span class="tag nostr">NIP-04</span>
       </div>
@@ -469,7 +470,39 @@ function renderThread() {
   sendBtn.addEventListener("click", fire);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); fire(); } });
   $("chatContactBtn")?.addEventListener("click", () => editContact(S.active));
+  fillIdLink(S.active);
   const body = $("chatNostrBody"); if (body) body.scrollTop = body.scrollHeight;
+}
+
+/* Identity Link in the thread head: verified npub↔EVM → ✓ chip + Send
+   (prefills the wallet quick-send with the ATTESTED address) */
+async function fillIdLink(pub) {
+  const slot = $("chatIdLink");
+  if (!slot) return;
+  try {
+    const { fetchLink } = await import("./idlink.js");
+    const link = await fetchLink(pub);
+    if (S.active !== pub) return;                 // user moved on meanwhile
+    const cur = $("chatIdLink");
+    if (!cur) return;
+    if (link && link.state === "verified") {
+      const short = `${link.addr.slice(0, 6)}…${link.addr.slice(-4)}`;
+      cur.innerHTML = `
+        <span class="tag lz idlink-ok" title="npub ↔ EVM attestation verified">✓ ${escapeHtml(short)}</span>
+        <button type="button" class="btn ghost sm idlink-pay" id="chatPayBtn">Send</button>`;
+      cur.querySelector("#chatPayBtn")?.addEventListener("click", () => {
+        location.hash = "#/wallet";
+        const who = displayName(pub);
+        setTimeout(() => {
+          const to = document.getElementById("sendTo");
+          if (to) { to.value = link.addr; to.focus(); }
+          toast(`Quick send → ${who} (${short}) · verified link`, "ok", 4200);
+        }, 350);
+      });
+    } else {
+      cur.innerHTML = "";
+    }
+  } catch (_) {}
 }
 
 function shortNpub(pub) {
