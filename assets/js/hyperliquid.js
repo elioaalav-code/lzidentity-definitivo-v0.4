@@ -16,8 +16,8 @@
  *  Docs: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api
  * ============================================================ */
 
-import { encode as msgpackEncode } from "https://esm.sh/@msgpack/msgpack@2.8.0";
-import { keccak_256 } from "https://esm.sh/@noble/hashes@1.4.0/sha3";
+import { encode as msgpackEncode } from "../vendor/msgpack.js";
+import { keccak_256 } from "../vendor/crypto.js";
 
 /* ─── network (mainnet default, persisted) ─────────────────── */
 
@@ -110,9 +110,14 @@ export async function meta(){
 /** asset index + szDecimals for a perp coin name (e.g. "ETH"). */
 export async function assetInfo(coin){
   const m = await meta();
-  const i = m.universe.findIndex(u => u.name === coin);
+  if (!m || !Array.isArray(m.universe) || !m.universe.length) throw new Error("bad meta response");
+  const i = m.universe.findIndex(u => u && u.name === coin);
   if (i < 0) throw new Error("unknown coin " + coin);
-  return { index: i, szDecimals: m.universe[i].szDecimals, maxLeverage: m.universe[i].maxLeverage };
+  const u = m.universe[i];
+  // Guard the asset index + decimals before they feed order construction/signing.
+  if (!Number.isInteger(i) || i >= m.universe.length) throw new Error("bad asset index");
+  if (!Number.isInteger(u.szDecimals) || u.szDecimals < 0) throw new Error("bad szDecimals for " + coin);
+  return { index: i, szDecimals: u.szDecimals, maxLeverage: u.maxLeverage };
 }
 
 export const allMids        = () => info({ type: "allMids" });

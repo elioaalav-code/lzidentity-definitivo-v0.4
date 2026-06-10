@@ -21,11 +21,13 @@ let cryptoReady = false;
 
 const cryptoReadyPromise = (async () => {
   try {
-    _secp = await import("https://esm.sh/@noble/secp256k1@2.1.0");
-    schnorr = _secp.schnorr;
-    const { sha256 } = await import("https://esm.sh/@noble/hashes@1.4.0/sha256");
-    _sha256 = sha256;
-    try { ({ bech32: _bech32 } = await import("https://esm.sh/@scure/base@1.1.6")); } catch (_) {}
+    // Vendored locally (assets/vendor/crypto.js). schnorr + ECDH come from
+    // @noble/curves; @noble/secp256k1 v2.x no longer ships schnorr.
+    const m = await import("../vendor/crypto.js");
+    _secp = m.secp256k1;          // full curve API (getSharedSecret for NIP-04)
+    schnorr = m.schnorr;
+    _sha256 = m.sha256;
+    _bech32 = m.bech32;
     cryptoReady = true;
   } catch (e) {
     // Browser: esm.sh unavailable -> degrade. Node (tests): fall back to

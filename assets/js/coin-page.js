@@ -301,6 +301,9 @@ function statCard(label, value, extra = "") {
 }
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+// esc() neutralizes HTML chars but NOT the URL scheme — a `javascript:` href
+// would survive it. safeUrl() only lets http(s) through, otherwise "#".
+const safeUrl = (u) => { try { const x = new URL(String(u)); return (x.protocol === "https:" || x.protocol === "http:") ? esc(x.href) : "#"; } catch { return "#"; } };
 
 /* 24h low → high bar with the current price marked. */
 function rangeBar(low, cur, hi) {
@@ -333,8 +336,8 @@ function aboutCard(md) {
   const desc = raw.length > 420 ? raw.slice(0, 420).replace(/\s+\S*$/, "") + "…" : raw;
   const cats = (md.categories || []).map(c => `<span class="cp-cat">${esc(c)}</span>`).join("");
   const links = [];
-  if (md.homepage) links.push(`<a class="cp-link" href="${esc(md.homepage)}" target="_blank" rel="noopener noreferrer">Website<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M3 13 13 3M6 3h7v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`);
-  if (md.explorer) links.push(`<a class="cp-link" href="${esc(md.explorer)}" target="_blank" rel="noopener noreferrer">Explorer<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M3 13 13 3M6 3h7v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`);
+  if (md.homepage) links.push(`<a class="cp-link" href="${safeUrl(md.homepage)}" target="_blank" rel="noopener noreferrer">Website<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M3 13 13 3M6 3h7v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`);
+  if (md.explorer) links.push(`<a class="cp-link" href="${safeUrl(md.explorer)}" target="_blank" rel="noopener noreferrer">Explorer<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M3 13 13 3M6 3h7v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`);
   if (!desc && !cats && !links.length) return "";
   return `<div class="cp-about">
     <div class="cp-about-head">About ${esc(md.name || "")}</div>
@@ -506,7 +509,7 @@ function renderDlSection(container, dl) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
     .map(([chain, tvl]) => `<div class="cp-dl-chain">
-      <span class="cp-dl-chain-name">${chain}</span>
+      <span class="cp-dl-chain-name">${esc(chain)}</span>
       <span class="cp-dl-chain-tvl">${fmtUSD(tvl)}</span>
     </div>`)
     .join("");
@@ -516,7 +519,7 @@ function renderDlSection(container, dl) {
     <div class="cp-dl-card">
       <div class="cp-dl-header">
         <span class="cp-dl-title">DeFiLlama TVL</span>
-        <span class="cp-dl-badge">${dl.category || "Protocol"}</span>
+        <span class="cp-dl-badge">${esc(dl.category || "Protocol")}</span>
       </div>
       <div class="cp-dl-total">${fmtUSD(dl.tvl_usd)}</div>
       ${chainRows ? `<div class="cp-dl-chains">${chainRows}</div>` : ""}
@@ -536,7 +539,7 @@ async function render(id) {
   /* Show loading state */
   root.innerHTML = `<div class="cp-loading">
     <div class="cp-loading-ring"></div>
-    <div class="cp-loading-label">Loading ${id || "coin"}…</div>
+    <div class="cp-loading-label">Loading ${esc(id || "coin")}…</div>
   </div>`;
 
   if (!id) {

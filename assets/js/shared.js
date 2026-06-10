@@ -4,11 +4,13 @@
 
 let schnorr, sha256, bech32;
 let cryptoReady = false;
+// Crypto is vendored locally (assets/vendor/crypto.js) — no third-party CDN in
+// the signing path. schnorr lives in @noble/curves (it was removed from
+// @noble/secp256k1 v2.x, which is why the old esm.sh import yielded `undefined`
+// and every derivation threw after the wallet signature).
 const cryptoReadyPromise = (async () => {
   try {
-    ({ schnorr } = await import("https://esm.sh/@noble/secp256k1@2.1.0"));
-    ({ sha256 }  = await import("https://esm.sh/@noble/hashes@1.4.0/sha256"));
-    ({ bech32 }  = await import("https://esm.sh/@scure/base@1.1.6"));
+    ({ schnorr, sha256, bech32 } = await import("../vendor/crypto.js"));
     cryptoReady = true;
   } catch (e) {
     console.warn("[cm] Nostr crypto libs failed to load:", e);
@@ -18,8 +20,12 @@ const cryptoReadyPromise = (async () => {
 const LS = {
   ADDR: "cm:addr",
   NPUB: "cm:npub",
-  PRIV: "cm:priv",   // never sent off-device; treat as a session key
+  PRIV: "cm:priv",   // kept on-device only; re-derivable from the wallet signature
 };
+
+// A derived Nostr private key is exactly 32 bytes of lowercase hex.
+const isValidPrivHex = (s) => typeof s === "string" && /^[0-9a-f]{64}$/.test(s);
+const isValidNpub    = (s) => typeof s === "string" && /^npub1[0-9a-z]+$/.test(s);
 
 export const state = {
   account: null,
@@ -94,8 +100,12 @@ export async function bootstrapWallet(){
   const savedPriv = localStorage.getItem(LS.PRIV);
   if (savedAddr){
     state.account = savedAddr;
-    if (savedNpub && savedPriv){
+    if (isValidNpub(savedNpub) && isValidPrivHex(savedPriv)){
       state.derived = { addr: savedAddr, sig: null, priv: savedPriv, npub: savedNpub };
+    } else if (savedNpub || savedPriv){
+      // Corrupt/tampered storage — drop it rather than feed a bad key to signEvent.
+      localStorage.removeItem(LS.NPUB);
+      localStorage.removeItem(LS.PRIV);
     }
     emit();
   }

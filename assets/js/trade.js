@@ -847,6 +847,7 @@ async function onSubmit(){
 
 /* ─── review modal ─────────────────────────────────────────── */
 let pendingOrder = null;
+let placing = false;   // in-flight guard: blocks a second signature while one is open
 function openReview(o){
   pendingOrder = o;
   const notional = o.sz * o.px;
@@ -871,7 +872,8 @@ function openReview(o){
 }
 function closeReview(){ $("hlModal").hidden = true; pendingOrder = null; }
 async function confirmOrder(){
-  if (!pendingOrder) return;
+  if (!pendingOrder || placing) return;   // ignore double-clicks during signing
+  placing = true;
   const o = pendingOrder;
   const btn = $("hlConfirm");
   const submit = $("hlSubmit");
@@ -898,6 +900,7 @@ async function confirmOrder(){
     toast("order rejected · " + (e?.message || e), "err", 4500);
     if (submit){ submit.dataset.busy = ""; submit.classList.remove("is-signing","is-placed"); updateSubmitLabel(); }
   } finally {
+    placing = false;
     btn.disabled = false;
     if (btn.dataset.state !== "placed"){ btn.dataset.state = ""; btn.textContent = "Sign & place ▸"; }
     setTimeout(() => { if (btn.dataset.state === "placed"){ btn.dataset.state = ""; btn.textContent = "Sign & place ▸"; } }, 900);
