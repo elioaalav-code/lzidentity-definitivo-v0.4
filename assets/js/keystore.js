@@ -221,8 +221,10 @@ async function protectFlow() {
   catch (e) { toast("Could not protect the key", "err"); console.warn("[keystore]", e); }
 }
 
-/* ── re-derive while protected: re-encrypt the NEW key, or fall back ── */
-window.addEventListener("lz:derived", async () => {
+/* ── re-derive while protected: re-encrypt the NEW key, or fall back ──
+   (boot-guarded below: listeners attach once even if the module is ever
+   loaded twice, e.g. entry tag + import under different URLs) */
+async function onDerived() {
   const ks = readKS();
   if (!ks || !state.derived || !state.derived.priv) return;
   try {
@@ -246,7 +248,7 @@ window.addEventListener("lz:derived", async () => {
     toast("Protection was reset for the new key — protect it again from Identity", "err");
   }
   renderCard();
-});
+}
 
 /* ── the #idProtection card on the Identity view ── */
 const ICN_SHIELD = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/></svg>`;
@@ -282,8 +284,12 @@ function renderCard() {
   }
 }
 
-onChange(renderCard);
-renderCard();
+if (!window.__lzKeystoreBooted) {
+  window.__lzKeystoreBooted = true;
+  window.addEventListener("lz:derived", onDerived);
+  onChange(renderCard);
+  renderCard();
+}
 
 /* ── self-mount ── */
 window.LZ = window.LZ || {};
