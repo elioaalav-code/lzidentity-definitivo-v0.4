@@ -6,7 +6,11 @@ let schnorr, sha256, bech32;
 let cryptoReady = false;
 const cryptoReadyPromise = (async () => {
   try {
-    ({ schnorr } = await import("https://esm.sh/@noble/secp256k1@2.1.0"));
+    // schnorr comes from @noble/curves — @noble/secp256k1 v2 dropped it
+    // (its namespace has sign/verify/getSharedSecret but NO schnorr, so the
+    // old destructure yielded undefined and broke derivation at runtime)
+    ({ schnorr } = await import("https://esm.sh/@noble/curves@1.4.0/secp256k1"));
+    if (!schnorr) throw new Error("schnorr export missing");
     ({ sha256 }  = await import("https://esm.sh/@noble/hashes@1.4.0/sha256"));
     ({ bech32 }  = await import("https://esm.sh/@scure/base@1.1.6"));
     cryptoReady = true;

@@ -22,7 +22,11 @@ let cryptoReady = false;
 const cryptoReadyPromise = (async () => {
   try {
     _secp = await import("https://esm.sh/@noble/secp256k1@2.1.0");
-    schnorr = _secp.schnorr;
+    // @noble/secp256k1 v2 has NO schnorr export (it kept ECDSA + ECDH only);
+    // schnorr lives in @noble/curves. The old `_secp.schnorr` was undefined,
+    // which silently broke signEvent/getPubkey in real browsers.
+    ({ schnorr } = await import("https://esm.sh/@noble/curves@1.4.0/secp256k1"));
+    if (!schnorr) throw new Error("schnorr export missing");
     const { sha256 } = await import("https://esm.sh/@noble/hashes@1.4.0/sha256");
     _sha256 = sha256;
     try { ({ bech32: _bech32 } = await import("https://esm.sh/@scure/base@1.1.6")); } catch (_) {}
