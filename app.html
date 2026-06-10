@@ -37,33 +37,34 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@1&display=swap" />
 
-<link rel="stylesheet" href="/assets/css/base.css?v=8" />
-<link rel="stylesheet" href="/assets/css/ui.css?v=8" />
-<link rel="stylesheet" href="/assets/css/app.css?v=8" />
-<link rel="stylesheet" href="/assets/css/anima.css?v=8" />
-<link rel="stylesheet" href="/assets/css/trade.css?v=8" />
-<link rel="stylesheet" href="/assets/css/assistant.css?v=8" />
-<link rel="stylesheet" href="/assets/css/risk.css?v=8" />
-<link rel="stylesheet" href="/assets/css/recovery.css?v=8" />
-<link rel="stylesheet" href="/assets/css/wallet-actions.css?v=8" />
-<link rel="stylesheet" href="/assets/css/wallet-pro.css?v=8" />
-<link rel="stylesheet" href="/assets/css/coin-page.css?v=8" />
-<link rel="stylesheet" href="/assets/css/coin-page-pro.css?v=8" />
-<link rel="stylesheet" href="/assets/css/chat-charts.css?v=8" />
-<link rel="stylesheet" href="/assets/css/hl-markets.css?v=8" />
-<link rel="stylesheet" href="/assets/css/markets-pro.css?v=8" />
-<link rel="stylesheet" href="/assets/css/hl-depth.css?v=8" />
-<link rel="stylesheet" href="/assets/css/hl-portfolio.css?v=8" />
-<link rel="stylesheet" href="/assets/css/hl-orders-pro.css?v=8" />
-<link rel="stylesheet" href="/assets/css/glass.css?v=8" />
-<link rel="stylesheet" href="/assets/css/sigil.css?v=8" />
-<link rel="stylesheet" href="/assets/css/motion.css?v=8" />
-<link rel="stylesheet" href="/assets/css/communities.css?v=8" />
-<link rel="stylesheet" href="/assets/css/governance.css?v=8" />
-<link rel="stylesheet" href="/assets/css/community-add.css?v=8" />
-<link rel="stylesheet" href="/assets/css/chat-nostr.css?v=8" />
-<script type="module" src="/assets/js/net.js?v=8"></script>
-<script type="module" src="/assets/js/ui.js?v=8"></script>
+<link rel="stylesheet" href="/assets/css/base.css?v=9" />
+<link rel="stylesheet" href="/assets/css/ui.css?v=9" />
+<link rel="stylesheet" href="/assets/css/app.css?v=9" />
+<link rel="stylesheet" href="/assets/css/anima.css?v=9" />
+<link rel="stylesheet" href="/assets/css/trade.css?v=9" />
+<link rel="stylesheet" href="/assets/css/assistant.css?v=9" />
+<link rel="stylesheet" href="/assets/css/risk.css?v=9" />
+<link rel="stylesheet" href="/assets/css/recovery.css?v=9" />
+<link rel="stylesheet" href="/assets/css/wallet-actions.css?v=9" />
+<link rel="stylesheet" href="/assets/css/wallet-pro.css?v=9" />
+<link rel="stylesheet" href="/assets/css/coin-page.css?v=9" />
+<link rel="stylesheet" href="/assets/css/coin-page-pro.css?v=9" />
+<link rel="stylesheet" href="/assets/css/chat-charts.css?v=9" />
+<link rel="stylesheet" href="/assets/css/hl-markets.css?v=9" />
+<link rel="stylesheet" href="/assets/css/markets-pro.css?v=9" />
+<link rel="stylesheet" href="/assets/css/hl-depth.css?v=9" />
+<link rel="stylesheet" href="/assets/css/hl-portfolio.css?v=9" />
+<link rel="stylesheet" href="/assets/css/hl-orders-pro.css?v=9" />
+<link rel="stylesheet" href="/assets/css/glass.css?v=9" />
+<link rel="stylesheet" href="/assets/css/sigil.css?v=9" />
+<link rel="stylesheet" href="/assets/css/motion.css?v=9" />
+<link rel="stylesheet" href="/assets/css/communities.css?v=9" />
+<link rel="stylesheet" href="/assets/css/governance.css?v=9" />
+<link rel="stylesheet" href="/assets/css/community-add.css?v=9" />
+<link rel="stylesheet" href="/assets/css/chat-nostr.css?v=9" />
+<link rel="stylesheet" href="/assets/css/chat-pro.css?v=9" />
+<script type="module" src="/assets/js/net.js?v=9"></script>
+<script type="module" src="/assets/js/ui.js?v=9"></script>
 </head>
 <body>
 
@@ -142,7 +143,7 @@
     <div class="side-foot">
       <div class="row"><span><span class="d"></span>System</span><span class="v">online</span></div>
       <div class="row"><span>Network</span><span class="v" id="sfNet">mainnet</span></div>
-      <div class="row"><span>Build</span><span class="v">v2.0.0</span></div>
+      <div class="row"><span>Build</span><span class="v">v0.6.0</span></div>
     </div>
   </aside>
 
@@ -174,7 +175,7 @@
 
       <div class="chat-layout">
         <div class="chat-list">
-          <div class="chat-list-head"><h3>Inbox</h3><span class="tag peer">6 active</span></div>
+          <div class="chat-list-head"><h3>Inbox</h3><span class="tag peer" id="chatRelayStat"><span class="dot" aria-hidden="true"></span>—</span></div>
           <div class="chat-search"><input type="text" id="chatSearch" placeholder="Search conversations…" autocomplete="off" /></div>
           <div class="chat-items" id="chatItems"></div>
         </div>
@@ -411,7 +412,7 @@
           </div>
           <div class="id-row" style="background:rgba(253,230,138,.04);border-color:rgba(253,230,138,.2)">
             <div class="lab" style="color:var(--warn)">SECURITY · DEMO MODE</div>
-            <div class="v" style="font-family:var(--sans);font-size:13px;color:var(--text-dim);line-height:1.5">
+            <div class="v prose" style="font-family:var(--sans);font-size:13px;color:var(--text-dim);line-height:1.5">
               The derived private key is held in localStorage for this demo so the dApp can sign Nostr events without re-prompting MetaMask. Production builds should wrap it with a WebAuthn PRF passkey or NIP-49 encryption.
             </div>
           </div>
@@ -733,25 +734,27 @@
 </aside>
 
 <!-- TradingView lightweight-charts (vendored locally, no build, offline at runtime) -->
-<script src="/assets/vendor/lightweight-charts.standalone.production.js?v=8"></script>
-<script type="module" src="/assets/js/app.js?v=8"></script>
-<script type="module" src="/assets/js/trade.js?v=8"></script>
-<script type="module" src="/assets/js/risk.js?v=8"></script>
-<script type="module" src="/assets/js/risk-watch.js?v=8"></script>
-<script type="module" src="/assets/js/assistant.js?v=8"></script>
-<script type="module" src="/assets/js/pillars.js?v=8"></script>
-<script type="module" src="/assets/js/wallet-actions.js?v=8"></script>
-<script type="module" src="/assets/js/coin-page.js?v=8"></script>
+<script src="/assets/vendor/lightweight-charts.standalone.production.js?v=9"></script>
+<script type="module" src="/assets/js/app.js?v=9"></script>
+<script type="module" src="/assets/js/trade.js?v=9"></script>
+<script type="module" src="/assets/js/risk.js?v=9"></script>
+<script type="module" src="/assets/js/risk-watch.js?v=9"></script>
+<script type="module" src="/assets/js/assistant.js?v=9"></script>
+<script type="module" src="/assets/js/pillars.js?v=9"></script>
+<script type="module" src="/assets/js/wallet-actions.js?v=9"></script>
+<script type="module" src="/assets/js/coin-page.js?v=9"></script>
 <!-- Hyperliquid parity add-ons (each module owns its own mount + files) -->
-<script type="module" src="/assets/js/hl-markets.js?v=8"></script>
-<script type="module" src="/assets/js/hl-depth.js?v=8"></script>
-<script type="module" src="/assets/js/hl-portfolio.js?v=8"></script>
-<script type="module" src="/assets/js/hl-orders-pro.js?v=8"></script>
+<script type="module" src="/assets/js/hl-markets.js?v=9"></script>
+<script type="module" src="/assets/js/hl-depth.js?v=9"></script>
+<script type="module" src="/assets/js/hl-portfolio.js?v=9"></script>
+<script type="module" src="/assets/js/hl-orders-pro.js?v=9"></script>
 <!-- Communities (DAO social): Nostr engine + governance adapters + UI -->
-<script type="module" src="/assets/js/nostr.js?v=8"></script>
-<script type="module" src="/assets/js/governance.js?v=8"></script>
-<script type="module" src="/assets/js/communities.js?v=8"></script>
-<script type="module" src="/assets/js/community-add.js?v=8"></script>
-<script type="module" src="/assets/js/chat-nostr.js?v=8"></script>
+<script type="module" src="/assets/js/nostr.js?v=9"></script>
+<script type="module" src="/assets/js/governance.js?v=9"></script>
+<script type="module" src="/assets/js/communities.js?v=9"></script>
+<script type="module" src="/assets/js/community-add.js?v=9"></script>
+<script type="module" src="/assets/js/chat-nostr.js?v=9"></script>
+<!-- Glass 27: material intensity control (tokens in base.css; pre-paint apply in preloader.js) -->
+<script type="module" src="/assets/js/glass-control.js?v=9"></script>
 </body>
 </html>

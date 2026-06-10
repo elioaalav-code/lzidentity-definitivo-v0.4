@@ -533,19 +533,40 @@ export function skeleton({ rows = 3, height = 44, gap = 8, radius = 12 } = {}){
   for (let i = 0; i < rows; i++) h += `<div class="lz-skel" style="height:${height}px;border-radius:${radius}px"></div>`;
   return `<div class="lz-skel-stack" style="gap:${gap}px" aria-busy="true" aria-label="Loading">${h}</div>`;
 }
-export function emptyState({ icon = "", title = "Nothing here yet", body = "", actionLabel = "", onAction = null, variant = "empty" } = {}){
+/* v2 (additive — every pre-v2 call site works unchanged):
+ *   hero      — route-level scale (bigger type, taller stage)
+ *   ring      — dashed "sigil await" orbit around the icon (Identity language)
+ *   ghost     — "chat" | "rows": blurred skeleton rows behind the message,
+ *               clearly skeletons (the promise seen through frosted glass)
+ *   ghostRows — how many ghost rows (default 4)
+ *   ctaHref   — render the action as an internal link (#/route) instead of
+ *               a button; non-internal hrefs are refused (no javascript:) */
+export function emptyState({ icon = "", title = "Nothing here yet", body = "", actionLabel = "", onAction = null, variant = "empty", hero = false, ring = false, ghost = "", ghostRows = 4, ctaHref = "" } = {}){
   const el = document.createElement("div");
   const isErr = variant === "error";
-  el.className = "lz-empty" + (isErr ? " lz-empty--error" : "");
+  el.className = "lz-empty" + (isErr ? " lz-empty--error" : "") + (hero ? " lz-empty--hero" : "") + (ghost ? " lz-empty--ghost" : "");
   el.setAttribute("role", isErr ? "alert" : "status");
   if (isErr && !icon){
     icon = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.2M12 16h.01" stroke-linecap="round"/></svg>`;
   }
-  el.innerHTML = `${icon ? `<div class="lz-empty-icn">${icon}</div>` : ``}
+  const W1 = [62, 48, 71, 55, 66], W2 = [38, 52, 30, 44, 35];
+  const ghostHTML = ghost ? `<div class="lz-ghost" aria-hidden="true">${Array.from({ length: ghostRows }, (_, i) =>
+    `<div class="lz-ghost-row"><span class="g-av"></span><span class="g-col"><span class="g-l" style="width:${W1[i % W1.length]}%"></span><span class="g-l g-l2" style="width:${W2[i % W2.length]}%"></span></span></div>`).join("")}</div>` : "";
+  const icnHTML = icon
+    ? (ring ? `<div class="lz-empty-orb"><span class="lz-empty-ring" aria-hidden="true"></span><div class="lz-empty-icn">${icon}</div></div>`
+            : `<div class="lz-empty-icn">${icon}</div>`)
+    : "";
+  const safeHref = /^#\//.test(ctaHref) ? ctaHref : "";
+  const actHTML = actionLabel
+    ? (safeHref
+        ? `<a href="${escapeHtml(safeHref)}" class="btn accent sm lz-empty-action">${escapeHtml(actionLabel)}</a>`
+        : `<button type="button" class="btn ${isErr ? "accent" : "ghost"} sm lz-empty-action">${escapeHtml(actionLabel)}</button>`)
+    : "";
+  el.innerHTML = `${ghostHTML}<div class="lz-empty-fore">${icnHTML}
     <div class="lz-empty-title">${escapeHtml(title)}</div>
     ${body ? `<div class="lz-empty-body">${escapeHtml(body)}</div>` : ``}
-    ${actionLabel ? `<button type="button" class="btn ${isErr ? "accent" : "ghost"} sm lz-empty-action">${escapeHtml(actionLabel)}</button>` : ``}`;
-  if (actionLabel && onAction) el.querySelector(".lz-empty-action").addEventListener("click", onAction);
+    ${actHTML}</div>`;
+  if (actionLabel && onAction && !safeHref) el.querySelector(".lz-empty-action").addEventListener("click", onAction);
   return el;
 }
 

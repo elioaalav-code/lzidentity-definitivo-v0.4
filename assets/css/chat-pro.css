@@ -1,0 +1,135 @@
+/* ============================================================ *
+ *  chat-pro.css — premium chat skin (v0.6 "Premium"). Loads LAST
+ *  so it wins the cascade (same elevation pattern as wallet-pro /
+ *  markets-pro / coin-page-pro).
+ *
+ *  The landing wt-phone "Chat" mockup is the visual spec; the data
+ *  stays honest — transport today is Nostr only, so the only badge
+ *  is NOSTR · NIP-04 and the head chip is a live relay census.
+ *
+ *  Perf: the .chat-layout slab carries the ONE backdrop blur; rows
+ *  and bubbles are cheap flat glass (no blur, no outer shadows).
+ * ============================================================ */
+
+/* — one glass slab, two panes — */
+[data-view="chat"] .chat-layout{
+  border:0;border-radius:var(--r-xl);
+  background:var(--glass-sheen),var(--glass);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(1.06);
+  backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(1.06);
+  box-shadow:var(--glass-stack);
+}
+[data-view="chat"] .chat-list{background:rgba(8,8,11,.30);border-right:1px solid var(--hairline)}
+[data-view="chat"] .chat-list-head{border-bottom:1px solid var(--hairline)}
+[data-view="chat"] .chat-search{border-bottom:1px solid var(--hairline)}
+[data-view="chat"] .chat-search input{border-radius:999px;background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.012));box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+[data-view="chat"] .chat-search input:focus{box-shadow:inset 0 0 0 1px rgba(179,154,255,.40)}
+[data-view="chat"] .thread-body{background:transparent}
+
+/* — live relay census chip (replaces the hardcoded "6 active") — */
+#chatRelayStat{display:inline-flex;align-items:center;gap:6px}
+#chatRelayStat .dot{width:6px;height:6px;border-radius:50%;background:var(--text-mute);flex:0 0 auto;transition:background var(--t) var(--ease)}
+#chatRelayStat.live .dot{background:var(--accent-2);box-shadow:0 0 8px var(--accent-2);animation:pulse 1.8s ease-in-out infinite}
+
+/* — conversation rows: floating glass pills, sigil avatars — */
+[data-view="chat"] .chat-item{
+  margin:4px 8px;padding:12px;border-radius:14px;border-bottom:0;
+  background:transparent;border-color:transparent;box-shadow:none;
+  transition:background var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease);
+}
+[data-view="chat"] .chat-item:hover{
+  background:var(--glass-sheen),rgba(22,23,30,.36);
+  box-shadow:var(--glass-hl),var(--glass-ring);
+}
+[data-view="chat"] .chat-item.active{
+  background:linear-gradient(180deg,rgba(179,154,255,.15),rgba(179,154,255,.05));
+  box-shadow:var(--glass-hl),inset 0 0 0 1px rgba(179,154,255,.22);
+}
+[data-view="chat"] .chat-item .av--sigil,
+[data-view="chat"] .thread-head .av--sigil{
+  border-radius:50%;background:#0b0b10;object-fit:cover;flex-shrink:0;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.10),0 0 16px -6px rgba(179,154,255,.40);
+}
+[data-view="chat"] .chat-item .name{text-shadow:var(--glass-text-shadow)}
+[data-view="chat"] .chat-item .unread{box-shadow:0 0 10px rgba(179,154,255,.55)}
+
+/* the kit's empty states stretch to fill the inbox pane */
+[data-view="chat"] .chat-items .lz-empty{flex:1}
+
+/* — day dividers — */
+[data-view="chat"] .day-divider{
+  display:flex;align-items:center;gap:12px;margin:6px 0 2px;
+  color:var(--text-mute);font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.14em;text-transform:uppercase;
+}
+[data-view="chat"] .day-divider::before,
+[data-view="chat"] .day-divider::after{
+  content:"";flex:1;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);
+}
+
+/* — bubbles: glass, not paint; every message carries its lock — */
+[data-view="chat"] .msg-bubble{box-shadow:var(--glass-hl),var(--glass-ring)}
+[data-view="chat"] .msg-bubble > div:first-child{text-shadow:var(--glass-text-shadow)}
+[data-view="chat"] .msg-bubble.them{background:var(--glass-sheen),rgba(26,27,36,.52)}
+[data-view="chat"] .msg-bubble.you{
+  background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,0) 40%),
+             linear-gradient(135deg,rgba(179,154,255,.94),rgba(143,116,238,.90));
+  color:var(--on-accent);
+  box-shadow:var(--glass-hl),0 10px 24px -12px rgba(179,154,255,.50);
+}
+[data-view="chat"] .msg-bubble.you > div:first-child{text-shadow:none}
+[data-view="chat"] .msg-bubble .meta .enc{display:inline-flex}
+[data-view="chat"] .msg-bubble .meta .enc svg{width:10px;height:10px;opacity:.75}
+[data-view="chat"] .msg-bubble.failed{box-shadow:var(--glass-hl),inset 0 0 0 1px rgba(253,164,175,.40)}
+
+/* — composer: frosted field + round accent send — */
+[data-view="chat"] .thread-compose{background:rgba(8,8,11,.34);border-top:1px solid var(--hairline)}
+[data-view="chat"] .thread-compose input{
+  border-radius:999px;padding:11px 16px;
+  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);
+  transition:box-shadow var(--t-fast) var(--ease);
+}
+[data-view="chat"] .thread-compose input:focus{
+  box-shadow:inset 0 0 0 1px rgba(179,154,255,.45),0 0 0 3px rgba(179,154,255,.12);
+}
+[data-view="chat"] .send-btn{
+  width:40px;height:40px;border-radius:50%;flex:0 0 auto;
+  display:grid;place-items:center;
+  background:var(--accent);color:var(--on-accent);
+  box-shadow:0 6px 18px -6px rgba(179,154,255,.55);
+  transition:transform var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+}
+[data-view="chat"] .send-btn:hover{transform:translateY(-1px) scale(1.05);background:#c4b0ff}
+[data-view="chat"] .send-btn:active{transform:scale(.95)}
+[data-view="chat"] .send-btn svg{width:18px;height:18px}
+
+/* — underived companion pane: quiet, one voice (the CTA lives in the list) — */
+[data-view="chat"] .chat-void{
+  flex:1;min-height:320px;padding:40px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+}
+[data-view="chat"] .chat-void .cv-ring{
+  position:relative;width:120px;height:120px;border-radius:50%;
+  border:1.5px dashed rgba(179,154,255,.22);
+  animation:lzRingSpin 40s linear infinite;
+}
+[data-view="chat"] .chat-void .cv-ring::after{
+  content:"";position:absolute;inset:14px;border-radius:50%;
+  border:1px dotted rgba(255,255,255,.08);
+}
+[data-view="chat"] .chat-void p{
+  font-family:var(--serif);font-style:italic;font-size:17px;
+  color:var(--text-mute);letter-spacing:.01em;
+}
+/* stacked layout (phone): the list already says it — drop the echo pane */
+@media (max-width:880px){
+  [data-view="chat"] .chat-void{display:none}
+}
+
+/* — reduced motion: stop the orbits, keep everything readable — */
+@media (prefers-reduced-motion: reduce){
+  [data-view="chat"] .chat-void .cv-ring{animation:none}
+  #chatRelayStat.live .dot{animation:none}
+}

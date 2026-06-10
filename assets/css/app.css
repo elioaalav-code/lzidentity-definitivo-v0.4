@@ -221,6 +221,9 @@ html.lz-vt .view{animation:none}
 .id-row .lab button:hover{background:rgba(179,154,255,.16)}
 .id-row .v{font-family:var(--mono);font-size:13px;word-break:break-all;line-height:1.4;color:var(--text)}
 .id-row .v.dim{color:var(--text-mute)}
+/* prose values wrap on words — break-all is for npub/hex strings only
+   (it was shredding the demo-mode note: "loca|torage", "si|gn") */
+.id-row .v.prose{word-break:normal;overflow-wrap:break-word}
 
 /* common: empty state */
 .empty{padding:60px 24px;text-align:center;border:1px dashed var(--border);border-radius:var(--r-lg);color:var(--text-mute)}

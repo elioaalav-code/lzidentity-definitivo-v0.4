@@ -73,6 +73,15 @@
 .cp-wrap .cp-link:hover{border-color:var(--accent);background:rgba(179,154,255,.06);transform:translateY(-1px);color:var(--accent)}
 .cp-wrap .cp-link svg{opacity:.8}
 
+/* v0.6 kit: the error icon sits inside the sigil-await orbit (ui.css orb/ring) */
+.cp-error .lz-empty-orb{margin:0 auto 6px}
+.cp-error .lz-empty-icn.cp-error-icon{
+  width:46px;height:46px;margin:0;border-radius:50%;
+  display:grid;place-items:center;font-size:20px;line-height:1;
+  border:1px solid rgba(253,164,175,.32);color:var(--error);background:rgba(253,164,175,.07);
+}
+.cp-error .lz-empty-ring{border-color:rgba(253,164,175,.40)}
+
 @media (prefers-reduced-motion:reduce){
   .cp-wrap .cp-supply-track i{transition:none}
 }

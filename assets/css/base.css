@@ -90,6 +90,34 @@
   --glass-depth:inset 0 -16px 36px -18px rgba(0,0,0,.40);
   --glass-drop:0 22px 56px -22px rgba(0,0,0,.66);
   --glass-stack:var(--glass-hl),var(--glass-rim),var(--glass-bevel),var(--glass-depth),var(--glass-drop);
+  /* Glass 27 — switchable material intensity (frosted = these defaults).
+     Blur amounts are tokens so html[data-glass] can retune the whole material. */
+  --glass-blur:20px;
+  --glass-blur-strong:28px;
+  --glass-blur-soft:12px;
+  --glass-text-shadow:none;
+}
+
+/* ── Glass 27 modes — user-controlled material (persisted as lz:glass,
+     applied pre-paint by preloader.js; control UI in glass-control.js).
+     prefers-reduced-transparency still hard-forces solid surfaces below. ── */
+html[data-glass="clear"]{
+  --glass-soft:rgba(24,25,32,.32);
+  --glass:rgba(22,23,31,.40);
+  --glass-strong-bg:rgba(20,21,29,.50);
+  --glass-blur:26px;
+  --glass-blur-strong:34px;
+  --glass-blur-soft:16px;
+  /* legibility on thinner glass (the iOS-27 lesson: clarity must not cost reading) */
+  --glass-text-shadow:0 1px 2px rgba(0,0,0,.55);
+}
+html[data-glass="solid"]{
+  --glass-soft:#121217;
+  --glass:#131319;
+  --glass-strong-bg:#16161d;
+  --glass-blur:0px;
+  --glass-blur-strong:0px;
+  --glass-blur-soft:0px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none !important}
@@ -117,9 +145,9 @@ ul,ol{list-style:none}
   background:var(--glass-sheen),var(--glass);
   box-shadow:var(--glass-stack);
 }
-.lz-glass{-webkit-backdrop-filter:blur(20px) saturate(180%) brightness(1.06);backdrop-filter:blur(20px) saturate(180%) brightness(1.06)}
-.lz-glass-strong{background:var(--glass-sheen),var(--glass-strong-bg);-webkit-backdrop-filter:blur(28px) saturate(190%) brightness(1.08);backdrop-filter:blur(28px) saturate(190%) brightness(1.08);box-shadow:var(--glass-hl),var(--glass-rim),var(--glass-depth),0 28px 74px -22px rgba(0,0,0,.7)}
-.lz-glass-soft{background:var(--glass-sheen),var(--glass-soft);-webkit-backdrop-filter:blur(12px) saturate(150%) brightness(1.04);backdrop-filter:blur(12px) saturate(150%) brightness(1.04)}
+.lz-glass{-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(1.06);backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(1.06)}
+.lz-glass-strong{background:var(--glass-sheen),var(--glass-strong-bg);-webkit-backdrop-filter:blur(var(--glass-blur-strong)) saturate(190%) brightness(1.08);backdrop-filter:blur(var(--glass-blur-strong)) saturate(190%) brightness(1.08);box-shadow:var(--glass-hl),var(--glass-rim),var(--glass-depth),0 28px 74px -22px rgba(0,0,0,.7)}
+.lz-glass-soft{background:var(--glass-sheen),var(--glass-soft);-webkit-backdrop-filter:blur(var(--glass-blur-soft)) saturate(150%) brightness(1.04);backdrop-filter:blur(var(--glass-blur-soft)) saturate(150%) brightness(1.04)}
 /* flat glass: same look, NO backdrop-filter — for continuously-updating panels. */
 .lz-glass-flat{
   background:var(--glass-sheen),var(--glass-strong-bg);

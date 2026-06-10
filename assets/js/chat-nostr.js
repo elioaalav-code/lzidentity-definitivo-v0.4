@@ -22,6 +22,8 @@
 
 import { state, toast } from "./shared.js";
 import { skeleton, emptyState, escapeHtml } from "./ui.js";
+import { sigilDataURL } from "./sigil.js";
+import { npubEncode } from "./nostr.js";
 
 /* default DM relays (same reliable public set as daos.js) */
 const DM_RELAYS = [
@@ -40,6 +42,15 @@ const ICN = {
   plus:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`,
 };
 
+/* ── read-state (REAL unread counts — v0.6) ─────────────────────── */
+const READ_KEY = "lz:chat:lastRead";
+function loadLastRead() {
+  try { return JSON.parse(localStorage.getItem(READ_KEY) || "{}") || {}; } catch (_) { return {}; }
+}
+function saveLastRead() {
+  try { localStorage.setItem(READ_KEY, JSON.stringify(S.lastRead)); } catch (_) {}
+}
+
 /* ── module state ───────────────────────────────────────────────── */
 const S = {
   pool: null,
@@ -48,9 +59,12 @@ const S = {
   convs: new Map(),   // counterpartyPubHex → { last, lastAt, msgs:[{id,from,to,text,at,pending,failed}] }
   active: null,       // counterparty pubkey hex
   profiles: new Map(),// pubkey → { name, picture, nip05 }
+  sigils: new Map(),  // pubkey → sigil data-URL (cached; deterministic per key)
+  lastRead: loadLastRead(), // pubkey → unix sec of last read message
   filter: "",
   booted: false,
   _redraw: null,
+  _statTick: null,
 };
 
 const nostr = () => (window.LZ && window.LZ.nostr) || null;
@@ -81,6 +95,62 @@ function displayName(pub) {
   const n = nostr();
   if (n && n.shortNpubFromHex) { try { return n.shortNpubFromHex(pub); } catch (_) {} }
   return pub ? `${pub.slice(0, 8)}…${pub.slice(-4)}` : "anon";
+}
+
+/* Every contact gets THEIR generative sigil as avatar — deterministic from
+   their real pubkey (npub-seeded, same artifact as Identity), cached per key.
+   Falls back to the old monogram if the sigil can't render. */
+function avatarHTML(pub, size = 40) {
+  let url = S.sigils.get(pub);
+  if (url === undefined) {
+    url = "";
+    try {
+      let np = "";
+      try { np = npubEncode(pub) || ""; } catch (_) {}
+      url = sigilDataURL(np || pub, size * 2) || "";
+    } catch (_) { url = ""; }
+    S.sigils.set(pub, url);
+  }
+  if (url) return `<img class="av av--sigil" src="${url}" alt="" width="${size}" height="${size}" decoding="async" />`;
+  return `<div class="av">${escapeHtml(monogram(displayName(pub)))}</div>`;
+}
+
+function unreadCount(pub, conv) {
+  const t = S.lastRead[pub] || 0;
+  let n = 0;
+  for (const m of conv.msgs || []) if (m.from === "them" && (m.at || 0) > t) n++;
+  return n;
+}
+
+/* "Today" / "Yesterday" / "Mar 4" — day divider labels for the thread */
+function dayLabel(sec) {
+  try {
+    const d = new Date(sec * 1000), now = new Date();
+    if (d.toDateString() === now.toDateString()) return "Today";
+    if (d.toDateString() === new Date(now.getTime() - 86400000).toDateString()) return "Yesterday";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch (_) { return ""; }
+}
+
+/* live relay census in the list head (replaces the old hardcoded "6 active") */
+function relayStatus() {
+  const el = $("chatRelayStat");
+  if (!el) return;
+  let on = 0, total = DM_RELAYS.length;
+  if (S.pool && S.pool.status) { const st = S.pool.status(); on = st.connected || 0; total = st.total || total; }
+  el.classList.toggle("live", on > 0);
+  el.innerHTML = `<span class="dot" aria-hidden="true"></span>${on}/${total} relays`;
+}
+function startStatusTicker() {
+  stopStatusTicker();
+  S._statTick = setInterval(() => {
+    const el = $("chatRelayStat");
+    if (document.hidden || !el || el.offsetParent === null) return; // gated: hidden tab / inactive route
+    relayStatus();
+  }, 12000);
+}
+function stopStatusTicker() {
+  if (S._statTick) { clearInterval(S._statTick); S._statTick = null; }
 }
 
 /* npub / hex / "npub1…" → x-only hex pubkey, or "" if invalid. */
@@ -162,6 +232,11 @@ async function ingestDM(evt) {
   conv.last = lastMsg.text;
   conv.lastAt = lastMsg.at;
   S.convs.set(counterparty, conv);
+  // messages landing in the OPEN conversation are read by definition
+  if (counterparty === S.active && conv.lastAt > (S.lastRead[counterparty] || 0)) {
+    S.lastRead[counterparty] = conv.lastAt;
+    saveLastRead();
+  }
   scheduleRedraw();
   // warm a profile for the counterparty
   fetchProfile(counterparty);
@@ -188,10 +263,15 @@ async function fetchProfile(pub) {
 function renderList() {
   const items = $("chatItems");
   if (!items) return;
+  relayStatus();
   if (!canPost()) {
+    // ONE underived state (was two lock cards): ghost rows behind frosted
+    // glass — the promise, visibly skeletons — plus a single derive CTA.
     items.replaceChildren(emptyState({
-      icon: ICN.lock, title: "Private messages",
-      body: "Derive your Nostr identity to read and send encrypted direct messages.",
+      icon: ICN.lock, title: "Your inbox is waiting",
+      body: "Direct messages travel encrypted over Nostr. Derive your identity once and they appear here — on every device, forever.",
+      hero: true, ring: true, ghost: "chat",
+      actionLabel: "Derive your identity →", ctaHref: "#/identity",
     }));
     return;
   }
@@ -206,20 +286,24 @@ function renderList() {
 
   if (!convs.length) {
     items.replaceChildren(emptyState({
-      icon: ICN.search, title: "No conversations yet",
-      body: S.filter ? `Nothing matches “${S.filter}”.` : "Start one with the + button using an npub.",
+      icon: ICN.search, title: S.filter ? "No matches" : "No conversations yet",
+      body: S.filter ? `Nothing matches “${S.filter}”.` : "Know someone's npub? Start an encrypted conversation.",
+      actionLabel: S.filter ? "" : "New message",
+      onAction: S.filter ? null : promptNewConversation,
     }));
     return;
   }
-  items.innerHTML = convs.map((c, i) => `
+  items.innerHTML = convs.map((c, i) => {
+    const un = unreadCount(c.pub, c);
+    return `
     <div class="chat-item${c.pub === S.active ? " active" : ""}" data-pub="${escapeHtml(c.pub)}" style="--i:${i}">
-      <div class="av">${escapeHtml(monogram(displayName(c.pub)))}</div>
+      ${avatarHTML(c.pub)}
       <div class="col">
         <div class="top"><span class="name">${escapeHtml(displayName(c.pub))}</span><span class="time">${escapeHtml(relTime(c.lastAt))}</span></div>
         <span class="msg">${escapeHtml(String(c.last || "").slice(0, 80))}</span>
-        <div class="meta-row"><span class="tag nostr">NOSTR · NIP-04</span></div>
+        <div class="meta-row"><span class="tag nostr">NOSTR · NIP-04</span>${un ? `<span class="unread">${un > 9 ? "9+" : un}</span>` : ""}</div>
       </div>
-    </div>`).join("");
+    </div>`; }).join("");
   items.querySelectorAll(".chat-item").forEach((el) =>
     el.addEventListener("click", () => openConversation(el.dataset.pub)));
 }
@@ -228,10 +312,12 @@ function renderThread() {
   const root = $("chatThread");
   if (!root) return;
   if (!canPost()) {
-    root.replaceChildren(emptyState({
-      icon: ICN.lock, title: "Encrypted by your key",
-      body: "Direct messages are encrypted to your Nostr identity. Derive it to open this inbox.",
-    }));
+    // quiet companion pane — the single CTA lives in the list (no second lock card)
+    root.innerHTML = `
+      <div class="chat-void">
+        <span class="cv-ring" aria-hidden="true"></span>
+        <p>One key. Every conversation.</p>
+      </div>`;
     return;
   }
   if (!S.active) {
@@ -242,25 +328,32 @@ function renderThread() {
     return;
   }
   const conv = S.convs.get(S.active) || { msgs: [] };
+  let lastDay = "";
+  const msgsHTML = conv.msgs.map((m) => {
+    const day = dayLabel(m.at);
+    const divider = day && day !== lastDay ? `<div class="day-divider" aria-hidden="true"><span>${escapeHtml(day)}</span></div>` : "";
+    lastDay = day || lastDay;
+    return `${divider}
+        <div class="msg-bubble ${m.from} ${m.pending ? "inflight" : ""} ${m.failed ? "failed" : ""}">
+          <div>${escapeHtml(m.text)}</div>
+          <div class="meta"><span class="enc" aria-hidden="true">${ICN.lock}</span><span>${escapeHtml(relTime(m.at))}${m.pending ? " · sending…" : m.failed ? " · failed" : ""}</span></div>
+        </div>`;
+  }).join("");
   root.innerHTML = `
     <div class="thread-head">
       <div class="who">
-        <div class="av">${escapeHtml(monogram(displayName(S.active)))}</div>
-        <div class="info"><span class="nm">${escapeHtml(displayName(S.active))}</span><span class="sub">${escapeHtml(shortNpub(S.active))} · Nostr DM</span></div>
+        ${avatarHTML(S.active, 36)}
+        <div class="info"><span class="nm">${escapeHtml(displayName(S.active))}</span><span class="sub">${escapeHtml(shortNpub(S.active))} · encrypted · NIP-04</span></div>
       </div>
       <div class="meta"><span class="tag nostr">NIP-04</span></div>
     </div>
     <div class="thread-body" id="chatNostrBody">
-      ${conv.msgs.length ? conv.msgs.map((m) => `
-        <div class="msg-bubble ${m.from} ${m.pending ? "inflight" : ""} ${m.failed ? "failed" : ""}">
-          <div>${escapeHtml(m.text)}</div>
-          <div class="meta"><span>${escapeHtml(relTime(m.at))}${m.pending ? " · sending…" : m.failed ? " · failed" : " · NIP-04"}</span></div>
-        </div>`).join("")
+      ${conv.msgs.length ? msgsHTML
         : `<div class="chat-nostr-empty">No messages yet — say hello. Messages are end-to-end encrypted (NIP-04).</div>`}
     </div>
     <div class="thread-compose">
       <input type="text" id="chatNostrInput" placeholder="Encrypted message via Nostr…" autocomplete="off" />
-      <button class="btn accent sm" id="chatNostrSend">Send →</button>
+      <button class="send-btn" id="chatNostrSend" aria-label="Send" title="Send">${ICN.send}</button>
     </div>`;
   const input = $("chatNostrInput");
   const sendBtn = $("chatNostrSend");
@@ -355,6 +448,10 @@ function promptNewConversation() {
 
 export function openConversation(pub) {
   S.active = pub;
+  // opening a conversation reads it — the unread badge is REAL, so clear it
+  const conv = S.convs.get(pub);
+  const lastAt = conv && conv.lastAt ? conv.lastAt : Math.floor(Date.now() / 1000);
+  if ((S.lastRead[pub] || 0) < lastAt) { S.lastRead[pub] = lastAt; saveLastRead(); }
   renderList();
   renderThread();
 }
@@ -369,6 +466,7 @@ export async function init() {
     wireNewButton();
     S.booted = true;
   }
+  startStatusTicker();
 
   if (!canPost()) { renderList(); renderThread(); return; }
 
@@ -432,6 +530,7 @@ export function teardown() {
   try { if (S.sub != null && S.pool && S.pool.unsub) S.pool.unsub(S.sub); } catch (_) {}
   try { if (S.pool && S.pool.close) S.pool.close(); } catch (_) {}
   S.pool = null; S.sub = null;
+  stopStatusTicker();
   clearTimeout(S._redraw); S._redraw = null;
 }
 

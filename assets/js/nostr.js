@@ -372,6 +372,13 @@ export function openPool(relays) {
   return {
     relays: urls,
 
+    /* additive (v0.6): live connection census for honest UI badges */
+    status() {
+      let connected = 0;
+      for (const c of conns) if (c.alive && c.sock && c.sock.readyState === 1) connected++;
+      return { connected, total: urls.length };
+    },
+
     sub(filters, { onEvent, onEose } = {}) {
       const subId = "lz" + (++subSeq) + Math.random().toString(36).slice(2, 8);
       const s = {

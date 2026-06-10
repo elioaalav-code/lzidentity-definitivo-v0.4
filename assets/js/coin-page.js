@@ -541,7 +541,7 @@ async function render(id) {
 
   if (!id) {
     root.innerHTML = `<div class="cp-error">
-      <div class="cp-error-icon">⚠</div>
+      <div class="lz-empty-orb"><span class="lz-empty-ring" aria-hidden="true"></span><div class="lz-empty-icn cp-error-icon">⚠</div></div>
       <div class="cp-error-msg">No coin specified. <button class="cp-link" id="cpErrBack">Back to Markets</button></div>
     </div>`;
     root.querySelector("#cpErrBack")?.addEventListener("click", () => window.LZ?.navigate?.("markets"));
@@ -564,7 +564,7 @@ async function render(id) {
     const msg = String(err?.message || "");
     const is429 = msg.includes("429") || msg.includes("rate");
     root.innerHTML = `<div class="cp-error">
-      <div class="cp-error-icon">⚠</div>
+      <div class="lz-empty-orb"><span class="lz-empty-ring" aria-hidden="true"></span><div class="lz-empty-icn cp-error-icon">⚠</div></div>
       <div class="cp-error-msg">
         ${is429
           ? "CoinGecko rate limit reached. Please wait a moment and try again."

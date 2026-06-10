@@ -26,8 +26,8 @@
 .network-stream{
   background:var(--glass-sheen),var(--glass);
   border:0;                            /* borderless: edges = luminous rim + shadow */
-  -webkit-backdrop-filter:blur(20px) saturate(180%) brightness(1.06);
-  backdrop-filter:blur(20px) saturate(180%) brightness(1.06);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(1.06);
+  backdrop-filter:blur(var(--glass-blur)) saturate(180%) brightness(1.06);
   box-shadow:var(--glass-stack);
 }
 
@@ -35,8 +35,8 @@
 .wa-card,.copilot,.lz-select-pop,.cmenu{
   background:var(--glass-sheen),var(--glass-strong-bg);
   border:0;
-  -webkit-backdrop-filter:blur(28px) saturate(190%) brightness(1.08);
-  backdrop-filter:blur(28px) saturate(190%) brightness(1.08);
+  -webkit-backdrop-filter:blur(var(--glass-blur-strong)) saturate(190%) brightness(1.08);
+  backdrop-filter:blur(var(--glass-blur-strong)) saturate(190%) brightness(1.08);
 }
 
 /* =================================================================== *
@@ -46,7 +46,7 @@
   border-color:transparent !important;
   background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.015)),rgba(20,20,26,.5) !important;
   box-shadow:var(--glass-hl),var(--glass-ring) !important;
-  -webkit-backdrop-filter:blur(12px) saturate(150%);backdrop-filter:blur(12px) saturate(150%);
+  -webkit-backdrop-filter:blur(var(--glass-blur-soft)) saturate(150%);backdrop-filter:blur(var(--glass-blur-soft)) saturate(150%);
 }
 .lz-select.open .lz-select-trigger,.lz-select-trigger:hover{
   box-shadow:var(--glass-hl),0 0 0 1px rgba(179,154,255,.35),0 8px 26px -10px rgba(179,154,255,.4) !important;
@@ -147,6 +147,17 @@
     -webkit-backdrop-filter:none;backdrop-filter:none;background:var(--surface);
   }
 }
+
+/* =================================================================== *
+ *  Glass 27 — material intensity picker (mounted by glass-control.js
+ *  into the sidebar, above .side-foot). Mono, quiet, on-brand.
+ * =================================================================== */
+.glass-ctl{margin:14px 16px 0;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.02);box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+.glass-ctl .gc-lab{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--text-mute);text-transform:uppercase;margin-bottom:8px}
+.gc-seg{display:flex;gap:3px;padding:3px;border-radius:9px;background:rgba(255,255,255,.04);box-shadow:var(--glass-hl),var(--glass-ring)}
+.gc-seg button{flex:1;padding:5px 0;border-radius:7px;font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mute);transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease)}
+.gc-seg button:hover{color:var(--text)}
+.gc-seg button[aria-checked="true"]{background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.03));color:var(--text);box-shadow:var(--glass-hl),inset 0 0 0 1px rgba(255,255,255,.08)}
 
 /* =================================================================== *
  *  Tactile hover — the glass edge brightens (material focus)

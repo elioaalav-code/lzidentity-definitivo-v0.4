@@ -302,17 +302,19 @@ function renderWallet(){
   if (!totalEl || !list || !txl) return;
 
   if (!state.account){
-    totalEl.innerHTML = `${fmt.usd(0)} <small id="walletDelta">— not connected</small>`;
+    // "$0.00", not fmt.usd(0)="$0.000000" — six zeros read as a glitch, not a balance
+    totalEl.innerHTML = `$0.00 <small id="walletDelta">— not connected</small>`;
     list.replaceChildren(emptyState({ icon: WALLET_ICN, title: "Connect a wallet",
       body: "Connect to see your real on-chain balances across Ethereum, Arbitrum, Optimism and Base.",
-      actionLabel: "Connect Wallet", onAction: connectFlow }));
+      actionLabel: "Connect Wallet", onAction: connectFlow,
+      hero: true, ring: true, ghost: "rows", ghostRows: 3 }));
     txl.replaceChildren(emptyState({ title: "No activity yet", body: "Connect a wallet to see your balances here." }));
     renderWalletAlloc(0);
     return;
   }
 
   if (walletLoading && !walletTokens.length){
-    totalEl.innerHTML = `${fmt.usd(0)} <small id="walletDelta">reading chain…</small>`;
+    totalEl.innerHTML = `$0.00 <small id="walletDelta">reading chain…</small>`;
     list.innerHTML = skeleton({ rows: 3, height: 62 });
     renderWalletAlloc(0);
   } else {
