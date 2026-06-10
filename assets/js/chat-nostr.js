@@ -41,6 +41,8 @@ const ICN = {
   send:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-3-7z"/></svg>`,
   lock:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`,
   plus:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`,
+  pen:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>`,
+  bell:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>`,
 };
 
 /* ── read-state (REAL unread counts — v0.6) ─────────────────────── */
@@ -50,6 +52,20 @@ function loadLastRead() {
 }
 function saveLastRead() {
   try { localStorage.setItem(READ_KEY, JSON.stringify(S.lastRead)); } catch (_) {}
+}
+
+/* ── contacts (petnames, local-only) + DM notifications — v0.7 F2 ── */
+const CONTACTS_KEY = "lz:contacts";
+const NOTIF_KEY = "lz:chat:notify";
+function loadContacts() {
+  try { return JSON.parse(localStorage.getItem(CONTACTS_KEY) || "{}") || {}; } catch (_) { return {}; }
+}
+function saveContacts() {
+  try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(S.contacts)); } catch (_) {}
+}
+function notifyEnabled() {
+  return localStorage.getItem(NOTIF_KEY) === "on"
+    && typeof Notification !== "undefined" && Notification.permission === "granted";
 }
 
 /* ── module state ───────────────────────────────────────────────── */
@@ -62,10 +78,13 @@ const S = {
   profiles: new Map(),// pubkey → { name, picture, nip05 }
   sigils: new Map(),  // pubkey → sigil data-URL (cached; deterministic per key)
   lastRead: loadLastRead(), // pubkey → unix sec of last read message
+  contacts: loadContacts(), // pubkey → { name, addedAt } (petnames, local-only)
   filter: "",
   booted: false,
   _redraw: null,
   _statTick: null,
+  _notifGate: 0,      // only DMs created AFTER this notify (kills backfill storms)
+  _notifLast: new Map(), // pubkey → last notification ms (per-conv throttle)
 };
 
 const nostr = () => (window.LZ && window.LZ.nostr) || null;
@@ -91,6 +110,8 @@ function monogram(s = "?") {
 }
 
 function displayName(pub) {
+  const c = S.contacts[pub];
+  if (c && c.name) return String(c.name).slice(0, 40); // petname wins over kind-0
   const p = S.profiles.get(pub);
   if (p && (p.display_name || p.name)) return String(p.display_name || p.name).slice(0, 40);
   const n = nostr();
@@ -142,6 +163,79 @@ function relayStatus() {
   el.classList.toggle("live", on > 0);
   el.innerHTML = `<span class="dot" aria-hidden="true"></span>${on}/${total} relays`;
 }
+/* one Notification per live DM, throttled per conversation; never for
+   backfill (the initial sub replays up to 200 stored DMs) */
+function maybeNotify(pub, text, at) {
+  if (!notifyEnabled()) return;
+  if (!at || at <= S._notifGate) return;            // stored history, not live
+  const last = S._notifLast.get(pub) || 0;
+  if (Date.now() - last < 15000) return;
+  S._notifLast.set(pub, Date.now());
+  try {
+    let icon;
+    try { let np = ""; try { np = npubEncode(pub) || ""; } catch (_) {} icon = sigilDataURL(np || pub, 64) || undefined; } catch (_) {}
+    const n = new Notification(displayName(pub), {
+      body: String(text || "").slice(0, 90),
+      tag: "lz-dm-" + pub.slice(0, 16),
+      icon,
+    });
+    n.onclick = () => {
+      try { window.focus(); } catch (_) {}
+      location.hash = "#/chat";
+      openConversation(pub);
+    };
+  } catch (_) {}
+}
+
+async function toggleNotify() {
+  if (localStorage.getItem(NOTIF_KEY) === "on") {
+    localStorage.setItem(NOTIF_KEY, "off");
+    toast("DM notifications off");
+  } else if (typeof Notification === "undefined") {
+    toast("Notifications aren't supported here", "err");
+  } else {
+    let perm = Notification.permission;
+    if (perm === "default") { try { perm = await Notification.requestPermission(); } catch (_) { perm = "denied"; } }
+    if (perm === "granted") { localStorage.setItem(NOTIF_KEY, "on"); toast("DM notifications on", "ok"); }
+    else { localStorage.setItem(NOTIF_KEY, "off"); toast("Notification permission denied", "err"); }
+  }
+  reflectBell();
+}
+function reflectBell() {
+  const b = document.querySelector('[data-view="chat"] .chat-nostr-bell');
+  if (b) b.classList.toggle("on", localStorage.getItem(NOTIF_KEY) === "on" && (typeof Notification === "undefined" || Notification.permission === "granted"));
+}
+
+/* save / rename / remove a contact (petname) */
+function editContact(pub) {
+  const ui = window.LZUI;
+  const existing = S.contacts[pub];
+  const apply = (name) => {
+    const clean = String(name || "").trim().slice(0, 40);
+    if (clean) S.contacts[pub] = { name: clean, addedAt: existing?.addedAt || Math.floor(Date.now() / 1000) };
+    else delete S.contacts[pub];
+    saveContacts();
+    renderList(); if (S.active) renderThread();
+  };
+  if (!ui || !ui.modal) { apply(prompt("Contact name (empty to remove):", existing?.name || "")); return; }
+  const m = ui.modal({
+    title: existing ? "Edit contact" : "Save contact",
+    width: "min(420px, 92vw)",
+    body: `
+      <p class="chat-nostr-modal-hint">${escapeHtml(shortNpub(pub))} — a local petname, shown instead of the npub. Only you see it.</p>
+      <input type="text" id="chatCName" class="chat-nostr-modal-input" placeholder="Name" autocomplete="off" value="${escapeHtml(existing?.name || "")}" />
+      <div class="chat-contact-actions">
+        <button type="button" class="btn accent sm" id="chatCSave">Save</button>
+        ${existing ? `<button type="button" class="btn ghost sm" id="chatCRemove">Remove</button>` : ``}
+      </div>`,
+  });
+  m.body.querySelector("#chatCSave").addEventListener("click", () => { apply(m.body.querySelector("#chatCName").value); m.close(); });
+  m.body.querySelector("#chatCRemove")?.addEventListener("click", () => { apply(""); m.close(); });
+  const inp = m.body.querySelector("#chatCName");
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); apply(inp.value); m.close(); } });
+  inp.focus();
+}
+
 function startStatusTicker() {
   stopStatusTicker();
   S._statTick = setInterval(() => {
@@ -237,6 +331,10 @@ async function ingestDM(evt) {
   if (counterparty === S.active && conv.lastAt > (S.lastRead[counterparty] || 0)) {
     S.lastRead[counterparty] = conv.lastAt;
     saveLastRead();
+  }
+  // notify for live incoming DMs when the user isn't looking at them
+  if (!mine && (document.hidden || !document.hasFocus() || counterparty !== S.active)) {
+    maybeNotify(counterparty, text, evt.created_at || 0);
   }
   scheduleRedraw();
   // warm a profile for the counterparty
@@ -352,7 +450,10 @@ function renderThread() {
         ${avatarHTML(S.active, 36)}
         <div class="info"><span class="nm">${escapeHtml(displayName(S.active))}</span><span class="sub">${escapeHtml(shortNpub(S.active))} · encrypted · NIP-04</span></div>
       </div>
-      <div class="meta"><span class="tag nostr">NIP-04</span></div>
+      <div class="meta">
+        <button type="button" class="chat-contact-btn" id="chatContactBtn" aria-label="${S.contacts[S.active] ? "Edit contact" : "Save contact"}" title="${S.contacts[S.active] ? "Edit contact" : "Save contact"}">${ICN.pen}</button>
+        <span class="tag nostr">NIP-04</span>
+      </div>
     </div>
     <div class="thread-body" id="chatNostrBody">
       ${conv.msgs.length ? msgsHTML
@@ -367,6 +468,7 @@ function renderThread() {
   const fire = () => sendMessage(input);
   sendBtn.addEventListener("click", fire);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); fire(); } });
+  $("chatContactBtn")?.addEventListener("click", () => editContact(S.active));
   const body = $("chatNostrBody"); if (body) body.scrollTop = body.scrollHeight;
 }
 
@@ -423,7 +525,18 @@ async function sendMessage(input) {
 
 function promptNewConversation() {
   const ui = window.LZUI;
+  const saved = Object.entries(S.contacts)
+    .sort((a, b) => (a[1].name || "").localeCompare(b[1].name || ""));
+  const contactsHTML = saved.length ? `
+    <div class="chat-contact-list" role="list">
+      ${saved.map(([pub, c]) => `
+        <button type="button" class="chat-contact-row" data-pub="${escapeHtml(pub)}" role="listitem">
+          <b>${escapeHtml(c.name)}</b><small>${escapeHtml(shortNpub(pub))}</small>
+        </button>`).join("")}
+    </div>
+    <div class="chat-contact-or">or</div>` : "";
   const bodyHTML = `
+    ${contactsHTML}
     <p class="chat-nostr-modal-hint">Enter an npub or hex public key to start an encrypted conversation.</p>
     <input type="text" id="chatNewPub" class="chat-nostr-modal-input" placeholder="npub1… or 64-char hex" autocomplete="off" />
     <button type="button" class="btn accent" id="chatNewGo">Start conversation</button>
@@ -443,6 +556,14 @@ function promptNewConversation() {
     m = ui.modal({ title: "New message", body: bodyHTML, width: "min(420px, 92vw)" });
     m.body.querySelector("#chatNewGo").addEventListener("click", start);
     m.body.querySelector("#chatNewPub").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); start(); } });
+    m.body.querySelectorAll(".chat-contact-row").forEach((row) =>
+      row.addEventListener("click", () => {
+        const hex = row.dataset.pub;
+        if (!S.convs.has(hex)) S.convs.set(hex, { msgs: [], seen: new Set(), last: "", lastAt: 0 });
+        m.close();
+        openConversation(hex);
+        fetchProfile(hex);
+      }));
     m.body.querySelector("#chatNewPub").focus();
   } else {
     const val = prompt("Enter an npub or hex public key:");
@@ -510,6 +631,8 @@ export async function init() {
     // idempotent: drop any prior subscription before re-subscribing so repeated
     // chat-route entries don't stack subs on the pool (relay-leak fix).
     if (S.sub != null && S.pool.unsub){ try { S.pool.unsub(S.sub); } catch (_) {} S.sub = null; }
+    // notifications: everything the sub replays from history is older than NOW
+    S._notifGate = Math.floor(Date.now() / 1000);
     // received DMs (#p = me) + sent DMs (authors = me)
     S.sub = S.pool.sub([
       { kinds: [4], "#p": [S.myPub], limit: 200 },
@@ -525,13 +648,25 @@ export async function init() {
 }
 
 function wireNewButton() {
-  // add a + button into the chat-list head if not present
+  // add bell (notifications) + new-message buttons into the chat-list head
   const head = document.querySelector('[data-view="chat"] .chat-list-head');
-  if (head && !head.querySelector(".chat-nostr-new")) {
+  if (head && !head.querySelector(".chat-nostr-bell")) {
+    const bell = document.createElement("button");
+    bell.type = "button";
+    bell.className = "chat-nostr-new chat-nostr-bell";
+    bell.setAttribute("aria-label", "DM notifications");
+    bell.title = "DM notifications";
+    bell.innerHTML = ICN.bell;
+    bell.addEventListener("click", toggleNotify);
+    head.appendChild(bell);
+    reflectBell();
+  }
+  if (head && !head.querySelector(".chat-nostr-plus")) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "chat-nostr-new";
+    btn.className = "chat-nostr-new chat-nostr-plus";
     btn.setAttribute("aria-label", "New message");
+    btn.title = "New message";
     btn.innerHTML = ICN.plus;
     btn.addEventListener("click", promptNewConversation);
     head.appendChild(btn);
