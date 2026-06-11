@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8">
+<!-- og-card template — render at 1200×630 (headless) and save as /assets/img/og-card.png -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500&family=Geist+Mono:wght@500;600&family=Instrument+Serif:ital@1&display=swap">
+<style>
+  *{margin:0;box-sizing:border-box}
+  body{width:1200px;height:630px;background:#050505;color:#f6f6f7;font-family:Geist,sans-serif;overflow:hidden;position:relative}
+  .glow{position:absolute;right:-160px;top:50%;transform:translateY(-50%);width:760px;height:760px;border-radius:50%;
+    background:radial-gradient(circle,rgba(179,154,255,.16),transparent 65%)}
+  .ring{position:absolute;right:88px;top:50%;transform:translateY(-50%);width:430px;height:430px;border-radius:50%;
+    border:1.5px dashed rgba(179,154,255,.35);display:grid;place-items:center}
+  .ring::after{content:"";position:absolute;inset:26px;border-radius:50%;border:1px dotted rgba(255,255,255,.12)}
+  .sigil{width:330px;height:330px;border-radius:50%;background:#0b0b10;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),0 0 80px -20px rgba(179,154,255,.5)}
+  .left{position:absolute;left:84px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:26px;max-width:620px}
+  .brand{font-family:"Geist Mono",monospace;font-size:19px;letter-spacing:.22em;color:#a0a0a8;display:flex;align-items:center;gap:12px}
+  .brand i{width:9px;height:9px;border-radius:50%;background:#5eead4;box-shadow:0 0 14px #5eead4}
+  h1{font-weight:300;font-size:88px;letter-spacing:-.03em;line-height:1.04}
+  h1 em{font-family:"Instrument Serif",serif;font-style:italic;font-weight:400;
+    background:linear-gradient(90deg,#b39aff,#5eead4);-webkit-background-clip:text;background-clip:text;color:transparent}
+  p{font-size:25px;line-height:1.5;color:#a0a0a8;font-weight:300;max-width:56ch}
+  .tags{display:flex;gap:10px;font-family:"Geist Mono",monospace;font-size:14px;letter-spacing:.1em}
+  .tags span{padding:7px 14px;border-radius:999px;color:#cbb8ff;background:rgba(179,154,255,.1);box-shadow:inset 0 0 0 1px rgba(179,154,255,.28)}
+  .tags span.t{color:#7ff0dd;background:rgba(94,234,212,.09);box-shadow:inset 0 0 0 1px rgba(94,234,212,.26)}
+  .tags span.w{color:#ff9f86;background:rgba(255,122,89,.09);box-shadow:inset 0 0 0 1px rgba(255,122,89,.26)}
+</style></head><body>
+  <div class="glow"></div>
+  <div class="ring"><canvas id="sg" class="sigil"></canvas></div>
+  <div class="left">
+    <div class="brand"><i></i>LZIDENTITY</div>
+    <h1>One you,<br><em>every chain.</em></h1>
+    <p>Sign once with your wallet — an encrypted identity is born. Chat, trading, governance and recovery. No seed phrase, no server.</p>
+    <div class="tags"><span>IDENTITY</span><span class="t">CHAT</span><span class="w">RECOVERY</span><span>TRADING</span></div>
+  </div>
+<script type="module" src="/docs/og/og-card.js"></script>
+</body></html>
